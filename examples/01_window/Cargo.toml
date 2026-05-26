@@ -1,0 +1,13 @@
+[package]
+name = "ex_01_window"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "01_window"
+path = "src/main.rs"
+
+[dependencies]
+toolkit-prelude = { workspace = true }
+env_logger = { workspace = true }

@@ -1,0 +1,15 @@
+[package]
+name = "toolkit-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow      = { workspace = true }
+log         = { workspace = true }
+wgpu        = { workspace = true }
+winit       = { workspace = true }
+egui        = { workspace = true }
+egui-wgpu   = { workspace = true }
+egui-winit  = { workspace = true }
+toolkit-gfx = { workspace = true }

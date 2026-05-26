@@ -1,0 +1,15 @@
+[package]
+name = "toolkit-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow        = { workspace = true }
+log           = { workspace = true }
+pollster      = { workspace = true }
+winit         = { workspace = true }
+toolkit-gfx    = { workspace = true }
+toolkit-input  = { workspace = true }
+toolkit-audio  = { workspace = true }
+toolkit-assets = { workspace = true }

@@ -1,0 +1,48 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/gfx",
+    "crates/input",
+    "crates/audio",
+    "crates/assets",
+    "crates/ui",
+    "crates/prelude",
+    "examples/bouncing_ball",
+    "examples/01_window",
+    "examples/03_primitives",
+    "examples/04_text",
+    "examples/05_tilemap",
+    "examples/06_egui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/sunsided/game-toolkit"
+authors = ["Markus Mayer"]
+
+[workspace.dependencies]
+toolkit-core    = { path = "crates/core" }
+toolkit-gfx     = { path = "crates/gfx" }
+toolkit-input   = { path = "crates/input" }
+toolkit-audio   = { path = "crates/audio" }
+toolkit-assets  = { path = "crates/assets" }
+toolkit-ui      = { path = "crates/ui" }
+toolkit-prelude = { path = "crates/prelude" }
+
+anyhow      = "1"
+bytemuck    = { version = "1.23", features = ["derive"] }
+log         = "0.4"
+env_logger  = "0.11"
+pollster    = "0.4"
+wgpu        = "29"
+winit       = "0.30"
+image       = { version = "0.25", default-features = false, features = ["png"] }
+kira        = "0.9"
+glyphon     = "0.11"
+notify      = "8"
+egui        = "0.34"
+egui-wgpu   = "0.34"
+egui-winit  = "0.34"

@@ -1,0 +1,13 @@
+[package]
+name = "ex_06_egui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "06_egui"
+path = "src/main.rs"
+
+[dependencies]
+toolkit-prelude = { workspace = true, features = ["ui"] }
+env_logger = { workspace = true }
