@@ -8,7 +8,7 @@
 //! one or more frames, so expect occasional repeat "reloaded" lines - that is the OS
 //! coalescing behavior, not a bug.
 
-use toolkit_prelude::*;
+use game_toolkit_prelude::*;
 
 struct HotReload {
     tex: TextureId,

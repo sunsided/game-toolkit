@@ -1,12 +1,12 @@
 [package]
-name = "toolkit-aseprite"
+name = "game-toolkit-aseprite"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Load native .aseprite files and exported PNG+JSON sheets into GPU-ready sprite sheets for game-toolkit."
 
 [dependencies]
-toolkit-gfx = { workspace = true }
+game-toolkit-gfx = { workspace = true }
 ah-asefile  = { workspace = true }
 serde       = { workspace = true }
 serde_json  = { workspace = true }

@@ -1,5 +1,5 @@
 [package]
-name = "toolkit-assets"
+name = "game-toolkit-assets"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

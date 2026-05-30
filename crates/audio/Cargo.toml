@@ -1,5 +1,5 @@
 [package]
-name = "toolkit-audio"
+name = "game-toolkit-audio"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

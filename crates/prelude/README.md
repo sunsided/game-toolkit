@@ -1,11 +1,11 @@
-# toolkit-prelude
+# game-toolkit-prelude
 
 The one-import entry point to [**game-toolkit**](https://github.com/sunsided/game-toolkit):
-`use toolkit_prelude::*;` re-exports the toolkit's runtime types (the `Game` trait, `Context`,
+`use game_toolkit_prelude::*;` re-exports the toolkit's runtime types (the `Game` trait, `Context`,
 `Painter`, input, audio, assets, ...).
 
 ```rust
-use toolkit_prelude::*;
+use game_toolkit_prelude::*;
 
 struct Game1;
 impl Game for Game1 {
@@ -30,4 +30,4 @@ examples, and quick-start.
 
 ## Documentation
 
-API docs: <https://docs.rs/toolkit-prelude>
+API docs: <https://docs.rs/game-toolkit-prelude>

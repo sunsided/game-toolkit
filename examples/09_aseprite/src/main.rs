@@ -1,12 +1,12 @@
 //! Loads a native `.aseprite` file into a `SpriteSheet` and plays one of its tagged
-//! animations with an `AnimationPlayer`. The toolkit-aseprite crate flattens each frame,
+//! animations with an `AnimationPlayer`. The game-toolkit-aseprite crate flattens each frame,
 //! packs them into one atlas texture, and exposes frames as UV rects - drawing a frame is
-//! an ordinary sprite with a UV sub-rect, so `toolkit-gfx` never learns about Aseprite.
+//! an ordinary sprite with a UV sub-rect, so `game-toolkit-gfx` never learns about Aseprite.
 //!
 //! The exported PNG + JSON path is available too via
 //! `SpriteSheet::from_aseprite_json(gfx, png, json)`.
 
-use toolkit_prelude::*;
+use game_toolkit_prelude::*;
 
 struct AsepriteDemo {
     sheet: SpriteSheet,

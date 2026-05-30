@@ -1,6 +1,6 @@
 use std::f32::consts::TAU;
 
-use toolkit_prelude::*;
+use game_toolkit_prelude::*;
 
 /// Beachball longitude panel colors (one per wedge running pole to pole).
 const PANELS: [[f32; 3]; 6] = [

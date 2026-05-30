@@ -4,7 +4,7 @@
 //! on top of the 2D layers. Here: a rotating ring of filled circles and a spinning stroked
 //! rounded rectangle, with a 2D text label underneath.
 
-use toolkit_prelude::*;
+use game_toolkit_prelude::*;
 use vello::kurbo::{Affine, Circle, RoundedRect, Stroke};
 use vello::peniko::{Color, Fill};
 

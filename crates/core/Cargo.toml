@@ -1,5 +1,5 @@
 [package]
-name = "toolkit-core"
+name = "game-toolkit-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,10 +11,10 @@ log           = { workspace = true }
 pollster      = { workspace = true }
 winit         = { workspace = true }
 wgpu          = { workspace = true }
-toolkit-gfx    = { workspace = true }
-toolkit-input  = { workspace = true }
-toolkit-audio  = { workspace = true }
-toolkit-assets = { workspace = true }
+game-toolkit-gfx    = { workspace = true }
+game-toolkit-input  = { workspace = true }
+game-toolkit-audio  = { workspace = true }
+game-toolkit-assets = { workspace = true }
 
 [lints]
 workspace = true

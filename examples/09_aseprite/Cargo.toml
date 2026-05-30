@@ -9,7 +9,7 @@ name = "09_aseprite"
 path = "src/main.rs"
 
 [dependencies]
-toolkit-prelude = { workspace = true, features = ["aseprite"] }
+game-toolkit-prelude = { workspace = true, features = ["aseprite"] }
 env_logger = { workspace = true }
 log = { workspace = true }
 

@@ -9,7 +9,7 @@ name = "12_vector"
 path = "src/main.rs"
 
 [dependencies]
-toolkit-prelude = { workspace = true, features = ["vector"] }
+game-toolkit-prelude = { workspace = true, features = ["vector"] }
 vello = { workspace = true }
 env_logger = { workspace = true }
 

@@ -9,7 +9,7 @@ name = "08_hot_reload"
 path = "src/main.rs"
 
 [dependencies]
-toolkit-prelude = { workspace = true }
+game-toolkit-prelude = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
 

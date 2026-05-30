@@ -6,7 +6,7 @@ use std::path::Path;
 use ah_asefile::{AnimationDirection, AsepriteFile};
 use anyhow::{anyhow, Context, Result};
 use image::RgbaImage;
-use toolkit_gfx::{Graphics, TextureId};
+use game_toolkit_gfx::{Graphics, TextureId};
 
 use crate::json;
 use crate::tag::{Animation, Direction};

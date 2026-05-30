@@ -9,7 +9,7 @@ name = "11_ecs"
 path = "src/main.rs"
 
 [dependencies]
-toolkit-prelude = { workspace = true, features = ["ecs"] }
+game-toolkit-prelude = { workspace = true, features = ["ecs"] }
 env_logger = { workspace = true }
 # The generated ECS code logs via tracing.
 tracing = { workspace = true }

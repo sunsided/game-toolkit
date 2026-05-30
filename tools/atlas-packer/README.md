@@ -2,7 +2,7 @@
 
 A CLI from [**game-toolkit**](https://github.com/sunsided/game-toolkit) that packs a directory
 of PNGs into a single texture atlas plus an Aseprite-compatible JSON sidecar - so the result
-loads with no extra code via `toolkit-aseprite`'s `SpriteSheet::from_aseprite_json`.
+loads with no extra code via `game-toolkit-aseprite`'s `SpriteSheet::from_aseprite_json`.
 
 ```sh
 atlas-packer --input sprites/ --output atlas.png --metadata atlas.json [--max-size 2048] [--padding 2]

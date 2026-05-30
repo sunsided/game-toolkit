@@ -1,5 +1,5 @@
 [package]
-name = "toolkit-ui"
+name = "game-toolkit-ui"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -13,7 +13,7 @@ winit       = { workspace = true }
 egui        = { workspace = true }
 egui-wgpu   = { workspace = true }
 egui-winit  = { workspace = true }
-toolkit-gfx = { workspace = true }
+game-toolkit-gfx = { workspace = true }
 
 [lints]
 workspace = true

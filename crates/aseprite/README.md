@@ -1,4 +1,4 @@
-# toolkit-aseprite
+# game-toolkit-aseprite
 
 Aseprite loading for [**game-toolkit**](https://github.com/sunsided/game-toolkit). Reads both
 native `.aseprite` binaries (via [ah-asefile](https://crates.io/crates/ah-asefile)) and
@@ -12,4 +12,4 @@ examples, and quick-start.
 
 ## Documentation
 
-API docs: <https://docs.rs/toolkit-aseprite>
+API docs: <https://docs.rs/game-toolkit-aseprite>

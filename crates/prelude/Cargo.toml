@@ -1,29 +1,29 @@
 [package]
-name = "toolkit-prelude"
+name = "game-toolkit-prelude"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Curated re-exports for game-toolkit - use toolkit_prelude::* and go."
+description = "Curated re-exports for game-toolkit - use game_toolkit_prelude::* and go."
 
 [dependencies]
-toolkit-core   = { workspace = true }
-toolkit-gfx    = { workspace = true }
-toolkit-input  = { workspace = true }
-toolkit-audio    = { workspace = true }
-toolkit-assets   = { workspace = true }
-toolkit-aseprite = { workspace = true, optional = true }
-toolkit-ecs      = { workspace = true, optional = true }
-toolkit-ui       = { workspace = true, optional = true }
+game-toolkit-core   = { workspace = true }
+game-toolkit-gfx    = { workspace = true }
+game-toolkit-input  = { workspace = true }
+game-toolkit-audio    = { workspace = true }
+game-toolkit-assets   = { workspace = true }
+game-toolkit-aseprite = { workspace = true, optional = true }
+game-toolkit-ecs      = { workspace = true, optional = true }
+game-toolkit-ui       = { workspace = true, optional = true }
 winit            = { workspace = true }
 anyhow           = { workspace = true }
 
 [features]
 default = []
-ui = ["dep:toolkit-ui"]
-aseprite = ["dep:toolkit-aseprite"]
-ecs = ["dep:toolkit-ecs"]
-synth = ["toolkit-audio/synth"]
-vector = ["toolkit-gfx/vector"]
+ui = ["dep:game-toolkit-ui"]
+aseprite = ["dep:game-toolkit-aseprite"]
+ecs = ["dep:game-toolkit-ecs"]
+synth = ["game-toolkit-audio/synth"]
+vector = ["game-toolkit-gfx/vector"]
 
 [lints]
 workspace = true

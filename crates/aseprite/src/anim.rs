@@ -107,7 +107,7 @@ impl AnimationPlayer {
 mod tests {
     use std::collections::HashMap;
 
-    use toolkit_gfx::TextureId;
+    use game_toolkit_gfx::TextureId;
 
     use super::AnimationPlayer;
     use crate::sheet::{FrameRect, SpriteSheet};

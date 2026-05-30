@@ -1,4 +1,4 @@
-# toolkit-ui
+# game-toolkit-ui
 
 [egui](https://crates.io/crates/egui) overlay integration (egui-wgpu + egui-winit) for
 [**game-toolkit**](https://github.com/sunsided/game-toolkit) - debug panels, inspectors and
@@ -10,4 +10,4 @@ examples, and quick-start.
 
 ## Documentation
 
-API docs: <https://docs.rs/toolkit-ui>
+API docs: <https://docs.rs/game-toolkit-ui>

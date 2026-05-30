@@ -1,5 +1,5 @@
 [package]
-name = "toolkit-ecs"
+name = "game-toolkit-ecs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

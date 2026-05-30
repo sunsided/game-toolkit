@@ -10,7 +10,7 @@
 //! Both expose frames as UV rects plus named [`Animation`]s lifted from Aseprite tags, and
 //! [`AnimationPlayer`] advances a tag over time.
 //!
-//! The dependency runs one way: this crate depends on `toolkit-gfx`, never the reverse, so
+//! The dependency runs one way: this crate depends on `game-toolkit-gfx`, never the reverse, so
 //! the renderer stays unaware of asset formats.
 
 mod anim;

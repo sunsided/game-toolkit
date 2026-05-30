@@ -2,7 +2,7 @@
 //! spins with its horizontal speed. Esc quits. Edit `update` (physics/input) and `render`
 //! (drawing) to make it yours.
 
-use toolkit_prelude::*;
+use game_toolkit_prelude::*;
 
 struct Game1 {
     pos: [f32; 2],

@@ -12,7 +12,7 @@ with optional `egui` tooling overlays and Aseprite asset loading.
 ## Quick start
 
 ```rust
-use toolkit_prelude::*;
+use game_toolkit_prelude::*;
 
 struct Game1;
 
@@ -68,23 +68,23 @@ cargo generate --git https://github.com/sunsided/game-toolkit templates/jam-3d -
 ```
 
 Each template is a minimal `Game` (window + Esc-to-quit + a drawn title) depending on
-`toolkit-prelude` with the `ui` feature on, plus an `assets/` directory. `cd my-jam && cargo run`.
+`game-toolkit-prelude` with the `ui` feature on, plus an `assets/` directory. `cd my-jam && cargo run`.
 
 ## Crates
 
 | Crate | What it gives you |
 |-------|-------------------|
-| `toolkit-core` | App loop on winit 0.30 `ApplicationHandler`, the `Game` trait, `Context`, time, optional fixed timestep. |
-| `toolkit-gfx` | wgpu init + surface management, sprite batcher, SDF circle/ring primitives, glyphon text, atlas tilemap, the `Painter` API. |
-| `toolkit-input` | Keyboard, mouse and gamepads (via gilrs) with held / just-pressed / just-released semantics, hot-plug, and rumble. |
-| `toolkit-audio` | Sound loading + playback on `kira`; degrades gracefully to muted when no device is available. Optional chiptune synthesis (`synth` feature, via `synthie`). |
-| `toolkit-assets` | Asset path resolution + optional hot-reload watcher (`notify`). |
-| `toolkit-aseprite` | Load native `.aseprite` files and exported PNG + JSON sheets into a GPU-ready `SpriteSheet` with animation playback. |
-| `toolkit-ecs` | Small glue (component data, command queue) for the `sillyecs` compile-time archetype ECS. |
-| `toolkit-ui` | egui overlay integration for debug tooling (feature-gated). |
-| `toolkit-prelude` | `use toolkit_prelude::*;` re-exports. Features: `ui`, `aseprite`. |
+| `game-toolkit-core` | App loop on winit 0.30 `ApplicationHandler`, the `Game` trait, `Context`, time, optional fixed timestep. |
+| `game-toolkit-gfx` | wgpu init + surface management, sprite batcher, SDF circle/ring primitives, glyphon text, atlas tilemap, the `Painter` API. |
+| `game-toolkit-input` | Keyboard, mouse and gamepads (via gilrs) with held / just-pressed / just-released semantics, hot-plug, and rumble. |
+| `game-toolkit-audio` | Sound loading + playback on `kira`; degrades gracefully to muted when no device is available. Optional chiptune synthesis (`synth` feature, via `synthie`). |
+| `game-toolkit-assets` | Asset path resolution + optional hot-reload watcher (`notify`). |
+| `game-toolkit-aseprite` | Load native `.aseprite` files and exported PNG + JSON sheets into a GPU-ready `SpriteSheet` with animation playback. |
+| `game-toolkit-ecs` | Small glue (component data, command queue) for the `sillyecs` compile-time archetype ECS. |
+| `game-toolkit-ui` | egui overlay integration for debug tooling (feature-gated). |
+| `game-toolkit-prelude` | `use game_toolkit_prelude::*;` re-exports. Features: `ui`, `aseprite`. |
 
-The dependency direction is one-way: `toolkit-aseprite` depends on `toolkit-gfx`, never the
+The dependency direction is one-way: `game-toolkit-aseprite` depends on `game-toolkit-gfx`, never the
 reverse, so the renderer stays unaware of asset formats.
 
 ## Examples
@@ -110,7 +110,7 @@ Run any example with `cargo run -p <package>`.
 
 ## Aseprite
 
-`toolkit-aseprite` reads both Aseprite formats into the same `SpriteSheet`:
+`game-toolkit-aseprite` reads both Aseprite formats into the same `SpriteSheet`:
 
 ```rust
 // Native binary: frames are flattened and packed into one atlas texture.

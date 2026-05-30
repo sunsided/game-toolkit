@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
-- `toolkit-aseprite` crate: load native `.aseprite` binaries (via `ah-asefile`) and
+- `game-toolkit-aseprite` crate: load native `.aseprite` binaries (via `ah-asefile`) and
   exported PNG + JSON sheets into a GPU-ready `SpriteSheet`, with `AnimationPlayer` for
   tag-driven playback (forward / reverse / ping-pong). Exposed through the prelude behind
   an `aseprite` feature.

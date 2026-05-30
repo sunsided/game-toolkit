@@ -1,4 +1,4 @@
-# toolkit-ecs
+# game-toolkit-ecs
 
 Small glue for using the [sillyecs](https://github.com/sunsided/sillyecs) compile-time
 archetype ECS with [**game-toolkit**](https://github.com/sunsided/game-toolkit): a `Vec2` to
@@ -15,4 +15,4 @@ examples, and quick-start.
 
 ## Documentation
 
-API docs: <https://docs.rs/toolkit-ecs>
+API docs: <https://docs.rs/game-toolkit-ecs>

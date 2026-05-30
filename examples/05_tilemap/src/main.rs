@@ -1,4 +1,4 @@
-use toolkit_prelude::*;
+use game_toolkit_prelude::*;
 
 struct App {
     map: Tilemap,

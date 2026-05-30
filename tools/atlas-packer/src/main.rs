@@ -2,8 +2,8 @@
 //! plus a JSON sidecar describing each sub-rect.
 //!
 //! The JSON matches Aseprite's exported "hash" sheet format, so the result loads directly
-//! with `toolkit_aseprite::SpriteSheet::from_aseprite_json(gfx, atlas_png, atlas_json)` -
-//! no toolkit-specific format to teach the runtime.
+//! with `game_toolkit_aseprite::SpriteSheet::from_aseprite_json(gfx, atlas_png, atlas_json)` -
+//! no game-toolkit-specific format to teach the runtime.
 //!
 //! ```text
 //! atlas-packer --input sprites/ --output atlas.png --metadata atlas.json [--max-size 2048] [--padding 2]

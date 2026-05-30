@@ -4,7 +4,7 @@
 //! Gamepad support degrades gracefully: with no backend or no controller the window still
 //! opens and shows a prompt.
 
-use toolkit_prelude::*;
+use game_toolkit_prelude::*;
 
 struct App;
 

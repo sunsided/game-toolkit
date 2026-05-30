@@ -23,7 +23,7 @@ pub struct Ui {
 }
 
 impl Ui {
-    pub fn new(gfx: &toolkit_gfx::Graphics) -> Result<Self> {
+    pub fn new(gfx: &game_toolkit_gfx::Graphics) -> Result<Self> {
         let window = gfx.window().clone();
         let ctx = egui::Context::default();
         let viewport_id = ctx.viewport_id();
@@ -58,7 +58,7 @@ impl Ui {
 
     /// Build, tessellate and render an egui frame on top of `frame`'s render target.
     /// `build` is the user's `|ctx: &egui::Context| { ... }` closure.
-    pub fn run<F>(&mut self, gfx: &mut toolkit_gfx::Graphics, frame: &mut toolkit_gfx::Frame, build: F)
+    pub fn run<F>(&mut self, gfx: &mut game_toolkit_gfx::Graphics, frame: &mut game_toolkit_gfx::Frame, build: F)
     where
         F: FnMut(&egui::Context),
     {

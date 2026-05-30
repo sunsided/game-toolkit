@@ -13,10 +13,10 @@ pub enum GameEvent {
 }
 
 pub struct Context {
-    pub gfx: toolkit_gfx::Graphics,
-    pub audio: Option<toolkit_audio::Audio>,
-    pub input: toolkit_input::Input,
-    pub assets: toolkit_assets::Assets,
+    pub gfx: game_toolkit_gfx::Graphics,
+    pub audio: Option<game_toolkit_audio::Audio>,
+    pub input: game_toolkit_input::Input,
+    pub assets: game_toolkit_assets::Assets,
     pub time: Time,
     pub window: Arc<Window>,
     pub(crate) quit_requested: bool,
@@ -38,26 +38,26 @@ impl Context {
             .with_title(title)
             .with_inner_size(winit::dpi::LogicalSize::new(width, height));
         let window = Arc::new(event_loop.create_window(attrs)?);
-        let gfx = pollster::block_on(toolkit_gfx::Graphics::new(
+        let gfx = pollster::block_on(game_toolkit_gfx::Graphics::new(
             window.clone(),
             vsync,
             depth_format,
             msaa_samples,
         ))?;
-        let audio = match toolkit_audio::Audio::new() {
+        let audio = match game_toolkit_audio::Audio::new() {
             Ok(a) => Some(a),
             Err(e) => {
                 log::warn!("audio init failed, continuing muted: {e}");
                 None
             }
         };
-        let input = toolkit_input::Input::new();
-        let assets = toolkit_assets::Assets::new(&asset_root).unwrap_or_else(|e| {
+        let input = game_toolkit_input::Input::new();
+        let assets = game_toolkit_assets::Assets::new(&asset_root).unwrap_or_else(|e| {
             log::warn!(
                 "asset root {} unusable ({e}); falling back to cwd",
                 asset_root.display()
             );
-            toolkit_assets::Assets::new(".").expect("cwd should resolve")
+            game_toolkit_assets::Assets::new(".").expect("cwd should resolve")
         });
         Ok(Self {
             gfx,

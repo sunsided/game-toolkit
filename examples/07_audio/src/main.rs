@@ -1,4 +1,4 @@
-//! Plays a loaded WAV (Space) and synthesized retro effects (1/2/3) through `toolkit-audio`.
+//! Plays a loaded WAV (Space) and synthesized retro effects (1/2/3) through `game-toolkit-audio`.
 //!
 //! `ctx.audio` is an `Option<Audio>`: when the audio backend fails to initialize the
 //! toolkit keeps running muted rather than aborting. This example mirrors that contract -
@@ -7,7 +7,7 @@
 //! The retro effects are rendered by `Synth` (the `synthie` chiptune engine) to PCM and
 //! played via `Audio::play_samples`, so no audio file is needed.
 
-use toolkit_prelude::*;
+use game_toolkit_prelude::*;
 
 struct AudioDemo {
     sound: Option<SoundId>,
