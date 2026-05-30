@@ -5,6 +5,8 @@
 //! [`Input::poll_gamepads`] once per frame before `update`, then [`Input::end_frame`] once
 //! per frame after `update` to clear edge state.
 
+#![forbid(unsafe_code)]
+
 use std::collections::{HashMap, HashSet};
 
 pub use winit::keyboard::KeyCode as Key;

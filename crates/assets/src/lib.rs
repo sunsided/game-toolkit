@@ -7,6 +7,8 @@
 //! Hot-reload is opt-in: call [`Assets::watch`] to start a `notify` watcher on the asset root,
 //! then drain change events each frame with [`Assets::drain_changes`].
 
+#![forbid(unsafe_code)]
+
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, channel};

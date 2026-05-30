@@ -22,6 +22,8 @@
 //! sillyecs = "0.0"
 //! ```
 
+#![forbid(unsafe_code)]
+
 use std::sync::mpsc::{Receiver, SendError, Sender, TryRecvError, channel};
 
 /// A plain 2D vector, convenient as ECS component data (position, velocity, ...).

@@ -5,6 +5,8 @@
 //! crates behind one dependency. Optional features: `ui`, `aseprite`, `ecs`, `synth`,
 //! `vector`.
 
+#![forbid(unsafe_code)]
+
 /// Everything you need to write a game: `use game_toolkit::prelude::*;`.
 pub mod prelude {
     pub use anyhow;
