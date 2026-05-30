@@ -16,7 +16,7 @@
     clippy::excessive_precision
 )]
 
-use game_toolkit_prelude::*;
+use game_toolkit::prelude::*;
 
 // Component payloads referenced by the generated `*Component` wrappers (`PositionData` ...).
 type PositionData = Vec2;

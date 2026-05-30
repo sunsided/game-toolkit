@@ -1,4 +1,4 @@
-use game_toolkit_prelude::*;
+use game_toolkit::prelude::*;
 
 struct App;
 

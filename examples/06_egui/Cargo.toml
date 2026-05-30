@@ -9,7 +9,7 @@ name = "06_egui"
 path = "src/main.rs"
 
 [dependencies]
-game-toolkit-prelude = { workspace = true, features = ["ui"] }
+game-toolkit = { workspace = true, features = ["ui"] }
 env_logger = { workspace = true }
 
 [lints]

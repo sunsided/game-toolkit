@@ -1,9 +1,9 @@
 [package]
-name = "game-toolkit-prelude"
+name = "game-toolkit"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Curated re-exports for game-toolkit - use game_toolkit_prelude::* and go."
+description = "A 2D-first Rust game-jam toolkit - umbrella crate; use game_toolkit::prelude::* and go."
 
 [dependencies]
 game-toolkit-core   = { workspace = true }

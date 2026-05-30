@@ -12,7 +12,7 @@ with optional `egui` tooling overlays and Aseprite asset loading.
 ## Quick start
 
 ```rust
-use game_toolkit_prelude::*;
+use game_toolkit::prelude::*;
 
 struct Game1;
 
@@ -68,7 +68,7 @@ cargo generate --git https://github.com/sunsided/game-toolkit templates/jam-3d -
 ```
 
 Each template is a minimal `Game` (window + Esc-to-quit + a drawn title) depending on
-`game-toolkit-prelude` with the `ui` feature on, plus an `assets/` directory. `cd my-jam && cargo run`.
+`game-toolkit` with the `ui` feature on, plus an `assets/` directory. `cd my-jam && cargo run`.
 
 ## Crates
 
@@ -82,7 +82,7 @@ Each template is a minimal `Game` (window + Esc-to-quit + a drawn title) dependi
 | `game-toolkit-aseprite` | Load native `.aseprite` files and exported PNG + JSON sheets into a GPU-ready `SpriteSheet` with animation playback. |
 | `game-toolkit-ecs` | Small glue (component data, command queue) for the `sillyecs` compile-time archetype ECS. |
 | `game-toolkit-ui` | egui overlay integration for debug tooling (feature-gated). |
-| `game-toolkit-prelude` | `use game_toolkit_prelude::*;` re-exports. Features: `ui`, `aseprite`. |
+| `game-toolkit` | Umbrella crate - depend on this one and `use game_toolkit::prelude::*;`. Features: `ui`, `aseprite`, `ecs`, `synth`, `vector`. |
 
 The dependency direction is one-way: `game-toolkit-aseprite` depends on `game-toolkit-gfx`, never the
 reverse, so the renderer stays unaware of asset formats.

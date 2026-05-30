@@ -1,7 +1,7 @@
 //! {{project-name}} - a 3D game-toolkit jam starter: one depth-tested spinning cube with a
 //! 2D HUD on top. Window opens, Esc quits.
 
-use game_toolkit_prelude::*;
+use game_toolkit::prelude::*;
 
 struct Game1 {
     cube: MeshId,

@@ -14,7 +14,7 @@ A window opens, spins a cube, and quits on `Esc`.
 ## Layout
 
 ```
-Cargo.toml      depends on game-toolkit-prelude (with the `ui` egui-overlay feature)
+Cargo.toml      depends on game-toolkit (with the `ui` egui-overlay feature)
 src/main.rs     your Game: uploads a mesh, drives camera3d, draws meshes + 2D HUD
 assets/         art, audio, fonts; AppConfig::asset_root points here
 Taskfile.yaml   task run / build / test / lint / fmt (needs go-task)

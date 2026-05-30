@@ -242,7 +242,7 @@ tasks:
             game-toolkit-aseprite,
             game-toolkit-ui,
             game-toolkit-core,
-            game-toolkit-prelude,
+            game-toolkit,
           ]
         cmd: cargo publish -p {{.ITEM}} --locked {{.DRY}} {{.CLI_ARGS}}
 

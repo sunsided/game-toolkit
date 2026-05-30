@@ -51,7 +51,7 @@ game-toolkit-assets   = { path = "crates/assets", version = "0.1.0" }
 game-toolkit-aseprite = { path = "crates/aseprite", version = "0.1.0" }
 game-toolkit-ecs      = { path = "crates/ecs", version = "0.1.0" }
 game-toolkit-ui       = { path = "crates/ui", version = "0.1.0" }
-game-toolkit-prelude  = { path = "crates/prelude", version = "0.1.0" }
+game-toolkit  = { path = "crates/prelude", version = "0.1.0" }
 
 anyhow      = "1"
 bytemuck    = { version = "1.23", features = ["derive"] }

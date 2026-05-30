@@ -6,7 +6,7 @@
 //! The exported PNG + JSON path is available too via
 //! `SpriteSheet::from_aseprite_json(gfx, png, json)`.
 
-use game_toolkit_prelude::*;
+use game_toolkit::prelude::*;
 
 struct AsepriteDemo {
     sheet: SpriteSheet,

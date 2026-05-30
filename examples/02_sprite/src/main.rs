@@ -1,7 +1,7 @@
 //! Loads a PNG with `Graphics::load_texture` and draws it three ways: plain, spinning,
 //! and tinted. Exercises the PNG decode -> upload -> render path end to end.
 
-use game_toolkit_prelude::*;
+use game_toolkit::prelude::*;
 
 struct Sprite {
     tex: TextureId,

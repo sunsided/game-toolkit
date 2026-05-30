@@ -9,7 +9,7 @@ name = "07_audio"
 path = "src/main.rs"
 
 [dependencies]
-game-toolkit-prelude = { workspace = true, features = ["synth"] }
+game-toolkit = { workspace = true, features = ["synth"] }
 env_logger = { workspace = true }
 log = { workspace = true }
 

@@ -6,7 +6,7 @@ API with layered 2D draw order, optional depth buffer + MSAA, an instanced 3D me
 and an optional [vello](https://github.com/linebender/vello) vector backend (`vector` feature).
 
 Part of game-toolkit, a Rust workspace of small crates for 2D-first game jams. Most users
-depend on [`game-toolkit-prelude`](https://crates.io/crates/game-toolkit-prelude) rather than this crate
+depend on [`game-toolkit`](https://crates.io/crates/game-toolkit) rather than this crate
 directly. See the [workspace README](https://github.com/sunsided/game-toolkit#readme) for the
 full toolkit, examples, and quick-start.
 

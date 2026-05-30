@@ -4,7 +4,7 @@
 //! color)` per instance. The mesh pass is depth-tested against `gfx.camera3d`; the 2D text
 //! composites over it.
 
-use game_toolkit_prelude::*;
+use game_toolkit::prelude::*;
 
 struct Cubes {
     cube: MeshId,

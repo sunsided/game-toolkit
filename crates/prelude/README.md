@@ -1,11 +1,11 @@
-# game-toolkit-prelude
+# game-toolkit
 
-The one-import entry point to [**game-toolkit**](https://github.com/sunsided/game-toolkit):
-`use game_toolkit_prelude::*;` re-exports the toolkit's runtime types (the `Game` trait, `Context`,
-`Painter`, input, audio, assets, ...).
+A 2D-first Rust toolkit for game jams. This umbrella crate is the one dependency you add;
+`use game_toolkit::prelude::*;` pulls in the runtime types from the `game-toolkit-*` crates
+(the `Game` trait, `Context`, `Painter`, input, audio, assets, ...).
 
 ```rust
-use game_toolkit_prelude::*;
+use game_toolkit::prelude::*;
 
 struct Game1;
 impl Game for Game1 {
@@ -30,4 +30,4 @@ examples, and quick-start.
 
 ## Documentation
 
-API docs: <https://docs.rs/game-toolkit-prelude>
+API docs: <https://docs.rs/game-toolkit>
