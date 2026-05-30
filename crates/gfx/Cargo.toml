@@ -13,7 +13,7 @@ pollster = { workspace = true }
 wgpu     = { workspace = true }
 winit    = { workspace = true }
 glyphon  = { workspace = true }
-miniscreenshot = { workspace = true }
+miniscreenshot-wgpu = { workspace = true }
 
 [lints]
 workspace = true

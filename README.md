@@ -137,8 +137,8 @@ cargo run -p atlas-packer -- --input sprites/ --output atlas.png --metadata atla
 It writes the atlas PNG plus an Aseprite-compatible JSON sidecar, so the result loads with
 no extra code via `SpriteSheet::from_aseprite_json(&mut ctx.gfx, "atlas.png", "atlas.json")`.
 
-`ctx.gfx.request_screenshot("shot.png")` saves a PNG of the next presented frame (read back
-from the surface, encoded with [miniscreenshot](https://github.com/sunsided/miniscreenshot)).
+`ctx.gfx.request_screenshot("shot.png")` saves a PNG of the next presented frame, read back
+from the surface with [miniscreenshot-wgpu](https://github.com/sunsided/miniscreenshot).
 
 ## 3D
 
