@@ -14,6 +14,11 @@ wgpu     = { workspace = true }
 winit    = { workspace = true }
 glyphon  = { workspace = true }
 miniscreenshot-wgpu = { workspace = true }
+vello    = { workspace = true, optional = true }
+
+[features]
+# Vello vector-graphics backend (compute-based; needs higher device limits).
+vector = ["dep:vello"]
 
 [lints]
 workspace = true

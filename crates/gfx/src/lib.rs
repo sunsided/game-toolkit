@@ -13,10 +13,17 @@ mod text;
 mod texture;
 mod tilemap;
 pub mod transform;
+#[cfg(feature = "vector")]
+mod vector;
 
 /// Re-export so downstream crates can name wgpu types (e.g. `wgpu::TextureFormat` for a
 /// depth format) without adding their own wgpu dependency or risking a version mismatch.
 pub use wgpu;
+
+/// Re-export of the vello vector renderer (feature `vector`), so callers can build a
+/// `vello::Scene` for [`Painter::vector`].
+#[cfg(feature = "vector")]
+pub use vello;
 
 pub use camera::Camera2D;
 pub use camera3d::{Camera, Camera3D};

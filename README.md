@@ -105,6 +105,7 @@ Run any example with `cargo run -p <package>`.
 | `09_aseprite` | `ex_09_aseprite` | Load a native `.aseprite`, pack its frames into an atlas, and play a tagged animation. |
 | `10_gamepad` | `ex_10_gamepad` | Live gamepad overlay: sticks, buttons, stick-clicks, and rumble on A. |
 | `11_ecs` | `ex_11_ecs` | Bouncing particles driven by the `sillyecs` archetype ECS (build.rs codegen). |
+| `12_vector` | `ex_12_vector` | Vector graphics (filled circles, stroked path) via the optional vello backend. |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
 
 ## Aseprite
@@ -158,6 +159,22 @@ p.mesh(cube, model, [0.4, 0.8, 0.45, 1.0]);
 
 Lighting is forward-unlit (Lambert from the vertex normal). glTF loading and a perspective
 follow-camera are future work.
+
+## Vector graphics
+
+The optional `vector` feature adds a [vello](https://github.com/linebender/vello) backend
+for high-quality 2D vector content. `painter.vector(|scene| ...)` hands the frame's
+`vello::Scene`; vello renders it to an offscreen target that composites on top of the
+sprite/primitive/text layers. It is compute-based and needs higher device limits, so it is
+off by default.
+
+```rust
+use vello::{kurbo::{Affine, Circle}, peniko::{Color, Fill}};
+p.vector(|scene| {
+    scene.fill(Fill::NonZero, Affine::IDENTITY, Color::from_rgb8(240, 140, 168), None,
+               &Circle::new((400.0, 300.0), 120.0));
+});
+```
 
 ## Development
 

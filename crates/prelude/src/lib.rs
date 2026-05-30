@@ -24,3 +24,6 @@ pub use toolkit_audio::{synthie, Synth};
 
 #[cfg(feature = "ecs")]
 pub use toolkit_ecs::{self, ChannelQueue, Vec2};
+
+#[cfg(feature = "vector")]
+pub use toolkit_gfx::vello;

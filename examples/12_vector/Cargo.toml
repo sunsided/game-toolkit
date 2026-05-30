@@ -1,0 +1,17 @@
+[package]
+name = "ex_12_vector"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "12_vector"
+path = "src/main.rs"
+
+[dependencies]
+toolkit-prelude = { workspace = true, features = ["vector"] }
+vello = { workspace = true }
+env_logger = { workspace = true }
+
+[lints]
+workspace = true

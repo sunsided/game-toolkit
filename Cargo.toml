@@ -23,6 +23,7 @@ members = [
     "examples/09_aseprite",
     "examples/10_gamepad",
     "examples/11_ecs",
+    "examples/12_vector",
     "tools/atlas-packer",
 ]
 # cargo-generate templates contain `{{placeholders}}` and depend on the toolkit via git, so
@@ -73,6 +74,7 @@ clap        = { version = "4", features = ["derive"] }
 etagere     = "0.3"
 sillyecs     = "0.0.6"
 tracing      = "0.1"
+vello        = "0.9"
 # Defaults to wgpu_28; pin the feature to our wgpu 29 so the texture types match.
 miniscreenshot-wgpu = { version = "0.2.1", default-features = false, features = ["wgpu-29"] }
 # Synthesis only (no `io`, which would pull cpal and fight kira for the audio device).

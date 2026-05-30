@@ -22,6 +22,7 @@ ui = ["dep:toolkit-ui"]
 aseprite = ["dep:toolkit-aseprite"]
 ecs = ["dep:toolkit-ecs"]
 synth = ["toolkit-audio/synth"]
+vector = ["toolkit-gfx/vector"]
 
 [lints]
 workspace = true

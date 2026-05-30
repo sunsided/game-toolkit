@@ -15,6 +15,8 @@ use crate::sprite::SpriteBatcher;
 use crate::target::Targets;
 use crate::text::TextSystem;
 use crate::texture::{TextureId, TextureRegistry};
+#[cfg(feature = "vector")]
+use crate::vector::VectorPass;
 
 pub struct Graphics {
     pub(crate) device: wgpu::Device,
@@ -43,6 +45,9 @@ pub struct Graphics {
     camera3d_bg: wgpu::BindGroup,
     meshes: MeshRegistry,
     mesh_batcher: MeshBatcher,
+    /// Vello vector backend; composites over the 2D layers each frame.
+    #[cfg(feature = "vector")]
+    pub(crate) vector: VectorPass,
     /// Whether the surface supports `COPY_SRC` (required to read frames back for screenshots).
     capture_copy_src: bool,
     /// Path to write a screenshot of the next presented frame, set by `request_screenshot`.
@@ -74,12 +79,17 @@ impl Graphics {
             .await
             .context("no compatible adapter")?;
 
+        // Vello needs the standard (non-downlevel) limits; bump them when the feature is on.
+        let required_limits = if cfg!(feature = "vector") {
+            wgpu::Limits::default().using_resolution(adapter.limits())
+        } else {
+            wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits())
+        };
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("toolkit.device"),
                 required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::downlevel_defaults()
-                    .using_resolution(adapter.limits()),
+                required_limits,
                 memory_hints: wgpu::MemoryHints::Performance,
                 ..Default::default()
             })
@@ -191,6 +201,8 @@ impl Graphics {
         let meshes = MeshRegistry::new();
         let mesh_batcher =
             MeshBatcher::new(&device, format, &camera_bgl, sample_count, depth_format);
+        #[cfg(feature = "vector")]
+        let vector = VectorPass::new(&device, format, width, height);
 
         Ok(Self {
             device,
@@ -216,6 +228,8 @@ impl Graphics {
             camera3d_bg,
             meshes,
             mesh_batcher,
+            #[cfg(feature = "vector")]
+            vector,
             capture_copy_src,
             pending_screenshot: None,
         })
@@ -239,6 +253,8 @@ impl Graphics {
         self.camera.resize(width as f32, height as f32);
         self.camera3d.resize(width as f32, height as f32);
         self.text.resize(&self.queue, width, height);
+        #[cfg(feature = "vector")]
+        self.vector.resize(&self.device, width, height);
     }
 
     pub fn window(&self) -> &Arc<Window> {
@@ -473,6 +489,11 @@ impl Graphics {
 
         self.text
             .flush(&self.device, &self.queue, encoder, &targets);
+
+        // Vector content composites on top of the 2D layers, directly onto the surface.
+        #[cfg(feature = "vector")]
+        self.vector
+            .render_and_composite(&self.device, &self.queue, encoder, &frame.view);
 
         self.sprites.clear();
         self.primitives.clear();

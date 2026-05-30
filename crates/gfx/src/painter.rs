@@ -132,6 +132,13 @@ impl<'a> Painter<'a> {
     pub fn mesh(&mut self, mesh: MeshId, model: Mat4, color: [f32; 4]) {
         self.gfx.draw_mesh(mesh, MeshInstance::new(model, color));
     }
+
+    /// Draw vector graphics with vello (feature `vector`). The closure receives the frame's
+    /// [`vello::Scene`]; vector content composites on top of all other layers.
+    #[cfg(feature = "vector")]
+    pub fn vector<F: FnOnce(&mut vello::Scene)>(&mut self, f: F) {
+        f(self.gfx.vector.scene());
+    }
 }
 
 impl<'a> Drop for Painter<'a> {
