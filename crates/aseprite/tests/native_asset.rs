@@ -1,13 +1,15 @@
-//! Validates the checked-in native `.aseprite` example asset against the exact `ah-asefile`
-//! API surface `SpriteSheet::load_aseprite` depends on. Pure parse - no GPU needed.
+//! Validates a checked-in native `.aseprite` fixture against the exact `ah-asefile` API
+//! surface `SpriteSheet::load_aseprite` depends on. Pure parse - no GPU needed.
+//!
+//! The fixture lives under this crate (`tests/data/`) so the crate's tests stay
+//! self-contained in a packaged or standalone checkout.
 
 use std::path::PathBuf;
 
 use ah_asefile::{AnimationDirection, AsepriteFile};
 
 fn asset() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../examples/09_aseprite/assets/character.aseprite")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/character.aseprite")
 }
 
 #[test]

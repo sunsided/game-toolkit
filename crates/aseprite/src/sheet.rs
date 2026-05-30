@@ -110,6 +110,11 @@ impl SpriteSheet {
         if sw == 0 || sh == 0 {
             return Err(anyhow!("{} reports a zero-size sheet", json_path.display()));
         }
+        // Reject an empty sheet before uploading: a frameless SpriteSheet would panic the
+        // moment anything indexes `frames[0]` (e.g. AnimationPlayer::current_uv).
+        if parsed.frames.is_empty() {
+            return Err(anyhow!("{} contains no frames", json_path.display()));
+        }
 
         let texture = gfx.load_texture(png_path.as_ref())?;
         let frames = parsed

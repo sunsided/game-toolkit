@@ -3,8 +3,11 @@
 //! Aseprite emits `frames` either as a JSON object keyed by frame name (the "hash" layout)
 //! or as an array (the "array" layout). Both are accepted; an [`IndexMap`] preserves the
 //! document order of the hash layout so animation tag indices stay correct.
+//!
+//! Packing options this loader cannot represent (rotated or trimmed frames) and tag
+//! directions it does not model are rejected with an error rather than mis-rendered.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use indexmap::IndexMap;
 use serde::Deserialize;
 
@@ -14,6 +17,7 @@ use crate::tag::{Animation, Direction};
 pub(crate) type FrameRectPx = (u32, u32, u32, u32);
 
 /// Parsed sprite-sheet metadata, normalized away from the on-disk JSON shape.
+#[derive(Debug)]
 pub(crate) struct ParsedSheet {
     pub sheet_size: (u32, u32),
     /// One entry per frame, in playback order: pixel rect + duration in milliseconds.
@@ -39,6 +43,10 @@ struct FrameEntry {
     frame: Rect,
     #[serde(default = "default_duration")]
     duration: u32,
+    #[serde(default)]
+    rotated: bool,
+    #[serde(default)]
+    trimmed: bool,
 }
 
 #[derive(Deserialize)]
@@ -77,25 +85,21 @@ fn default_duration() -> u32 {
 
 pub(crate) fn parse(bytes: &[u8]) -> Result<ParsedSheet> {
     let doc: AseJson = serde_json::from_slice(bytes).context("parse Aseprite JSON")?;
-    let frames = match doc.frames {
-        Frames::Hash(map) => map.into_values().map(to_frame).collect(),
-        Frames::List(list) => list.into_iter().map(to_frame).collect(),
+    let entries: Vec<FrameEntry> = match doc.frames {
+        Frames::Hash(map) => map.into_values().collect(),
+        Frames::List(list) => list,
     };
+    let frames = entries
+        .into_iter()
+        .enumerate()
+        .map(|(i, e)| to_frame(i, e))
+        .collect::<Result<Vec<_>>>()?;
     let tags = doc
         .meta
         .frame_tags
         .into_iter()
-        .map(|t| Animation {
-            from: t.from,
-            to: t.to,
-            direction: match t.direction.as_str() {
-                "reverse" => Direction::Reverse,
-                "pingpong" => Direction::PingPong,
-                _ => Direction::Forward,
-            },
-            name: t.name,
-        })
-        .collect();
+        .map(parse_tag)
+        .collect::<Result<Vec<_>>>()?;
     Ok(ParsedSheet {
         sheet_size: (doc.meta.size.w, doc.meta.size.h),
         frames,
@@ -103,8 +107,34 @@ pub(crate) fn parse(bytes: &[u8]) -> Result<ParsedSheet> {
     })
 }
 
-fn to_frame(e: FrameEntry) -> (FrameRectPx, u32) {
-    ((e.frame.x, e.frame.y, e.frame.w, e.frame.h), e.duration)
+/// Reject packing options the UV-rect model cannot represent rather than mis-render them:
+/// a rotated frame would need a rotated quad, and a trimmed frame's atlas rect is smaller
+/// than and offset from the source, so it would draw cropped and mispositioned.
+fn to_frame(index: usize, e: FrameEntry) -> Result<(FrameRectPx, u32)> {
+    if e.rotated {
+        bail!("frame {index} is rotated in the atlas; re-export with rotation disabled");
+    }
+    if e.trimmed {
+        bail!("frame {index} is trimmed; re-export with trim disabled");
+    }
+    Ok(((e.frame.x, e.frame.y, e.frame.w, e.frame.h), e.duration))
+}
+
+fn parse_tag(t: TagEntry) -> Result<Animation> {
+    // Missing direction defaults to forward; an unrecognized value (e.g. a reverse
+    // ping-pong export this enum does not model) is an error, not a silent fallback.
+    let direction = match t.direction.as_str() {
+        "" | "forward" => Direction::Forward,
+        "reverse" => Direction::Reverse,
+        "pingpong" => Direction::PingPong,
+        other => bail!("tag {:?} has unsupported direction {other:?}", t.name),
+    };
+    Ok(Animation {
+        name: t.name,
+        from: t.from,
+        to: t.to,
+        direction,
+    })
 }
 
 #[cfg(test)]
@@ -147,5 +177,30 @@ mod tests {
         let p = parse(ARRAY.as_bytes()).unwrap();
         assert_eq!(p.frames.len(), 2);
         assert!(p.tags.is_empty());
+    }
+
+    #[test]
+    fn rejects_rotated_frame() {
+        let json = r#"{"frames":[{"frame":{"x":0,"y":0,"w":8,"h":8},"rotated":true}],
+                       "meta":{"size":{"w":8,"h":8}}}"#;
+        let err = parse(json.as_bytes()).unwrap_err().to_string();
+        assert!(err.contains("rotated"), "{err}");
+    }
+
+    #[test]
+    fn rejects_trimmed_frame() {
+        let json = r#"{"frames":[{"frame":{"x":0,"y":0,"w":8,"h":8},"trimmed":true}],
+                       "meta":{"size":{"w":8,"h":8}}}"#;
+        let err = parse(json.as_bytes()).unwrap_err().to_string();
+        assert!(err.contains("trimmed"), "{err}");
+    }
+
+    #[test]
+    fn rejects_unknown_direction() {
+        let json = r#"{"frames":[{"frame":{"x":0,"y":0,"w":8,"h":8}}],
+                       "meta":{"size":{"w":8,"h":8},
+                       "frameTags":[{"name":"t","from":0,"to":0,"direction":"pingpong_reverse"}]}}"#;
+        let err = parse(json.as_bytes()).unwrap_err().to_string();
+        assert!(err.contains("unsupported direction"), "{err}");
     }
 }

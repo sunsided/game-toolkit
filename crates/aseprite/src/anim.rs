@@ -102,3 +102,108 @@ impl AnimationPlayer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use toolkit_gfx::TextureId;
+
+    use super::AnimationPlayer;
+    use crate::sheet::{FrameRect, SpriteSheet};
+    use crate::tag::{Animation, Direction};
+
+    /// A sheet of `n` frames, each lasting `dur` seconds, tagged "t" with `dir`.
+    fn sheet(n: usize, dur: f32, dir: Direction) -> SpriteSheet {
+        let frames = (0..n)
+            .map(|_| FrameRect {
+                uv_min: [0.0, 0.0],
+                uv_max: [1.0, 1.0],
+                size: [1, 1],
+                duration: dur,
+            })
+            .collect();
+        let mut animations = HashMap::new();
+        animations.insert(
+            "t".to_string(),
+            Animation {
+                name: "t".to_string(),
+                from: 0,
+                to: n - 1,
+                direction: dir,
+            },
+        );
+        SpriteSheet {
+            texture: TextureId(0),
+            size: [1, 1],
+            frames,
+            animations,
+        }
+    }
+
+    #[test]
+    fn forward_wraps() {
+        let s = sheet(3, 0.1, Direction::Forward);
+        let mut p = AnimationPlayer::new(&s, "t").unwrap();
+        assert_eq!(p.current_index(), 0);
+        p.advance(&s, 0.1);
+        assert_eq!(p.current_index(), 1);
+        p.advance(&s, 0.1);
+        assert_eq!(p.current_index(), 2);
+        p.advance(&s, 0.1);
+        assert_eq!(p.current_index(), 0);
+    }
+
+    #[test]
+    fn dt_below_duration_holds_frame() {
+        let s = sheet(3, 0.1, Direction::Forward);
+        let mut p = AnimationPlayer::new(&s, "t").unwrap();
+        p.advance(&s, 0.05);
+        assert_eq!(p.current_index(), 0);
+        p.advance(&s, 0.05); // accumulates to one full frame
+        assert_eq!(p.current_index(), 1);
+    }
+
+    #[test]
+    fn duration_rollover_steps_multiple_frames() {
+        let s = sheet(4, 0.1, Direction::Forward);
+        let mut p = AnimationPlayer::new(&s, "t").unwrap();
+        p.advance(&s, 0.25); // two full frames consumed, 0.05 left over
+        assert_eq!(p.current_index(), 2);
+    }
+
+    #[test]
+    fn reverse_starts_at_end_and_wraps() {
+        let s = sheet(3, 0.1, Direction::Reverse);
+        let mut p = AnimationPlayer::new(&s, "t").unwrap();
+        assert_eq!(p.current_index(), 2);
+        p.advance(&s, 0.1);
+        assert_eq!(p.current_index(), 1);
+        p.advance(&s, 0.1);
+        assert_eq!(p.current_index(), 0);
+        p.advance(&s, 0.1);
+        assert_eq!(p.current_index(), 2);
+    }
+
+    #[test]
+    fn pingpong_bounces_at_endpoints() {
+        let s = sheet(3, 0.1, Direction::PingPong);
+        let mut p = AnimationPlayer::new(&s, "t").unwrap();
+        let seq: Vec<usize> = (0..6)
+            .map(|_| {
+                let i = p.current_index();
+                p.advance(&s, 0.1);
+                i
+            })
+            .collect();
+        assert_eq!(seq, vec![0, 1, 2, 1, 0, 1]);
+    }
+
+    #[test]
+    fn single_frame_tag_is_stable() {
+        let s = sheet(1, 0.1, Direction::Forward);
+        let mut p = AnimationPlayer::new(&s, "t").unwrap();
+        p.advance(&s, 1.0);
+        assert_eq!(p.current_index(), 0);
+    }
+}
