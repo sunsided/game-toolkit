@@ -3,7 +3,10 @@ name = "game-toolkit-assets"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Asset path resolution and optional hot-reload (notify) for game-toolkit."
+keywords = ["assets", "hot-reload", "gamedev", "gamejam"]
+categories = ["game-development", "filesystem"]
 
 [dependencies]
 anyhow = { workspace = true }

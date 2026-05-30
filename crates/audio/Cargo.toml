@@ -3,7 +3,10 @@ name = "game-toolkit-audio"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Sound playback on kira, with optional synthie chiptune synthesis, for game-toolkit."
+keywords = ["audio", "sound", "gamedev", "kira", "synth"]
+categories = ["game-development", "multimedia::audio"]
 
 [dependencies]
 anyhow  = { workspace = true }

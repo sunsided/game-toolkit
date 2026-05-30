@@ -3,7 +3,10 @@ name = "game-toolkit-input"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Keyboard, mouse and gamepad input for game-toolkit."
+keywords = ["input", "gamepad", "keyboard", "gamedev", "winit"]
+categories = ["game-development"]
 
 [dependencies]
 winit = { workspace = true }

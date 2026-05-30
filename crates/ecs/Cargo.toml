@@ -3,7 +3,10 @@ name = "game-toolkit-ecs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Small glue for using the sillyecs archetype ECS with game-toolkit."
+keywords = ["ecs", "gamedev", "sillyecs", "entity"]
+categories = ["game-development"]
 
 [dependencies]
 

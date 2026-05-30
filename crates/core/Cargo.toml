@@ -3,7 +3,10 @@ name = "game-toolkit-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Game loop, the Game trait, Context and time for the game-toolkit game-jam kit."
+keywords = ["gamedev", "game-loop", "gamejam", "2d"]
+categories = ["game-development"]
 
 [dependencies]
 anyhow        = { workspace = true }

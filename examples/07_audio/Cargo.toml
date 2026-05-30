@@ -1,5 +1,6 @@
 [package]
 name = "ex_07_audio"
+publish = false
 version.workspace = true
 edition.workspace = true
 license.workspace = true

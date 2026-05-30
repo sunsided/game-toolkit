@@ -3,7 +3,10 @@ name = "game-toolkit-aseprite"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Load native .aseprite files and exported PNG+JSON sheets into GPU-ready sprite sheets for game-toolkit."
+keywords = ["aseprite", "sprite", "spritesheet", "gamedev", "2d"]
+categories = ["game-development", "multimedia::images"]
 
 [dependencies]
 game-toolkit-gfx = { workspace = true }

@@ -3,7 +3,10 @@ name = "game-toolkit"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "A 2D-first Rust game-jam toolkit - umbrella crate; use game_toolkit::prelude::* and go."
+keywords = ["gamedev", "game", "gamejam", "2d", "toolkit"]
+categories = ["game-development", "game-engines"]
 
 [dependencies]
 game-toolkit-core   = { workspace = true }

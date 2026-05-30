@@ -3,7 +3,10 @@ name = "game-toolkit-ui"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "egui debug-overlay integration for game-toolkit."
+keywords = ["egui", "debug", "overlay", "gamedev", "ui"]
+categories = ["game-development", "gui"]
 
 [dependencies]
 anyhow      = { workspace = true }
