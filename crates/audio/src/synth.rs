@@ -13,6 +13,7 @@ use synthie::prelude::{AudioEvent, MidiNote, SynthParams, SynthProcessor};
 pub struct Synth {
     processor: SynthProcessor<8>,
     sample_rate: u32,
+    target_peak: f32,
 }
 
 impl Synth {
@@ -20,11 +21,25 @@ impl Synth {
         Self {
             processor: SynthProcessor::new(sample_rate as f32),
             sample_rate,
+            target_peak: 0.9,
         }
     }
 
     pub fn sample_rate(&self) -> u32 {
         self.sample_rate
+    }
+
+    /// Peak amplitude each rendered buffer is normalized to (`0.9` by default), so effects
+    /// have a consistent, loud level regardless of the patch's gain and filtering. Set to
+    /// `0.0` to disable normalization and play synthie's raw output.
+    pub fn set_target_peak(&mut self, peak: f32) {
+        self.target_peak = peak;
+    }
+
+    /// Builder form of [`Synth::set_target_peak`].
+    pub fn with_target_peak(mut self, peak: f32) -> Self {
+        self.target_peak = peak;
+        self
     }
 
     /// Render one MIDI `note` with `params`: hold for `hold_secs`, then release and render
@@ -49,6 +64,18 @@ impl Synth {
         self.processor.process_block(&on, &mut buf[..hold], 1);
         let off = [AudioEvent::NoteOff(MidiNote(note))];
         self.processor.process_block(&off, &mut buf[hold..], 1);
+
+        // Normalize to a consistent peak: synthie applies a 0.5 master gain plus the patch's
+        // own volume/filtering, so raw output is much quieter than a typical sample file.
+        if self.target_peak > 0.0 {
+            let peak = buf.iter().fold(0.0f32, |m, &s| m.max(s.abs()));
+            if peak > 1e-4 {
+                let gain = self.target_peak / peak;
+                for s in &mut buf {
+                    *s *= gain;
+                }
+            }
+        }
         buf
     }
 
@@ -75,11 +102,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn render_produces_audio() {
+    fn render_is_normalized_to_target_peak() {
         let mut synth = Synth::new(44_100);
         let pcm = synth.blip();
         assert!(!pcm.is_empty());
         let peak = pcm.iter().fold(0.0f32, |m, &x| m.max(x.abs()));
-        assert!(peak > 0.01, "synth output too quiet: peak {peak}");
+        assert!((peak - 0.9).abs() < 0.02, "expected ~0.9 peak, got {peak}");
+    }
+
+    #[test]
+    fn target_peak_zero_disables_normalization() {
+        let mut synth = Synth::new(44_100).with_target_peak(0.0);
+        let pcm = synth.blip();
+        let peak = pcm.iter().fold(0.0f32, |m, &x| m.max(x.abs()));
+        // Raw synthie output (0.5 master gain etc.) is well below the normalized 0.9.
+        assert!(peak > 0.0 && peak < 0.6, "raw peak unexpectedly high: {peak}");
     }
 }
