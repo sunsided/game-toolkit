@@ -35,12 +35,12 @@ impl Game for AudioDemo {
         if ctx.input.key_pressed(Key::Escape) {
             ctx.quit();
         }
-        if ctx.input.key_pressed(Key::Space) {
-            if let (Some(audio), Some(id)) = (ctx.audio.as_mut(), self.sound) {
-                match audio.play(id) {
-                    Ok(_) => self.plays += 1,
-                    Err(e) => log::warn!("play failed: {e}"),
-                }
+        if ctx.input.key_pressed(Key::Space)
+            && let (Some(audio), Some(id)) = (ctx.audio.as_mut(), self.sound)
+        {
+            match audio.play(id) {
+                Ok(_) => self.plays += 1,
+                Err(e) => log::warn!("play failed: {e}"),
             }
         }
     }
