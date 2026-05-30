@@ -8,7 +8,7 @@ A 2D game built on [game-toolkit](https://github.com/sunsided/game-toolkit).
 cargo run
 ```
 
-A window opens, draws the title, and quits on `Esc`.
+A window opens with a ball bouncing around (spinning with its speed), and quits on `Esc`.
 
 ## Layout
 
