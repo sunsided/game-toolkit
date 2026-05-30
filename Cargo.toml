@@ -69,3 +69,5 @@ indexmap    = { version = "2", features = ["serde"] }
 clap        = { version = "4", features = ["derive"] }
 etagere     = "0.3"
 miniscreenshot = "0.2"
+# Synthesis only (no `io`, which would pull cpal and fight kira for the audio device).
+synthie     = { version = "0.4", default-features = false, features = ["std"] }

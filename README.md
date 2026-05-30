@@ -77,7 +77,7 @@ Each template is a minimal `Game` (window + Esc-to-quit + a drawn title) dependi
 | `toolkit-core` | App loop on winit 0.30 `ApplicationHandler`, the `Game` trait, `Context`, time, optional fixed timestep. |
 | `toolkit-gfx` | wgpu init + surface management, sprite batcher, SDF circle/ring primitives, glyphon text, atlas tilemap, the `Painter` API. |
 | `toolkit-input` | Keyboard, mouse and gamepads (via gilrs) with held / just-pressed / just-released semantics, hot-plug, and rumble. |
-| `toolkit-audio` | Sound loading + playback on `kira`; degrades gracefully to muted when no device is available. |
+| `toolkit-audio` | Sound loading + playback on `kira`; degrades gracefully to muted when no device is available. Optional chiptune synthesis (`synth` feature, via `synthie`). |
 | `toolkit-assets` | Asset path resolution + optional hot-reload watcher (`notify`). |
 | `toolkit-aseprite` | Load native `.aseprite` files and exported PNG + JSON sheets into a GPU-ready `SpriteSheet` with animation playback. |
 | `toolkit-ui` | egui overlay integration for debug tooling (feature-gated). |
@@ -99,7 +99,7 @@ Run any example with `cargo run -p <package>`.
 | `05_tilemap` | `ex_05_tilemap` | Instanced atlas tilemap. |
 | `06_egui` | `ex_06_egui` | egui debug overlay (uses the `ui` feature). |
 | `07_3d` | `ex_07_3d` | Depth-tested perspective cubes (instanced meshes) with a 2D HUD on top. |
-| `07_audio` | `ex_07_audio` | Load and play a sound; Space triggers it, runs muted with no device. |
+| `07_audio` | `ex_07_audio` | Play a WAV (Space) and synthesized retro effects (1/2/3); runs muted with no device. |
 | `08_hot_reload` | `ex_08_hot_reload` | Edit `assets/reload_me.png` while it runs and watch the texture update live. |
 | `09_aseprite` | `ex_09_aseprite` | Load a native `.aseprite`, pack its frames into an atlas, and play a tagged animation. |
 | `10_gamepad` | `ex_10_gamepad` | Live gamepad overlay: sticks, buttons, stick-clicks, and rumble on A. |

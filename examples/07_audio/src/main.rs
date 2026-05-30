@@ -1,13 +1,17 @@
-//! Loads a sound through `toolkit-audio` (kira) and plays it on Space.
+//! Plays a loaded WAV (Space) and synthesized retro effects (1/2/3) through `toolkit-audio`.
 //!
 //! `ctx.audio` is an `Option<Audio>`: when the audio backend fails to initialize the
 //! toolkit keeps running muted rather than aborting. This example mirrors that contract -
 //! every audio call is guarded, so it still opens a window and runs with no audio device.
+//!
+//! The retro effects are rendered by `Synth` (the `synthie` chiptune engine) to PCM and
+//! played via `Audio::play_samples`, so no audio file is needed.
 
 use toolkit_prelude::*;
 
 struct AudioDemo {
     sound: Option<SoundId>,
+    synth: Synth,
     plays: u32,
 }
 
@@ -28,7 +32,11 @@ impl Game for AudioDemo {
                 None
             }
         };
-        Ok(Self { sound, plays: 0 })
+        Ok(Self {
+            sound,
+            synth: Synth::new(44_100),
+            plays: 0,
+        })
     }
 
     fn update(&mut self, ctx: &mut Context, _dt: f32) {
@@ -43,17 +51,36 @@ impl Game for AudioDemo {
                 Err(e) => log::warn!("play failed: {e}"),
             }
         }
+
+        // Synthesized retro effects on the number keys.
+        let pcm = if ctx.input.key_pressed(Key::Digit1) {
+            Some(self.synth.blip())
+        } else if ctx.input.key_pressed(Key::Digit2) {
+            Some(self.synth.coin())
+        } else if ctx.input.key_pressed(Key::Digit3) {
+            Some(self.synth.thud())
+        } else {
+            None
+        };
+        if let Some(pcm) = pcm
+            && let Some(audio) = ctx.audio.as_mut()
+        {
+            match audio.play_samples(&pcm, self.synth.sample_rate()) {
+                Ok(_) => self.plays += 1,
+                Err(e) => log::warn!("synth play failed: {e}"),
+            }
+        }
     }
 
     fn render(&mut self, ctx: &mut Context, frame: &mut Frame) {
         let mut p = frame.painter(&mut ctx.gfx);
         p.clear([0.06, 0.07, 0.1, 1.0]);
         let status = if self.sound.is_some() {
-            "Press Space to play a sound (Esc to quit)"
+            "Space: WAV   1: blip   2: coin   3: thud   (Esc to quit)"
         } else {
-            "No sound loaded - running muted (Esc to quit)"
+            "No device - running muted. 1/2/3 synth, Space WAV (Esc to quit)"
         };
-        p.text([24.0, 24.0], status, 22.0, [0.9, 0.9, 0.95, 1.0]);
+        p.text([24.0, 24.0], status, 20.0, [0.9, 0.9, 0.95, 1.0]);
         p.text(
             [24.0, 56.0],
             &format!("plays: {}", self.plays),
@@ -67,7 +94,7 @@ fn main() -> Result<()> {
     env_logger::init();
     run::<AudioDemo>(AppConfig {
         title: "07_audio".into(),
-        width: 640,
+        width: 680,
         height: 360,
         asset_root: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"),
         ..Default::default()

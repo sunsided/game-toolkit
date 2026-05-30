@@ -5,12 +5,21 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use kira::manager::backend::DefaultBackend;
 use kira::manager::{AudioManager, AudioManagerSettings};
-use kira::sound::static_sound::{StaticSoundData, StaticSoundHandle};
+use kira::sound::static_sound::{StaticSoundData, StaticSoundHandle, StaticSoundSettings};
 use kira::tween::Tween;
+use kira::Frame;
+
+#[cfg(feature = "synth")]
+mod synth;
+#[cfg(feature = "synth")]
+pub use synth::Synth;
+#[cfg(feature = "synth")]
+pub use synthie;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SoundId(pub u32);
@@ -47,6 +56,24 @@ impl Audio {
             .get(&id)
             .ok_or_else(|| anyhow!("unknown SoundId {id:?}"))?
             .clone();
+        self.manager
+            .play(data)
+            .map_err(|e| anyhow!("kira play: {e}"))
+    }
+
+    /// Play mono PCM samples (`-1.0..=1.0`) directly, e.g. a buffer rendered by
+    /// [`Synth`](crate::Synth). The samples are duplicated to both channels.
+    pub fn play_samples(&mut self, samples: &[f32], sample_rate: u32) -> Result<StaticSoundHandle> {
+        let frames: Arc<[Frame]> = samples
+            .iter()
+            .map(|&s| Frame { left: s, right: s })
+            .collect();
+        let data = StaticSoundData {
+            sample_rate,
+            frames,
+            settings: StaticSoundSettings::default(),
+            slice: None,
+        };
         self.manager
             .play(data)
             .map_err(|e| anyhow!("kira play: {e}"))

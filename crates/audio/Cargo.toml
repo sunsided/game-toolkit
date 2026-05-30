@@ -5,9 +5,14 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-anyhow = { workspace = true }
-kira   = { workspace = true }
-log    = { workspace = true }
+anyhow  = { workspace = true }
+kira    = { workspace = true }
+log     = { workspace = true }
+synthie = { workspace = true, optional = true }
+
+[features]
+# Chiptune/retro sound synthesis via the `synthie` crate.
+synth = ["dep:synthie"]
 
 [lints]
 workspace = true
