@@ -1,0 +1,34 @@
+# Config for `cargo release` (https://github.com/crate-ci/cargo-release).
+#
+# What cargo-release does, in one command: bump the workspace version, rewrite the
+# `version = "x.y.z"` in each crate's [workspace.dependencies] entry, commit, tag, then
+# `cargo publish` every publishable crate **in dependency order, waiting for the crates.io
+# index between each**. That ordering is the one thing a plain `cargo publish --workspace`
+# cannot do (a dependent crate fails until its dep is live on the index).
+#
+# Install once:  cargo install cargo-release --locked
+#
+# Two ways to ship (pick one - don't do both, or you double-publish):
+#
+#   CI-driven (recommended; the token lives in GitHub, not on your laptop):
+#     cargo release 0.1.0 --execute --no-publish   # bump + commit + tag v0.1.0 + push
+#     -> pushing the tag triggers .github/workflows/release.yml, which publishes in order.
+#
+#   All local (no CI; needs CARGO_REGISTRY_TOKEN in your env):
+#     cargo release 0.1.0 --execute                # bump + commit + tag + push + publish
+#
+# Dry-run either by dropping --execute. `task publish` does just the ordered publish step
+# with no tooling to install; cargo-release adds the version-bump, commit, and tagging.
+
+# All crates share [workspace.package] version, so move them in lockstep.
+shared-version = true
+
+# One commit and one `vX.Y.Z` tag for the whole workspace, not one per crate.
+consolidate-commits = true
+tag-name = "v{{version}}"
+pre-release-commit-message = "Release {{version}}"
+
+# Only release from main.
+allow-branch = ["main"]
+
+# Examples, templates and tools carry `publish = false`, so cargo-release skips them.

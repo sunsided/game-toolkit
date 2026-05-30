@@ -1,0 +1,32 @@
+name: Release
+
+# Push a `vX.Y.Z` tag (e.g. `cargo release 0.1.0 --execute` creates and pushes it) to
+# publish every toolkit crate to crates.io in dependency order.
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-release
+
+      # `cargo release publish` reads release.toml, skips `publish = false` members, and
+      # publishes the rest in dependency order, waiting for the index between each.
+      - name: Publish workspace
+        run: cargo release publish --workspace --no-confirm --execute
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
