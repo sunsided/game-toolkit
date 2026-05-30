@@ -58,7 +58,12 @@ fn stick(p: &mut Painter, center: [f32; 2], axes: [f32; 2], clicked: bool, label
         [0.4, 0.8, 1.0, 1.0]
     };
     p.circle(dot, 12.0, dot_color);
-    p.text([center[0] - 24.0, center[1] + r + 8.0], label, 18.0, [0.8, 0.8, 0.85, 1.0]);
+    p.text(
+        [center[0] - 24.0, center[1] + r + 8.0],
+        label,
+        18.0,
+        [0.8, 0.8, 0.85, 1.0],
+    );
 }
 
 fn button(p: &mut Painter, center: [f32; 2], on: bool, label: &str) {
@@ -68,7 +73,12 @@ fn button(p: &mut Painter, center: [f32; 2], on: bool, label: &str) {
         [0.30, 0.32, 0.38, 1.0]
     };
     p.circle(center, 18.0, color);
-    p.text([center[0] - 6.0, center[1] - 9.0], label, 18.0, [0.1, 0.1, 0.12, 1.0]);
+    p.text(
+        [center[0] - 6.0, center[1] - 9.0],
+        label,
+        18.0,
+        [0.1, 0.1, 0.12, 1.0],
+    );
 }
 
 impl Game for App {
@@ -96,7 +106,12 @@ impl Game for App {
 
         let mut p = frame.painter(&mut ctx.gfx);
         p.clear([0.06, 0.07, 0.1, 1.0]);
-        p.text([16.0, 16.0], "10_gamepad (Esc to quit)", 22.0, [0.9, 0.9, 0.95, 1.0]);
+        p.text(
+            [16.0, 16.0],
+            "10_gamepad (Esc to quit)",
+            22.0,
+            [0.9, 0.9, 0.95, 1.0],
+        );
 
         let Some(pad) = pad else {
             p.text(
@@ -108,7 +123,12 @@ impl Game for App {
             return;
         };
 
-        p.text([16.0, 56.0], &format!("pad: {}", pad.name), 18.0, [0.6, 0.85, 0.7, 1.0]);
+        p.text(
+            [16.0, 56.0],
+            &format!("pad: {}", pad.name),
+            18.0,
+            [0.6, 0.85, 0.7, 1.0],
+        );
 
         stick(&mut p, [200.0, 320.0], pad.left, pad.l3, "L stick (L3)");
         stick(&mut p, [430.0, 320.0], pad.right, pad.r3, "R stick (R3)");
@@ -126,7 +146,12 @@ impl Game for App {
         button(&mut p, [690.0, 120.0], pad.rb, "RB");
         button(&mut p, [690.0, 170.0], pad.rt, "RT");
 
-        p.text([520.0, 430.0], "Press A to rumble", 18.0, [0.8, 0.8, 0.85, 1.0]);
+        p.text(
+            [520.0, 430.0],
+            "Press A to rumble",
+            18.0,
+            [0.8, 0.8, 0.85, 1.0],
+        );
     }
 }
 

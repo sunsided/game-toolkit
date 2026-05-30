@@ -137,8 +137,12 @@ impl VectorPass {
         self.width = width;
         self.height = height;
         self.target_view = make_target(device, width, height);
-        self.composite_bg =
-            make_bind_group(device, &self.composite_bgl, &self.target_view, &self.sampler);
+        self.composite_bg = make_bind_group(
+            device,
+            &self.composite_bgl,
+            &self.target_view,
+            &self.sampler,
+        );
     }
 
     /// Render the queued scene to the offscreen target (a separate vello submit) and composite
@@ -159,10 +163,13 @@ impl VectorPass {
             height: self.height,
             antialiasing_method: AaConfig::Area,
         };
-        match self
-            .renderer
-            .render_to_texture(device, queue, &self.scene, &self.target_view, &params)
-        {
+        match self.renderer.render_to_texture(
+            device,
+            queue,
+            &self.scene,
+            &self.target_view,
+            &params,
+        ) {
             Ok(()) => {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("vector.composite.pass"),

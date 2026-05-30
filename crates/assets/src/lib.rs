@@ -9,7 +9,7 @@
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::{Receiver, channel};
 
 use anyhow::{Context, Result};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -61,19 +61,20 @@ impl Assets {
             return Ok(());
         }
         let (tx, rx) = channel::<PathBuf>();
-        let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| match res {
-            Ok(event) => {
-                if matches!(
-                    event.kind,
-                    EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
-                ) {
-                    for p in event.paths {
-                        let _ = tx.send(p);
+        let mut watcher =
+            notify::recommended_watcher(move |res: notify::Result<Event>| match res {
+                Ok(event) => {
+                    if matches!(
+                        event.kind,
+                        EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
+                    ) {
+                        for p in event.paths {
+                            let _ = tx.send(p);
+                        }
                     }
                 }
-            }
-            Err(e) => log::warn!("notify error: {e}"),
-        })?;
+                Err(e) => log::warn!("notify error: {e}"),
+            })?;
         watcher.watch(&self.root, RecursiveMode::Recursive)?;
         self.watcher = Some(watcher);
         self.rx = Some(rx);

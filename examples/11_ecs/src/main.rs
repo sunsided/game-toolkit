@@ -114,10 +114,9 @@ impl Game for EcsDemo {
             let speed = 140.0 + 90.0 * (t * 7.0).fract();
             let pos = Vec2::new(w * 0.5, h * 0.5);
             let vel = Vec2::new(angle.cos() * speed, angle.sin() * speed);
-            entities.push(world.spawn_particle_with(
-                PositionComponent::new(pos),
-                VelocityComponent::new(vel),
-            ));
+            entities.push(
+                world.spawn_particle_with(PositionComponent::new(pos), VelocityComponent::new(vel)),
+            );
         }
         Ok(Self { world, entities })
     }

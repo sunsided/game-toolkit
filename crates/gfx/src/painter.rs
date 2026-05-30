@@ -31,7 +31,13 @@ impl<'a> Painter<'a> {
             .draw(tex, 0, BlendMode::Alpha, SpriteInstance::at(pos, size));
     }
 
-    pub fn sprite_ex(&mut self, tex: TextureId, inst: SpriteInstance, layer: i16, blend: BlendMode) {
+    pub fn sprite_ex(
+        &mut self,
+        tex: TextureId,
+        inst: SpriteInstance,
+        layer: i16,
+        blend: BlendMode,
+    ) {
         self.gfx.sprites.draw(tex, layer, blend, inst);
     }
 

@@ -1,7 +1,7 @@
 //! Perspective 3D camera producing a column-major `view_proj` for the same camera uniform
 //! the 2D path uses. Right-handed, looking down -Z, with wgpu's `[0, 1]` depth range.
 
-use crate::transform::{mul, Mat4};
+use crate::transform::{Mat4, mul};
 
 /// A camera with a `view_proj` matrix, implemented by both [`crate::Camera2D`] and
 /// [`Camera3D`] so a pipeline can be fed by either.

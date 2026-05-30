@@ -82,7 +82,11 @@ impl AnimationPlayer {
         match self.anim.direction {
             Direction::Forward => self.local = (self.local + 1) % len,
             Direction::Reverse => {
-                self.local = if self.local == 0 { len - 1 } else { self.local - 1 }
+                self.local = if self.local == 0 {
+                    len - 1
+                } else {
+                    self.local - 1
+                }
             }
             Direction::PingPong => {
                 if self.forward {

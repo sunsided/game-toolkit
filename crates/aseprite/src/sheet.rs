@@ -4,9 +4,9 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use ah_asefile::{AnimationDirection, AsepriteFile};
-use anyhow::{anyhow, Context, Result};
-use image::RgbaImage;
+use anyhow::{Context, Result, anyhow};
 use game_toolkit_gfx::{Graphics, TextureId};
+use image::RgbaImage;
 
 use crate::json;
 use crate::tag::{Animation, Direction};
@@ -103,8 +103,8 @@ impl SpriteSheet {
         json_path: impl AsRef<Path>,
     ) -> Result<Self> {
         let json_path = json_path.as_ref();
-        let bytes = std::fs::read(json_path)
-            .with_context(|| format!("read {}", json_path.display()))?;
+        let bytes =
+            std::fs::read(json_path).with_context(|| format!("read {}", json_path.display()))?;
         let parsed = json::parse(&bytes)?;
         let (sw, sh) = parsed.sheet_size;
         if sw == 0 || sh == 0 {

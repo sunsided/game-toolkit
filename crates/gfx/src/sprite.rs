@@ -14,10 +14,22 @@ struct QuadVertex {
 }
 
 const QUAD_VERTS: &[QuadVertex] = &[
-    QuadVertex { pos: [0.0, 0.0], uv: [0.0, 0.0] },
-    QuadVertex { pos: [1.0, 0.0], uv: [1.0, 0.0] },
-    QuadVertex { pos: [1.0, 1.0], uv: [1.0, 1.0] },
-    QuadVertex { pos: [0.0, 1.0], uv: [0.0, 1.0] },
+    QuadVertex {
+        pos: [0.0, 0.0],
+        uv: [0.0, 0.0],
+    },
+    QuadVertex {
+        pos: [1.0, 0.0],
+        uv: [1.0, 0.0],
+    },
+    QuadVertex {
+        pos: [1.0, 1.0],
+        uv: [1.0, 1.0],
+    },
+    QuadVertex {
+        pos: [0.0, 1.0],
+        uv: [0.0, 1.0],
+    },
 ];
 const QUAD_INDICES: &[u16] = &[0, 1, 2, 0, 2, 3];
 

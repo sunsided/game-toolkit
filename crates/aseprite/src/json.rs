@@ -7,7 +7,7 @@
 //! Packing options this loader cannot represent (rotated or trimmed frames) and tag
 //! directions it does not model are rejected with an error rather than mis-rendered.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use indexmap::IndexMap;
 use serde::Deserialize;
 

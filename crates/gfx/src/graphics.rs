@@ -293,7 +293,10 @@ impl Graphics {
     {
         let mut n = 0;
         for p in changed_paths {
-            let canon = p.as_ref().canonicalize().unwrap_or_else(|_| p.as_ref().to_path_buf());
+            let canon = p
+                .as_ref()
+                .canonicalize()
+                .unwrap_or_else(|_| p.as_ref().to_path_buf());
             if let Some(&id) = self.texture_paths.get(&canon) {
                 match self.textures.reload(&self.device, &self.queue, id, &canon) {
                     Ok(()) => n += 1,
@@ -484,7 +487,8 @@ impl Graphics {
         for &layer in &layers {
             self.sprites
                 .draw_layer(layer, encoder, &targets, &self.camera_bg, &self.textures);
-            self.primitives.draw_layer(layer, encoder, &targets, &self.camera_bg);
+            self.primitives
+                .draw_layer(layer, encoder, &targets, &self.camera_bg);
         }
 
         self.text

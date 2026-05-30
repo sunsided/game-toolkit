@@ -60,13 +60,8 @@ impl TextSystem {
         let font_system = FontSystem::new();
         let swash_cache = SwashCache::new();
         let cache = Cache::new(device);
-        let mut atlas = TextAtlas::with_color_mode(
-            device,
-            queue,
-            &cache,
-            surface_format,
-            ColorMode::Accurate,
-        );
+        let mut atlas =
+            TextAtlas::with_color_mode(device, queue, &cache, surface_format, ColorMode::Accurate);
         let mut viewport = Viewport::new(device, &cache);
         viewport.update(queue, Resolution { width, height });
         let renderer = TextRenderer::new(

@@ -12,10 +12,10 @@ fn build_procedural_atlas(gfx: &mut Graphics) -> TextureId {
     let h = tile;
     let mut rgba = vec![0u8; (w * h * 4) as usize];
     let colors = [
-        (96, 192, 96),  // grass
-        (224, 200, 96), // sand
-        (64, 128, 224), // water
-        (160, 160, 168),// stone
+        (96, 192, 96),   // grass
+        (224, 200, 96),  // sand
+        (64, 128, 224),  // water
+        (160, 160, 168), // stone
     ];
     for (i, (r, g, b)) in colors.iter().enumerate() {
         for y in 0..tile {

@@ -15,12 +15,30 @@ fn unit_cube() -> (Vec<MeshVertex>, Vec<u16>) {
     let h = 0.5;
     // (normal, four corners in a loop) for each of the six faces.
     let faces: [([f32; 3], [[f32; 3]; 4]); 6] = [
-        ([1.0, 0.0, 0.0], [[h, -h, -h], [h, h, -h], [h, h, h], [h, -h, h]]),
-        ([-1.0, 0.0, 0.0], [[-h, -h, h], [-h, h, h], [-h, h, -h], [-h, -h, -h]]),
-        ([0.0, 1.0, 0.0], [[-h, h, -h], [-h, h, h], [h, h, h], [h, h, -h]]),
-        ([0.0, -1.0, 0.0], [[-h, -h, h], [-h, -h, -h], [h, -h, -h], [h, -h, h]]),
-        ([0.0, 0.0, 1.0], [[-h, -h, h], [h, -h, h], [h, h, h], [-h, h, h]]),
-        ([0.0, 0.0, -1.0], [[h, -h, -h], [-h, -h, -h], [-h, h, -h], [h, h, -h]]),
+        (
+            [1.0, 0.0, 0.0],
+            [[h, -h, -h], [h, h, -h], [h, h, h], [h, -h, h]],
+        ),
+        (
+            [-1.0, 0.0, 0.0],
+            [[-h, -h, h], [-h, h, h], [-h, h, -h], [-h, -h, -h]],
+        ),
+        (
+            [0.0, 1.0, 0.0],
+            [[-h, h, -h], [-h, h, h], [h, h, h], [h, h, -h]],
+        ),
+        (
+            [0.0, -1.0, 0.0],
+            [[-h, -h, h], [-h, -h, -h], [h, -h, -h], [h, -h, h]],
+        ),
+        (
+            [0.0, 0.0, 1.0],
+            [[-h, -h, h], [h, -h, h], [h, h, h], [-h, h, h]],
+        ),
+        (
+            [0.0, 0.0, -1.0],
+            [[h, -h, -h], [-h, -h, -h], [-h, h, -h], [h, h, -h]],
+        ),
     ];
     let mut vertices = Vec::with_capacity(24);
     let mut indices = Vec::with_capacity(36);

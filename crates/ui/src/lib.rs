@@ -28,14 +28,7 @@ impl Ui {
         let ctx = egui::Context::default();
         let viewport_id = ctx.viewport_id();
         let scale = Some(window.scale_factor() as f32);
-        let state = State::new(
-            ctx.clone(),
-            viewport_id,
-            window.as_ref(),
-            scale,
-            None,
-            None,
-        );
+        let state = State::new(ctx.clone(), viewport_id, window.as_ref(), scale, None, None);
         let renderer = Renderer::new(
             gfx.device(),
             gfx.surface_format(),
@@ -58,8 +51,12 @@ impl Ui {
 
     /// Build, tessellate and render an egui frame on top of `frame`'s render target.
     /// `build` is the user's `|ctx: &egui::Context| { ... }` closure.
-    pub fn run<F>(&mut self, gfx: &mut game_toolkit_gfx::Graphics, frame: &mut game_toolkit_gfx::Frame, build: F)
-    where
+    pub fn run<F>(
+        &mut self,
+        gfx: &mut game_toolkit_gfx::Graphics,
+        frame: &mut game_toolkit_gfx::Frame,
+        build: F,
+    ) where
         F: FnMut(&egui::Context),
     {
         // Make sure prior 2D layers were submitted.

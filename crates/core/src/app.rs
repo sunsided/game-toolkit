@@ -6,8 +6,8 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::WindowId;
 
-use crate::context::{Context, GameEvent};
 use crate::Game;
+use crate::context::{Context, GameEvent};
 
 #[derive(Clone)]
 pub struct AppConfig {
@@ -100,12 +100,7 @@ impl<G: Game> ApplicationHandler for AppRunner<G> {
         self.state = Some(RunState { ctx, game });
     }
 
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        _id: WindowId,
-        event: WindowEvent,
-    ) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         let Some(state) = self.state.as_mut() else {
             return;
         };
@@ -127,7 +122,10 @@ impl<G: Game> ApplicationHandler for AppRunner<G> {
                 );
             }
             WindowEvent::Focused(focused) => {
-                state.ctx.input.handle_window_event(&WindowEvent::Focused(focused));
+                state
+                    .ctx
+                    .input
+                    .handle_window_event(&WindowEvent::Focused(focused));
                 state
                     .game
                     .event(&mut state.ctx, &GameEvent::FocusChanged(focused));

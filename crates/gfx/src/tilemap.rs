@@ -139,8 +139,14 @@ impl Tilemap {
         let tw = self.tile_size[0] as f32;
         let th = self.tile_size[1] as f32;
         (
-            [self.origin[0] + x0 as f32 * tw, self.origin[1] + y0 as f32 * th],
-            [self.origin[0] + x1 as f32 * tw, self.origin[1] + y1 as f32 * th],
+            [
+                self.origin[0] + x0 as f32 * tw,
+                self.origin[1] + y0 as f32 * th,
+            ],
+            [
+                self.origin[0] + x1 as f32 * tw,
+                self.origin[1] + y1 as f32 * th,
+            ],
         )
     }
 

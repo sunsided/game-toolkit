@@ -7,12 +7,12 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use kira::Frame;
 use kira::manager::backend::DefaultBackend;
 use kira::manager::{AudioManager, AudioManagerSettings};
 use kira::sound::static_sound::{StaticSoundData, StaticSoundHandle, StaticSoundSettings};
 use kira::tween::Tween;
-use kira::Frame;
 
 #[cfg(feature = "synth")]
 mod synth;

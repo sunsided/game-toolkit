@@ -11,9 +11,9 @@
 
 use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Parser;
-use etagere::{size2, AtlasAllocator};
+use etagere::{AtlasAllocator, size2};
 use image::RgbaImage;
 use serde_json::json;
 

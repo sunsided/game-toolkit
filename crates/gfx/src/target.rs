@@ -68,13 +68,14 @@ impl<'a> Targets<'a> {
         &self,
         load: wgpu::LoadOp<f32>,
     ) -> Option<wgpu::RenderPassDepthStencilAttachment<'a>> {
-        self.depth.map(|view| wgpu::RenderPassDepthStencilAttachment {
-            view,
-            depth_ops: Some(wgpu::Operations {
-                load,
-                store: wgpu::StoreOp::Store,
-            }),
-            stencil_ops: None,
-        })
+        self.depth
+            .map(|view| wgpu::RenderPassDepthStencilAttachment {
+                view,
+                depth_ops: Some(wgpu::Operations {
+                    load,
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            })
     }
 }

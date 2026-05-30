@@ -116,6 +116,9 @@ mod tests {
         let pcm = synth.blip();
         let peak = pcm.iter().fold(0.0f32, |m, &x| m.max(x.abs()));
         // Raw synthie output (0.5 master gain etc.) is well below the normalized 0.9.
-        assert!(peak > 0.0 && peak < 0.6, "raw peak unexpectedly high: {peak}");
+        assert!(
+            peak > 0.0 && peak < 0.6,
+            "raw peak unexpectedly high: {peak}"
+        );
     }
 }

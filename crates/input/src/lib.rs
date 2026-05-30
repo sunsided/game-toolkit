@@ -9,8 +9,8 @@ use std::collections::{HashMap, HashSet};
 
 pub use winit::keyboard::KeyCode as Key;
 
-pub use gilrs::{Axis, Button, GamepadId};
 use gilrs::ff::{BaseEffect, BaseEffectType, EffectBuilder, Replay, Ticks};
+pub use gilrs::{Axis, Button, GamepadId};
 use gilrs::{Event, Gilrs};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

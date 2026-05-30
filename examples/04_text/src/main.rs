@@ -16,12 +16,7 @@ impl Game for App {
         let mut p = frame.painter(&mut ctx.gfx);
         p.clear([0.04, 0.05, 0.08, 1.0]);
 
-        p.text(
-            [20.0, 20.0],
-            "Hello, toolkit!",
-            36.0,
-            [1.0, 1.0, 1.0, 1.0],
-        );
+        p.text([20.0, 20.0], "Hello, toolkit!", 36.0, [1.0, 1.0, 1.0, 1.0]);
         p.text(
             [20.0, 70.0],
             "Glyphon + cosmic-text rendering on top of wgpu.",

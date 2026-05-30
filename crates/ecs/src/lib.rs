@@ -22,7 +22,7 @@
 //! sillyecs = "0.0"
 //! ```
 
-use std::sync::mpsc::{channel, Receiver, SendError, Sender, TryRecvError};
+use std::sync::mpsc::{Receiver, SendError, Sender, TryRecvError, channel};
 
 /// A plain 2D vector, convenient as ECS component data (position, velocity, ...).
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -118,4 +118,3 @@ mod tests {
         assert_eq!(<[f32; 2]>::from(v), [1.0, 2.0]);
     }
 }
-

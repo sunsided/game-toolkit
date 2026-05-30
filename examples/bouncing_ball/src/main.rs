@@ -113,7 +113,11 @@ impl Game for BouncingBall {
                 // the silhouette. Size slightly over `step` to avoid seams.
                 let cell = step + 0.3;
                 let half = cell * 0.5;
-                p.rect([center[0] + dx - half, center[1] + dy - half], [cell, cell], color);
+                p.rect(
+                    [center[0] + dx - half, center[1] + dy - half],
+                    [cell, cell],
+                    color,
+                );
             }
         }
     }
