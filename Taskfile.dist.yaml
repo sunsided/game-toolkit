@@ -1,0 +1,174 @@
+# game-toolkit — Rust workspace task runner
+# https://taskfile.dev
+version: '3'
+
+vars:
+  PROFILE: '{{ .PROFILE | default "debug" }}'
+  PROFILE_FLAG: '{{ if eq .PROFILE "release" }}--release{{ end }}'
+  PROFILE_DIR: '{{ if eq .PROFILE "release" }}release{{ else }}debug{{ end }}'
+
+  # Default example binary for `task run`. Override: task run EXAMPLE=ex_05_tilemap
+  EXAMPLE: '{{ .EXAMPLE | default "bouncing_ball" }}'
+
+tasks:
+  default:
+    cmds:
+      - task --list --sort=none
+    silent: true
+
+  fmt:
+    desc: Format all Rust sources
+    aliases: [format]
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    sources:
+      - ./**/*.rs
+    cmds:
+      - cargo fmt --all
+
+  lint:
+    desc: Lint the workspace (clippy, warnings are errors)
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    cmds:
+      - cargo clippy --workspace --all-targets -- -D warnings {{.CLI_ARGS}}
+
+  lint:fix:
+    desc: Auto-fix clippy lints, then format
+    aliases: [fix]
+    cmds:
+      - cargo clippy --workspace --all-targets --fix --allow-staged {{.CLI_ARGS}}
+      - task: fmt
+
+  check:
+    desc: Static checks - format check plus clippy
+    cmds:
+      - cargo fmt --all --check
+      - cargo clippy --workspace --all-targets -- -D warnings
+
+  build:
+    desc: Build the whole workspace (PROFILE=debug|release)
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    requires:
+      vars:
+        - name: PROFILE
+          enum: [debug, release]
+    sources:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/**/*.rs
+      - crates/**/*.toml
+      - examples/**/*.rs
+      - examples/**/*.toml
+    cmds:
+      - cargo build --workspace --all-targets {{.PROFILE_FLAG}} {{.CLI_ARGS}}
+
+  build:release:
+    desc: Build the workspace in release mode
+    cmds:
+      - task: build
+        vars: {PROFILE: release}
+
+  test:
+    desc: Run all tests (nextest if available, falls back to cargo test)
+    env:
+      RUST_LOG: disabled
+    cmds:
+      - |
+        if command -v cargo-nextest >/dev/null 2>&1; then
+          cargo nextest run --workspace {{.CLI_ARGS}}
+          # nextest does not run doctests — run them separately
+          cargo test --workspace --doc {{.CLI_ARGS}}
+        else
+          cargo test --workspace {{.CLI_ARGS}}
+        fi
+
+  run:
+    desc: 'Run an example binary (EXAMPLE=bouncing_ball|ex_01_window|ex_03_primitives|ex_04_text|ex_05_tilemap|ex_06_egui)'
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    cmds:
+      - cargo run {{.PROFILE_FLAG}} -p {{.EXAMPLE}} -- {{.CLI_ARGS}}
+
+  example:window:
+    desc: Run the window example
+    aliases: [run:window]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_01_window}
+
+  example:primitives:
+    desc: Run the primitives example
+    aliases: [run:primitives]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_03_primitives}
+
+  example:text:
+    desc: Run the text example
+    aliases: [run:text]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_04_text}
+
+  example:tilemap:
+    desc: Run the tilemap example
+    aliases: [run:tilemap]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_05_tilemap}
+
+  example:egui:
+    desc: Run the egui example
+    aliases: [run:egui]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_06_egui}
+
+  example:ball:
+    desc: Run the bouncing ball example
+    aliases: [run:ball]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: bouncing_ball}
+
+  docs:
+    desc: Build rustdoc for the workspace
+    sources:
+      - crates/**/*.rs
+      - crates/**/*.toml
+    generates:
+      - target/doc/**
+    cmds:
+      - cargo doc --workspace --no-deps {{.CLI_ARGS}}
+
+  docs:open:
+    desc: Build and open rustdoc in the browser
+    aliases: [open:docs]
+    cmds:
+      - task: docs
+        vars:
+          CLI_ARGS: --open {{.CLI_ARGS}}
+
+  ci:
+    desc: Full CI sequence - static checks then tests
+    cmds:
+      - task: check
+      - task: test
+
+  update:
+    desc: Update dependencies in Cargo.lock
+    cmds:
+      - cargo update {{.CLI_ARGS}}
+
+  clean:
+    desc: Remove all build artifacts
+    status:
+      - test ! -d target
+    cmds:
+      - cargo clean
