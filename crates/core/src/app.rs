@@ -161,6 +161,7 @@ impl<G: Game> AppRunner<G> {
             return;
         };
         state.ctx.time.tick();
+        state.ctx.input.poll_gamepads();
 
         match self.config.fixed_timestep {
             Some(step) => {

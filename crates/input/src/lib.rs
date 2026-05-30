@@ -1,11 +1,17 @@
-//! Input subsystem: keyboard + mouse with held / just-pressed / just-released semantics.
+//! Input subsystem: keyboard + mouse + gamepads, with held / just-pressed / just-released
+//! semantics.
 //!
-//! Call [`Input::handle_window_event`] for every `winit::event::WindowEvent`, then
-//! [`Input::end_frame`] once per frame after game `update` to clear edge state.
+//! Call [`Input::handle_window_event`] for every `winit::event::WindowEvent` and
+//! [`Input::poll_gamepads`] once per frame before `update`, then [`Input::end_frame`] once
+//! per frame after `update` to clear edge state.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 pub use winit::keyboard::KeyCode as Key;
+
+pub use gilrs::{Axis, Button, GamepadId};
+use gilrs::ff::{BaseEffect, BaseEffectType, EffectBuilder, Replay, Ticks};
+use gilrs::{Event, Gilrs};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum MouseButton {
@@ -28,6 +34,55 @@ impl From<winit::event::MouseButton> for MouseButton {
     }
 }
 
+/// Per-controller state, with the same held / just-pressed / just-released model as the
+/// keyboard. Obtain via [`Input::gamepads`] or [`Input::first_gamepad`].
+pub struct Gamepad {
+    id: GamepadId,
+    name: String,
+    connected: bool,
+    held: HashSet<Button>,
+    pressed: HashSet<Button>,
+    released: HashSet<Button>,
+    axes: HashMap<Axis, f32>,
+}
+
+impl Gamepad {
+    fn new(id: GamepadId) -> Self {
+        Self {
+            id,
+            name: String::new(),
+            connected: true,
+            held: HashSet::new(),
+            pressed: HashSet::new(),
+            released: HashSet::new(),
+            axes: HashMap::new(),
+        }
+    }
+
+    pub fn id(&self) -> GamepadId {
+        self.id
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn is_connected(&self) -> bool {
+        self.connected
+    }
+    pub fn button_held(&self, b: Button) -> bool {
+        self.held.contains(&b)
+    }
+    pub fn button_pressed(&self, b: Button) -> bool {
+        self.pressed.contains(&b)
+    }
+    pub fn button_released(&self, b: Button) -> bool {
+        self.released.contains(&b)
+    }
+    /// Axis value in `[-1, 1]` (triggers in `[0, 1]`); `0.0` if never reported.
+    pub fn axis(&self, axis: Axis) -> f32 {
+        self.axes.get(&axis).copied().unwrap_or(0.0)
+    }
+}
+
 #[derive(Default)]
 pub struct Input {
     keys_held: HashSet<Key>,
@@ -39,11 +94,115 @@ pub struct Input {
     mouse_pos: (f32, f32),
     mouse_delta: (f32, f32),
     scroll: (f32, f32),
+    /// `None` when no gamepad backend could initialize (the toolkit keeps running).
+    gilrs: Option<Gilrs>,
+    gamepads: HashMap<GamepadId, Gamepad>,
+    /// Active rumble effects kept alive for their duration (bounded ring).
+    rumble: Vec<gilrs::ff::Effect>,
 }
 
 impl Input {
     pub fn new() -> Self {
-        Self::default()
+        let mut me = Self::default();
+        match Gilrs::new() {
+            Ok(g) => {
+                // Seed pads already connected at startup; gilrs only emits `Connected` for
+                // hot-plugs, so without this a present controller is unknown until it moves.
+                for (id, gp) in g.gamepads() {
+                    let mut pad = Gamepad::new(id);
+                    pad.name = gp.name().to_string();
+                    me.gamepads.insert(id, pad);
+                }
+                me.gilrs = Some(g);
+            }
+            Err(e) => log::warn!("gamepad backend unavailable, continuing without it: {e}"),
+        }
+        me
+    }
+
+    /// Iterator over currently connected gamepads.
+    pub fn gamepads(&self) -> impl Iterator<Item = &Gamepad> {
+        self.gamepads.values().filter(|g| g.connected)
+    }
+
+    /// The first connected gamepad, if any. Convenient for single-player input.
+    pub fn first_gamepad(&self) -> Option<&Gamepad> {
+        self.gamepads.values().find(|g| g.connected)
+    }
+
+    /// Look up a connected gamepad by id.
+    pub fn gamepad(&self, id: GamepadId) -> Option<&Gamepad> {
+        self.gamepads.get(&id).filter(|g| g.connected)
+    }
+
+    /// Drain pending gamepad events into per-pad state, tracking hot-plug. Call once per
+    /// frame before `update`.
+    pub fn poll_gamepads(&mut self) {
+        let Some(gilrs) = self.gilrs.as_mut() else {
+            return;
+        };
+        while let Some(Event { id, event, .. }) = gilrs.next_event() {
+            use gilrs::EventType::*;
+            let pad = self.gamepads.entry(id).or_insert_with(|| Gamepad::new(id));
+            match event {
+                Connected => {
+                    pad.connected = true;
+                    pad.name = gilrs.gamepad(id).name().to_string();
+                }
+                Disconnected | Dropped => {
+                    pad.connected = false;
+                    pad.held.clear();
+                    pad.axes.clear();
+                }
+                ButtonPressed(b, _) => {
+                    pad.held.insert(b);
+                    pad.pressed.insert(b);
+                }
+                ButtonReleased(b, _) => {
+                    pad.held.remove(&b);
+                    pad.released.insert(b);
+                }
+                AxisChanged(axis, value, _) => {
+                    pad.axes.insert(axis, value);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Rumble `id` at `magnitude` (`0..=1`) for `duration_ms`. No-op when the pad has no
+    /// force feedback or no backend is available.
+    pub fn set_rumble(&mut self, id: GamepadId, magnitude: f32, duration_ms: u32) {
+        let Some(gilrs) = self.gilrs.as_mut() else {
+            return;
+        };
+        if !gilrs
+            .connected_gamepad(id)
+            .is_some_and(|g| g.is_ff_supported())
+        {
+            return;
+        }
+        let mag = (magnitude.clamp(0.0, 1.0) * f32::from(u16::MAX)) as u16;
+        let effect = EffectBuilder::new()
+            .add_effect(BaseEffect {
+                kind: BaseEffectType::Strong { magnitude: mag },
+                scheduling: Replay {
+                    play_for: Ticks::from_ms(duration_ms),
+                    ..Default::default()
+                },
+                envelope: Default::default(),
+            })
+            .gamepads(&[id])
+            .finish(gilrs);
+        if let Ok(effect) = effect {
+            let _ = effect.play();
+            // Keep the handle alive so the effect is not dropped (and stopped) immediately;
+            // bound the buffer so finished effects are eventually released.
+            self.rumble.push(effect);
+            if self.rumble.len() > 16 {
+                self.rumble.remove(0);
+            }
+        }
     }
 
     pub fn key_held(&self, k: Key) -> bool {
@@ -143,5 +302,9 @@ impl Input {
         self.mouse_released.clear();
         self.mouse_delta = (0.0, 0.0);
         self.scroll = (0.0, 0.0);
+        for pad in self.gamepads.values_mut() {
+            pad.pressed.clear();
+            pad.released.clear();
+        }
     }
 }

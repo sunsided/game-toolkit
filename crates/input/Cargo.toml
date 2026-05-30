@@ -6,6 +6,8 @@ license.workspace = true
 
 [dependencies]
 winit = { workspace = true }
+gilrs = { workspace = true }
+log   = { workspace = true }
 
 [lints]
 workspace = true

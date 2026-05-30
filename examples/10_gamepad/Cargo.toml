@@ -1,0 +1,16 @@
+[package]
+name = "ex_10_gamepad"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "10_gamepad"
+path = "src/main.rs"
+
+[dependencies]
+toolkit-prelude = { workspace = true }
+env_logger = { workspace = true }
+
+[lints]
+workspace = true
