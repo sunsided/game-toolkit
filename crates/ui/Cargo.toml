@@ -3,6 +3,7 @@ name = "toolkit-ui"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "egui debug-overlay integration for game-toolkit."
 
 [dependencies]
 anyhow      = { workspace = true }

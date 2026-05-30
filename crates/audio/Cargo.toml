@@ -3,6 +3,7 @@ name = "toolkit-audio"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Sound playback on kira, with optional synthie chiptune synthesis, for game-toolkit."
 
 [dependencies]
 anyhow  = { workspace = true }

@@ -16,6 +16,7 @@ All notable changes to this project are documented here. The format is based on
   `08_hot_reload` (live texture reload via `notify`), `09_aseprite` (native `.aseprite`
   animation).
 - Top-level `README.md` with quick-start, crate matrix, and example index.
+- Per-crate `README.md` and Cargo `description` metadata for clean crates.io pages.
 - This changelog.
 
 [Unreleased]: https://github.com/sunsided/game-toolkit/commits/main
