@@ -270,31 +270,54 @@ impl Graphics {
         let Some(encoder) = frame.encoder.as_mut() else {
             return;
         };
-        let load = wgpu::LoadOp::Clear(wgpu::Color {
-            r: frame.clear_color[0] as f64,
-            g: frame.clear_color[1] as f64,
-            b: frame.clear_color[2] as f64,
-            a: frame.clear_color[3] as f64,
+        // Interleave sprites and circles by layer so a circle on layer -1 draws under a
+        // sprite on layer 0; within a layer, sprites draw under circles. Text renders once
+        // on top (glyphon prepares a single vertex buffer per call, so it is not layered).
+        let mut layers = std::collections::BTreeSet::new();
+        self.sprites.collect_layers(&mut layers);
+        self.primitives.collect_layers(&mut layers);
+
+        // Upload each batcher's instances exactly once before drawing: `queue.write_buffer`
+        // is not part of the encoder command stream, so writing per layer pass would clobber
+        // earlier layers' instance data.
+        self.sprites.upload(&self.device, &self.queue);
+        self.primitives.upload(&self.device, &self.queue);
+
+        // Clear the target once up front; every layer pass then loads onto it.
+        let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("clear.pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &frame.view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: frame.clear_color[0] as f64,
+                        g: frame.clear_color[1] as f64,
+                        b: frame.clear_color[2] as f64,
+                        a: frame.clear_color[3] as f64,
+                    }),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            occlusion_query_set: None,
+            timestamp_writes: None,
+            multiview_mask: None,
         });
-        // Order matters: sprites first (with clear), then primitives, then text on top.
-        self.sprites.flush(
-            &self.device,
-            &self.queue,
-            encoder,
-            &frame.view,
-            &self.camera_bg,
-            &self.textures,
-            load,
-        );
-        self.primitives.flush(
-            &self.device,
-            &self.queue,
-            encoder,
-            &frame.view,
-            &self.camera_bg,
-        );
+
+        for &layer in &layers {
+            self.sprites
+                .draw_layer(layer, encoder, &frame.view, &self.camera_bg, &self.textures);
+            self.primitives
+                .draw_layer(layer, encoder, &frame.view, &self.camera_bg);
+        }
+
         self.text
             .flush(&self.device, &self.queue, encoder, &frame.view);
+
+        self.sprites.clear();
+        self.primitives.clear();
         frame.flushed = true;
     }
 }

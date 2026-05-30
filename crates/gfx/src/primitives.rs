@@ -31,7 +31,7 @@ pub(crate) struct PrimitiveBatcher {
     instance_vb: wgpu::Buffer,
     capacity: usize,
     pipeline: wgpu::RenderPipeline,
-    pending: Vec<CircleInstance>,
+    pending: Vec<(i16, CircleInstance)>,
 }
 
 impl PrimitiveBatcher {
@@ -120,21 +120,23 @@ impl PrimitiveBatcher {
         }
     }
 
-    pub fn push(&mut self, inst: CircleInstance) {
-        self.pending.push(inst);
+    pub fn push(&mut self, layer: i16, inst: CircleInstance) {
+        self.pending.push((layer, inst));
     }
 
-    pub fn flush(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        encoder: &mut wgpu::CommandEncoder,
-        view: &wgpu::TextureView,
-        camera_bg: &wgpu::BindGroup,
-    ) {
+    /// Record every layer that has pending circles, for cross-batcher interleaving.
+    pub fn collect_layers(&self, out: &mut std::collections::BTreeSet<i16>) {
+        out.extend(self.pending.iter().map(|(layer, _)| *layer));
+    }
+
+    /// Sort all pending circles by layer and upload them in one write. Must run before any
+    /// [`PrimitiveBatcher::draw_layer`]; see [`SpriteBatcher::upload`] for why the buffer is
+    /// written exactly once per frame rather than per layer pass.
+    pub fn upload(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
         if self.pending.is_empty() {
             return;
         }
+        self.pending.sort_by_key(|(layer, _)| *layer);
         if self.pending.len() > self.capacity {
             self.capacity = self.pending.len().next_power_of_two();
             self.instance_vb = device.create_buffer(&wgpu::BufferDescriptor {
@@ -144,7 +146,25 @@ impl PrimitiveBatcher {
                 mapped_at_creation: false,
             });
         }
-        queue.write_buffer(&self.instance_vb, 0, bytemuck::cast_slice(&self.pending));
+        let flat: Vec<CircleInstance> = self.pending.iter().map(|(_, c)| *c).collect();
+        queue.write_buffer(&self.instance_vb, 0, bytemuck::cast_slice(&flat));
+    }
+
+    /// Draw the circles on `layer` (already uploaded by [`PrimitiveBatcher::upload`]) into the
+    /// already-cleared target.
+    pub fn draw_layer(
+        &self,
+        layer: i16,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        camera_bg: &wgpu::BindGroup,
+    ) {
+        // `pending` is sorted by layer, so this layer's circles are a contiguous range.
+        let lo = self.pending.partition_point(|(l, _)| *l < layer);
+        let hi = self.pending.partition_point(|(l, _)| *l <= layer);
+        if lo == hi {
+            return;
+        }
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("prim.circle.pass"),
@@ -167,8 +187,10 @@ impl PrimitiveBatcher {
         pass.set_vertex_buffer(0, self.quad_vb.slice(..));
         pass.set_index_buffer(self.quad_ib.slice(..), wgpu::IndexFormat::Uint16);
         pass.set_vertex_buffer(1, self.instance_vb.slice(..));
-        pass.draw_indexed(0..6, 0, 0..self.pending.len() as u32);
-        drop(pass);
+        pass.draw_indexed(0..6, 0, lo as u32..hi as u32);
+    }
+
+    pub fn clear(&mut self) {
         self.pending.clear();
     }
 }

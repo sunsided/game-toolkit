@@ -99,6 +99,9 @@ impl TextSystem {
         });
     }
 
+    /// Render all queued text in one pass. Glyphon prepares a single internal vertex buffer
+    /// per call, so (unlike sprites and circles) text is not interleaved by layer; it always
+    /// draws on top of the sprite and circle layers.
     pub fn flush(
         &mut self,
         device: &wgpu::Device,

@@ -213,47 +213,25 @@ impl SpriteBatcher {
         ));
     }
 
-    // Passes the wgpu handles needed for one render pass; grouping them into a
-    // struct would not make call sites clearer.
-    #[allow(clippy::too_many_arguments)]
-    pub fn flush(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        encoder: &mut wgpu::CommandEncoder,
-        view: &wgpu::TextureView,
-        camera_bg: &wgpu::BindGroup,
-        textures: &TextureRegistry,
-        load_op: wgpu::LoadOp<wgpu::Color>,
-    ) {
+    /// Record every layer that has pending sprites, for cross-batcher interleaving.
+    pub fn collect_layers(&self, out: &mut std::collections::BTreeSet<i16>) {
+        out.extend(self.pending.iter().map(|(k, _)| k.layer));
+    }
+
+    /// Sort all pending sprites by layer (then blend, then texture) and upload them to the
+    /// instance buffer in one write. Must run before any [`SpriteBatcher::draw_layer`]: the
+    /// buffer is written once per frame because `queue.write_buffer` does not interleave with
+    /// encoder passes, so a per-pass write would clobber the earlier layers' data.
+    pub fn upload(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
         if self.pending.is_empty() {
-            // Still need to clear if requested.
-            let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("sprite.clear"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: load_op,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                occlusion_query_set: None,
-                timestamp_writes: None,
-                multiview_mask: None,
-            });
             return;
         }
-
         self.pending.sort_by(|a, b| {
             a.0.layer
                 .cmp(&b.0.layer)
                 .then((a.0.blend as u8).cmp(&(b.0.blend as u8)))
                 .then(a.0.texture.0.cmp(&b.0.texture.0))
         });
-
         if self.pending.len() > self.instance_capacity {
             self.instance_capacity = self.pending.len().next_power_of_two();
             self.instance_vb = device.create_buffer(&wgpu::BufferDescriptor {
@@ -263,9 +241,26 @@ impl SpriteBatcher {
                 mapped_at_creation: false,
             });
         }
-
         let flat: Vec<SpriteInstance> = self.pending.iter().map(|(_, i)| *i).collect();
         queue.write_buffer(&self.instance_vb, 0, bytemuck::cast_slice(&flat));
+    }
+
+    /// Draw the sprites on `layer` (already uploaded by [`SpriteBatcher::upload`]) into the
+    /// already-cleared target, grouped by blend then texture to minimize state changes.
+    pub fn draw_layer(
+        &self,
+        layer: i16,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        camera_bg: &wgpu::BindGroup,
+        textures: &TextureRegistry,
+    ) {
+        // `pending` is sorted by layer, so this layer's sprites are a contiguous range.
+        let lo = self.pending.partition_point(|(k, _)| k.layer < layer);
+        let hi = self.pending.partition_point(|(k, _)| k.layer <= layer);
+        if lo == hi {
+            return;
+        }
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("sprite.pass"),
@@ -274,7 +269,7 @@ impl SpriteBatcher {
                 depth_slice: None,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: load_op,
+                    load: wgpu::LoadOp::Load,
                     store: wgpu::StoreOp::Store,
                 },
             })],
@@ -289,11 +284,11 @@ impl SpriteBatcher {
         pass.set_index_buffer(self.quad_ib.slice(..), wgpu::IndexFormat::Uint16);
         pass.set_vertex_buffer(1, self.instance_vb.slice(..));
 
-        let mut i = 0;
-        while i < self.pending.len() {
+        let mut i = lo;
+        while i < hi {
             let key = self.pending[i].0;
             let start = i;
-            while i < self.pending.len()
+            while i < hi
                 && self.pending[i].0.blend == key.blend
                 && self.pending[i].0.texture == key.texture
             {
@@ -304,8 +299,9 @@ impl SpriteBatcher {
             pass.set_bind_group(1, textures.bind_group(key.texture), &[]);
             pass.draw_indexed(0..6, 0, (start as u32)..(start as u32 + count));
         }
+    }
 
-        drop(pass);
+    pub fn clear(&mut self) {
         self.pending.clear();
     }
 }

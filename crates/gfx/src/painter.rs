@@ -77,17 +77,12 @@ impl<'a> Painter<'a> {
         self.gfx.sprites.draw(tex, 0, BlendMode::Alpha, inst);
     }
 
-    /// Filled disk.
+    /// Filled disk (layer 0).
     pub fn circle(&mut self, center: [f32; 2], radius: f32, color: [f32; 4]) {
-        self.gfx.primitives.push(CircleInstance {
-            center,
-            radius,
-            thickness: 0.0,
-            color,
-        });
+        self.circle_ex(center, radius, 0.0, color, 0);
     }
 
-    /// Ring (outline circle) with the given pixel thickness.
+    /// Ring (outline circle) with the given pixel thickness (layer 0).
     pub fn circle_outline(
         &mut self,
         center: [f32; 2],
@@ -95,14 +90,31 @@ impl<'a> Painter<'a> {
         thickness: f32,
         color: [f32; 4],
     ) {
-        self.gfx.primitives.push(CircleInstance {
-            center,
-            radius,
-            thickness: thickness.max(1.0),
-            color,
-        });
+        self.circle_ex(center, radius, thickness.max(1.0), color, 0);
     }
 
+    /// Circle on an explicit layer. `thickness == 0.0` is a filled disk; `> 0.0` is a ring of
+    /// that pixel thickness. Lower layers draw under higher ones across all batchers.
+    pub fn circle_ex(
+        &mut self,
+        center: [f32; 2],
+        radius: f32,
+        thickness: f32,
+        color: [f32; 4],
+        layer: i16,
+    ) {
+        self.gfx.primitives.push(
+            layer,
+            CircleInstance {
+                center,
+                radius,
+                thickness,
+                color,
+            },
+        );
+    }
+
+    /// Draw text. Text always renders on top of sprites and circles (it is not layered).
     pub fn text(&mut self, pos: [f32; 2], s: &str, size_px: f32, color: [f32; 4]) {
         self.gfx.text.queue(s, pos, size_px, color);
     }

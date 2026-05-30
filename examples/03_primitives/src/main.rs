@@ -36,6 +36,16 @@ impl Game for App {
             let to = [cx + a.cos() * r1, cy + a.sin() * r1];
             p.line(from, to, 2.0, [1.0, 1.0, 1.0, 0.5]);
         }
+
+        // Cross-batcher z-order (#14): sprites and circles interleave by layer, lower under
+        // higher. A layer-0 sprite rect sits between a layer -1 circle (peeking out behind
+        // it, top-left) and a layer +1 circle (in front of it, bottom-right).
+        let bx = w - 150.0;
+        let by = 95.0;
+        p.circle_ex([bx - 30.0, by - 30.0], 34.0, 0.0, [0.95, 0.30, 0.30, 1.0], -1);
+        p.rect([bx - 42.0, by - 42.0], [84.0, 84.0], [0.25, 0.80, 0.45, 1.0]);
+        p.circle_ex([bx + 34.0, by + 34.0], 28.0, 0.0, [0.35, 0.55, 1.0, 1.0], 1);
+        p.text([bx - 58.0, by + 62.0], "z-order", 18.0, [1.0, 1.0, 1.0, 1.0]);
     }
 }
 
