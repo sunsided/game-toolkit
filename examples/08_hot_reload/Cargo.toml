@@ -1,0 +1,14 @@
+[package]
+name = "ex_08_hot_reload"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "08_hot_reload"
+path = "src/main.rs"
+
+[dependencies]
+toolkit-prelude = { workspace = true }
+env_logger = { workspace = true }
+log = { workspace = true }
