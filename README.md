@@ -195,10 +195,11 @@ The generated jam templates ship their own `Taskfile.yaml` too.
 
 ## Status
 
-Pre-1.0. The 2D runtime, input, audio, assets, text, tilemap, egui overlay, Aseprite
-loading, optional depth/MSAA, and a first-cut 3D mesh path are in place. Roadmap and open
-workstreams live in the [toolkit epic](https://github.com/sunsided/game-toolkit/issues/15):
-ECS integration, an atlas-packer CLI, a `cargo-generate` jam template, and gamepad support.
+First crates.io release: `0.1.0`. The 2D runtime, input (keyboard / mouse / gamepad),
+audio, assets, text, tilemap, egui overlay, Aseprite loading, optional depth/MSAA, a
+first-cut 3D mesh path, ECS glue, the atlas-packer CLI, and `cargo-generate` jam templates
+are all in place. Still pre-1.0, so the API may shift between minor versions; roadmap and
+open workstreams live in the [toolkit epic](https://github.com/sunsided/game-toolkit/issues/15).
 
 ## License
 
