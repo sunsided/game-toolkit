@@ -1,0 +1,32 @@
+# ECS spec for 11_ecs: particles that integrate velocity into position and bounce.
+# sillyecs reads this in build.rs and generates the World/components/systems.
+
+# Generate the unchecked archetype fast-paths wrapped in `unsafe` blocks.
+allow_unsafe: true
+
+components:
+  - name: Position
+  - name: Velocity
+
+archetypes:
+  - name: Particle
+    description: A bouncing particle.
+    components:
+      - Position
+      - Velocity
+
+phases:
+  - name: FixedUpdate
+    fixed: 60Hz
+
+systems:
+  - name: Physics
+    phase: FixedUpdate
+    outputs:
+      - Position
+      - Velocity
+
+worlds:
+  - name: Main
+    archetypes:
+      - Particle

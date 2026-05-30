@@ -80,6 +80,7 @@ Each template is a minimal `Game` (window + Esc-to-quit + a drawn title) dependi
 | `toolkit-audio` | Sound loading + playback on `kira`; degrades gracefully to muted when no device is available. Optional chiptune synthesis (`synth` feature, via `synthie`). |
 | `toolkit-assets` | Asset path resolution + optional hot-reload watcher (`notify`). |
 | `toolkit-aseprite` | Load native `.aseprite` files and exported PNG + JSON sheets into a GPU-ready `SpriteSheet` with animation playback. |
+| `toolkit-ecs` | Small glue (component data, command queue) for the `sillyecs` compile-time archetype ECS. |
 | `toolkit-ui` | egui overlay integration for debug tooling (feature-gated). |
 | `toolkit-prelude` | `use toolkit_prelude::*;` re-exports. Features: `ui`, `aseprite`. |
 
@@ -103,6 +104,7 @@ Run any example with `cargo run -p <package>`.
 | `08_hot_reload` | `ex_08_hot_reload` | Edit `assets/reload_me.png` while it runs and watch the texture update live. |
 | `09_aseprite` | `ex_09_aseprite` | Load a native `.aseprite`, pack its frames into an atlas, and play a tagged animation. |
 | `10_gamepad` | `ex_10_gamepad` | Live gamepad overlay: sticks, buttons, stick-clicks, and rumble on A. |
+| `11_ecs` | `ex_11_ecs` | Bouncing particles driven by the `sillyecs` archetype ECS (build.rs codegen). |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
 
 ## Aseprite

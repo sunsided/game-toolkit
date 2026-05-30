@@ -21,3 +21,6 @@ pub use toolkit_aseprite::{self, Animation, AnimationPlayer, Direction, FrameRec
 
 #[cfg(feature = "synth")]
 pub use toolkit_audio::{synthie, Synth};
+
+#[cfg(feature = "ecs")]
+pub use toolkit_ecs::{self, ChannelQueue, Vec2};

@@ -11,6 +11,7 @@ toolkit-input  = { workspace = true }
 toolkit-audio    = { workspace = true }
 toolkit-assets   = { workspace = true }
 toolkit-aseprite = { workspace = true, optional = true }
+toolkit-ecs      = { workspace = true, optional = true }
 toolkit-ui       = { workspace = true, optional = true }
 winit            = { workspace = true }
 anyhow           = { workspace = true }
@@ -19,6 +20,7 @@ anyhow           = { workspace = true }
 default = []
 ui = ["dep:toolkit-ui"]
 aseprite = ["dep:toolkit-aseprite"]
+ecs = ["dep:toolkit-ecs"]
 synth = ["toolkit-audio/synth"]
 
 [lints]
