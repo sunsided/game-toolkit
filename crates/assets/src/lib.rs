@@ -2,7 +2,7 @@
 //!
 //! Asset paths are relative to a base directory (defaults to `assets/` next to the executable
 //! or the current working directory). Reads return raw bytes; decoding is the caller's job —
-//! [`game_toolkit_gfx`] decodes PNGs, [`game_toolkit_audio`] decodes ogg/wav, etc.
+//! `game_toolkit_gfx` decodes PNGs, `game_toolkit_audio` decodes ogg/wav, etc.
 //!
 //! Hot-reload is opt-in: call [`Assets::watch`] to start a `notify` watcher on the asset root,
 //! then drain change events each frame with [`Assets::drain_changes`].

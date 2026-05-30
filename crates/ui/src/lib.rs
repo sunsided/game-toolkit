@@ -3,7 +3,7 @@
 //! Wire it into your game by:
 //! 1. construct [`Ui::new`] once in `Game::init`,
 //! 2. call [`Ui::on_window_event`] from `Game::event` (you need to forward the raw winit event;
-//!    use [`raw_event_passthrough`] or pull the event from `GameEvent` in your own routing),
+//!    use `raw_event_passthrough` or pull the event from `GameEvent` in your own routing),
 //! 3. call [`Ui::run`] inside `Game::render`, passing a closure that builds the UI.
 
 #![forbid(unsafe_code)]

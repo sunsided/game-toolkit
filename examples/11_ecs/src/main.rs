@@ -13,7 +13,9 @@
     clippy::missing_safety_doc,
     clippy::new_without_default,
     clippy::nonminimal_bool,
-    clippy::excessive_precision
+    clippy::excessive_precision,
+    rustdoc::broken_intra_doc_links,
+    rustdoc::redundant_explicit_links
 )]
 
 use game_toolkit::prelude::*;

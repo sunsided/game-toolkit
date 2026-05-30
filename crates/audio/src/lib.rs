@@ -64,7 +64,7 @@ impl Audio {
     }
 
     /// Play mono PCM samples (`-1.0..=1.0`) directly, e.g. a buffer rendered by
-    /// [`Synth`](crate::Synth). The samples are duplicated to both channels.
+    /// [`Synth`]. The samples are duplicated to both channels.
     pub fn play_samples(&mut self, samples: &[f32], sample_rate: u32) -> Result<StaticSoundHandle> {
         let frames: Arc<[Frame]> = samples
             .iter()
