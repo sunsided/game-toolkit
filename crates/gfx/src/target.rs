@@ -16,6 +16,17 @@ pub(crate) fn no_write_depth(format: wgpu::TextureFormat) -> wgpu::DepthStencilS
     }
 }
 
+/// Depth-stencil state for 3D meshes: standard depth test (`Less`) with depth writes on.
+pub(crate) fn depth_test(format: wgpu::TextureFormat) -> wgpu::DepthStencilState {
+    wgpu::DepthStencilState {
+        format,
+        depth_write_enabled: Some(true),
+        depth_compare: Some(wgpu::CompareFunction::Less),
+        stencil: wgpu::StencilState::default(),
+        bias: wgpu::DepthBiasState::default(),
+    }
+}
+
 /// Multisample state for `sample_count` samples (no alpha-to-coverage).
 pub(crate) fn multisample(sample_count: u32) -> wgpu::MultisampleState {
     wgpu::MultisampleState {

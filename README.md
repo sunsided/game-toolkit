@@ -85,6 +85,7 @@ Run any example with `cargo run -p <package>`.
 | `04_text` | `ex_04_text` | Text rendering through glyphon. |
 | `05_tilemap` | `ex_05_tilemap` | Instanced atlas tilemap. |
 | `06_egui` | `ex_06_egui` | egui debug overlay (uses the `ui` feature). |
+| `07_3d` | `ex_07_3d` | Depth-tested perspective cubes (instanced meshes) with a 2D HUD on top. |
 | `07_audio` | `ex_07_audio` | Load and play a sound; Space triggers it, runs muted with no device. |
 | `08_hot_reload` | `ex_08_hot_reload` | Edit `assets/reload_me.png` while it runs and watch the texture update live. |
 | `09_aseprite` | `ex_09_aseprite` | Load a native `.aseprite`, pack its frames into an atlas, and play a tagged animation. |
@@ -110,11 +111,28 @@ let (uv_min, uv_max) = player.current_uv(&sheet);
 Both the hash and array `frames` layouts of the exported JSON are accepted, and tag
 directions (forward / reverse / ping-pong) drive playback.
 
+## 3D
+
+A small instanced static-mesh path renders under the 2D layers (which composite on top).
+It needs a depth buffer (`AppConfig::depth_format`).
+
+```rust
+let cube = ctx.gfx.create_mesh(&vertices, &indices); // [MeshVertex] + [u16]
+ctx.gfx.camera3d.eye = [0.0, 1.6, 6.0];              // perspective Camera3D
+
+// each frame, via the painter:
+let model = transform::mul(&transform::translation([x, 0.0, 0.0]), &transform::rotation_y(t));
+p.mesh(cube, model, [0.4, 0.8, 0.45, 1.0]);
+```
+
+Lighting is forward-unlit (Lambert from the vertex normal). glTF loading and a perspective
+follow-camera are future work.
+
 ## Status
 
-Pre-1.0. The 2D runtime, input, audio, assets, text, tilemap, egui overlay, and Aseprite
-loading are in place. Roadmap and open workstreams live in the
-[toolkit epic](https://github.com/sunsided/game-toolkit/issues/15): a 3D mesh pipeline,
+Pre-1.0. The 2D runtime, input, audio, assets, text, tilemap, egui overlay, Aseprite
+loading, optional depth/MSAA, and a first-cut 3D mesh path are in place. Roadmap and open
+workstreams live in the [toolkit epic](https://github.com/sunsided/game-toolkit/issues/15):
 ECS integration, an atlas-packer CLI, a `cargo-generate` jam template, and gamepad support.
 
 ## License

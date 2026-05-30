@@ -16,6 +16,7 @@ members = [
     "examples/04_text",
     "examples/05_tilemap",
     "examples/06_egui",
+    "examples/07_3d",
     "examples/07_audio",
     "examples/08_hot_reload",
     "examples/09_aseprite",

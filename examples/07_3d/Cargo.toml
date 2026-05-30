@@ -1,0 +1,16 @@
+[package]
+name = "ex_07_3d"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "07_3d"
+path = "src/main.rs"
+
+[dependencies]
+toolkit-prelude = { workspace = true }
+env_logger = { workspace = true }
+
+[lints]
+workspace = true

@@ -7,7 +7,9 @@ use wgpu::util::DeviceExt;
 use winit::window::Window;
 
 use crate::camera::{Camera2D, CameraUniform};
+use crate::camera3d::{Camera, Camera3D};
 use crate::frame::Frame;
+use crate::mesh::{MeshBatcher, MeshId, MeshInstance, MeshRegistry, MeshVertex};
 use crate::primitives::PrimitiveBatcher;
 use crate::sprite::SpriteBatcher;
 use crate::target::Targets;
@@ -35,6 +37,12 @@ pub struct Graphics {
     msaa_view: Option<wgpu::TextureView>,
     /// Depth attachment when `depth_format` is set. Recreated on resize.
     depth_view: Option<wgpu::TextureView>,
+    /// Perspective camera for 3D meshes. Set its fields to move the view.
+    pub camera3d: Camera3D,
+    camera3d_buf: wgpu::Buffer,
+    camera3d_bg: wgpu::BindGroup,
+    meshes: MeshRegistry,
+    mesh_batcher: MeshBatcher,
 }
 
 impl Graphics {
@@ -128,6 +136,23 @@ impl Graphics {
             }],
         });
 
+        let camera3d = Camera3D::new(width as f32 / height.max(1) as f32);
+        let camera3d_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("camera3d.buf"),
+            contents: bytemuck::bytes_of(&CameraUniform {
+                view_proj: camera3d.view_proj(),
+            }),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let camera3d_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("camera3d.bg"),
+            layout: &camera_bgl,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: camera3d_buf.as_entire_binding(),
+            }],
+        });
+
         let sample_count = msaa_samples.max(1);
         let textures = TextureRegistry::new(&device, &queue);
         let sprites = SpriteBatcher::new(
@@ -151,6 +176,9 @@ impl Graphics {
         );
         let (msaa_view, depth_view) =
             make_attachments(&device, &surface_config, sample_count, depth_format);
+        let meshes = MeshRegistry::new();
+        let mesh_batcher =
+            MeshBatcher::new(&device, format, &camera_bgl, sample_count, depth_format);
 
         Ok(Self {
             device,
@@ -171,6 +199,11 @@ impl Graphics {
             depth_format,
             msaa_view,
             depth_view,
+            camera3d,
+            camera3d_buf,
+            camera3d_bg,
+            meshes,
+            mesh_batcher,
         })
     }
 
@@ -190,6 +223,7 @@ impl Graphics {
         self.msaa_view = msaa_view;
         self.depth_view = depth_view;
         self.camera.resize(width as f32, height as f32);
+        self.camera3d.resize(width as f32, height as f32);
         self.text.resize(&self.queue, width, height);
     }
 
@@ -255,12 +289,31 @@ impl Graphics {
         self.textures.white()
     }
 
+    /// Upload a static mesh (positions + normals, indexed) and return its handle. Meshes are
+    /// drawn depth-tested via [`Graphics::draw_mesh`] using the perspective [`Self::camera3d`].
+    pub fn create_mesh(&mut self, vertices: &[MeshVertex], indices: &[u16]) -> MeshId {
+        self.meshes.create(&self.device, vertices, indices)
+    }
+
+    /// Queue one instance of `mesh` for this frame. Meshes render before the 2D layers, so
+    /// 2D sprites, primitives and text draw on top of them.
+    pub fn draw_mesh(&mut self, mesh: MeshId, instance: MeshInstance) {
+        self.mesh_batcher.push(mesh, instance);
+    }
+
     pub fn begin_frame(&mut self) -> Result<Frame> {
         self.queue.write_buffer(
             &self.camera_buf,
             0,
             bytemuck::bytes_of(&CameraUniform {
                 view_proj: self.camera.view_proj(),
+            }),
+        );
+        self.queue.write_buffer(
+            &self.camera3d_buf,
+            0,
+            bytemuck::bytes_of(&CameraUniform {
+                view_proj: self.camera3d.view_proj(),
             }),
         );
 
@@ -355,6 +408,17 @@ impl Graphics {
             multiview_mask: None,
         });
 
+        // 3D meshes draw first, depth-tested, so the 2D layers (which do not write depth)
+        // composite on top of them.
+        self.mesh_batcher.draw(
+            &self.device,
+            &self.queue,
+            &self.meshes,
+            encoder,
+            &targets,
+            &self.camera3d_bg,
+        );
+
         for &layer in &layers {
             self.sprites
                 .draw_layer(layer, encoder, &targets, &self.camera_bg, &self.textures);
@@ -366,6 +430,7 @@ impl Graphics {
 
         self.sprites.clear();
         self.primitives.clear();
+        self.mesh_batcher.clear();
         frame.flushed = true;
     }
 }

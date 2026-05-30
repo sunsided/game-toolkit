@@ -1,8 +1,10 @@
 use crate::frame::Frame;
 use crate::graphics::Graphics;
+use crate::mesh::{MeshId, MeshInstance};
 use crate::primitives::CircleInstance;
 use crate::sprite::{BlendMode, SpriteInstance};
 use crate::texture::TextureId;
+use crate::transform::Mat4;
 
 pub struct Painter<'a> {
     frame: &'a mut Frame,
@@ -117,6 +119,13 @@ impl<'a> Painter<'a> {
     /// Draw text. Text always renders on top of sprites and circles (it is not layered).
     pub fn text(&mut self, pos: [f32; 2], s: &str, size_px: f32, color: [f32; 4]) {
         self.gfx.text.queue(s, pos, size_px, color);
+    }
+
+    /// Draw an instance of a 3D `mesh` with the given column-major `model` transform and
+    /// tint. Meshes are depth-tested against [`crate::Graphics::camera3d`] and render under
+    /// all 2D content.
+    pub fn mesh(&mut self, mesh: MeshId, model: Mat4, color: [f32; 4]) {
+        self.gfx.draw_mesh(mesh, MeshInstance::new(model, color));
     }
 }
 

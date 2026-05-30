@@ -6,8 +6,8 @@ pub use winit;
 
 pub use toolkit_core::{run, AppConfig, Context, Game, GameEvent, Time};
 pub use toolkit_gfx::{
-    wgpu, BlendMode, Camera2D, CircleInstance, Frame, Graphics, Painter, SpriteInstance, TextureId,
-    Tilemap,
+    transform, wgpu, BlendMode, Camera, Camera2D, Camera3D, CircleInstance, Frame, Graphics, Mat4,
+    MeshId, MeshInstance, MeshVertex, Painter, SpriteInstance, TextureId, Tilemap,
 };
 pub use toolkit_input::{Input, Key, MouseButton};
 pub use toolkit_audio::{Audio, SoundId};
