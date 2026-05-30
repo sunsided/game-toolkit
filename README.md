@@ -1,6 +1,6 @@
 # game-toolkit
 
-[![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![license](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](#license)
 
 A Rust workspace of small, focused crates for 2D-first game jams. Drop in, implement
 `Game::init` / `update` / `render`, and ship. Each subsystem is its own crate, so a jam
@@ -114,5 +114,6 @@ ECS integration, an atlas-packer CLI, a `cargo-generate` jam template, and gamep
 
 ## License
 
-Dual-licensed under either of [MIT](https://opensource.org/licenses/MIT) or
-[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0), at your option.
+Licensed under the European Union Public Licence v. 1.2 (EUPL-1.2). See
+[LICENSE](LICENSE), or the
+[official text](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
