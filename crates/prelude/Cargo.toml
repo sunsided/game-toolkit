@@ -8,12 +8,14 @@ license.workspace = true
 toolkit-core   = { workspace = true }
 toolkit-gfx    = { workspace = true }
 toolkit-input  = { workspace = true }
-toolkit-audio  = { workspace = true }
-toolkit-assets = { workspace = true }
-toolkit-ui     = { workspace = true, optional = true }
-winit          = { workspace = true }
-anyhow         = { workspace = true }
+toolkit-audio    = { workspace = true }
+toolkit-assets   = { workspace = true }
+toolkit-aseprite = { workspace = true, optional = true }
+toolkit-ui       = { workspace = true, optional = true }
+winit            = { workspace = true }
+anyhow           = { workspace = true }
 
 [features]
 default = []
 ui = ["dep:toolkit-ui"]
+aseprite = ["dep:toolkit-aseprite"]

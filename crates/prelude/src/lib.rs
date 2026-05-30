@@ -15,3 +15,6 @@ pub use toolkit_assets::Assets;
 
 #[cfg(feature = "ui")]
 pub use toolkit_ui::{self, egui, Ui};
+
+#[cfg(feature = "aseprite")]
+pub use toolkit_aseprite::{self, Animation, AnimationPlayer, Direction, FrameRect, SpriteSheet};

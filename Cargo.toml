@@ -6,14 +6,19 @@ members = [
     "crates/input",
     "crates/audio",
     "crates/assets",
+    "crates/aseprite",
     "crates/ui",
     "crates/prelude",
     "examples/bouncing_ball",
     "examples/01_window",
+    "examples/02_sprite",
     "examples/03_primitives",
     "examples/04_text",
     "examples/05_tilemap",
     "examples/06_egui",
+    "examples/07_audio",
+    "examples/08_hot_reload",
+    "examples/09_aseprite",
 ]
 
 [workspace.package]
@@ -27,10 +32,11 @@ authors = ["Markus Mayer"]
 toolkit-core    = { path = "crates/core" }
 toolkit-gfx     = { path = "crates/gfx" }
 toolkit-input   = { path = "crates/input" }
-toolkit-audio   = { path = "crates/audio" }
-toolkit-assets  = { path = "crates/assets" }
-toolkit-ui      = { path = "crates/ui" }
-toolkit-prelude = { path = "crates/prelude" }
+toolkit-audio    = { path = "crates/audio" }
+toolkit-assets   = { path = "crates/assets" }
+toolkit-aseprite = { path = "crates/aseprite" }
+toolkit-ui       = { path = "crates/ui" }
+toolkit-prelude  = { path = "crates/prelude" }
 
 anyhow      = "1"
 bytemuck    = { version = "1.23", features = ["derive"] }
@@ -46,3 +52,7 @@ notify      = "8"
 egui        = "0.34"
 egui-wgpu   = "0.34"
 egui-winit  = "0.34"
+ah-asefile  = "0.4"
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+indexmap    = { version = "2", features = ["serde"] }
