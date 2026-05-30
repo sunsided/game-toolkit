@@ -13,6 +13,8 @@
 //! The dependency runs one way: this crate depends on `toolkit-gfx`, never the reverse, so
 //! the renderer stays unaware of asset formats.
 
+#![deny(unsafe_code)]
+
 mod anim;
 mod json;
 mod sheet;

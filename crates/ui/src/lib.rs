@@ -6,6 +6,8 @@
 //!    use [`raw_event_passthrough`] or pull the event from `GameEvent` in your own routing),
 //! 3. call [`Ui::run`] inside `Game::render`, passing a closure that builds the UI.
 
+#![deny(unsafe_code)]
+
 use std::sync::Arc;
 
 use anyhow::Result;

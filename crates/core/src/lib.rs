@@ -1,5 +1,7 @@
 //! Core: app loop, [`Game`] trait, [`Context`], time.
 
+#![deny(unsafe_code)]
+
 mod app;
 mod context;
 mod time;
