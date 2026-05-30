@@ -57,6 +57,19 @@ asset_root: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"),
 default `None`). The built-in 2D pipelines never write depth, so enabling it is harmless
 and is there to support depth-tested rendering.
 
+## Start a new jam
+
+Generate a project from a template with [cargo-generate](https://cargo-generate.github.io):
+
+```sh
+cargo generate --git https://github.com/sunsided/game-toolkit templates/jam --name my-jam
+# or the 3D starter (spinning cube):
+cargo generate --git https://github.com/sunsided/game-toolkit templates/jam-3d --name my-jam
+```
+
+Each template is a minimal `Game` (window + Esc-to-quit + a drawn title) depending on
+`toolkit-prelude` with the `ui` feature on, plus an `assets/` directory. `cd my-jam && cargo run`.
+
 ## Crates
 
 | Crate | What it gives you |

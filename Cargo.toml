@@ -22,6 +22,9 @@ members = [
     "examples/09_aseprite",
     "examples/10_gamepad",
 ]
+# cargo-generate templates contain `{{placeholders}}` and depend on the toolkit via git, so
+# they are not workspace members.
+exclude = ["templates"]
 
 [workspace.package]
 version = "0.1.0"

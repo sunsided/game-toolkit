@@ -1,0 +1,10 @@
+[package]
+name = "{{project-name}}"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+# The `ui` feature pulls in the egui debug-overlay support, handy during a jam.
+toolkit-prelude = { git = "https://github.com/sunsided/game-toolkit", features = ["ui"] }
+env_logger = "0.11"
