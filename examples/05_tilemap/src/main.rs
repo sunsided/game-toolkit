@@ -25,7 +25,7 @@ fn build_procedural_atlas(gfx: &mut Graphics) -> TextureId {
                 let idx = (py * w as usize + px) * 4;
                 let edge = x < 1 || y < 1 || x >= tile - 1 || y >= tile - 1;
                 let mul = if edge { 70 } else { 100 };
-                rgba[idx + 0] = (*r as u32 * mul / 100) as u8;
+                rgba[idx] = (*r as u32 * mul / 100) as u8;
                 rgba[idx + 1] = (*g as u32 * mul / 100) as u8;
                 rgba[idx + 2] = (*b as u32 * mul / 100) as u8;
                 rgba[idx + 3] = 255;

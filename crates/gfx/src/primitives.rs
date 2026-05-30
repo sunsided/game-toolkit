@@ -124,10 +124,6 @@ impl PrimitiveBatcher {
         self.pending.push(inst);
     }
 
-    pub fn has_pending(&self) -> bool {
-        !self.pending.is_empty()
-    }
-
     pub fn flush(
         &mut self,
         device: &wgpu::Device,

@@ -213,6 +213,9 @@ impl SpriteBatcher {
         ));
     }
 
+    // Passes the wgpu handles needed for one render pass; grouping them into a
+    // struct would not make call sites clearer.
+    #[allow(clippy::too_many_arguments)]
     pub fn flush(
         &mut self,
         device: &wgpu::Device,

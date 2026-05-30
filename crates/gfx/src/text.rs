@@ -76,10 +76,6 @@ impl TextSystem {
         });
     }
 
-    pub fn has_pending(&self) -> bool {
-        !self.queued.is_empty()
-    }
-
     pub fn flush(
         &mut self,
         device: &wgpu::Device,
