@@ -52,6 +52,11 @@ that load files and want to run from anywhere should set it explicitly:
 asset_root: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"),
 ```
 
+`AppConfig` also exposes `msaa_samples` (e.g. `4` for anti-aliasing; default `1`) and
+`depth_format` (`Some(wgpu::TextureFormat::Depth32Float)` to allocate a depth buffer;
+default `None`). The built-in 2D pipelines never write depth, so enabling it is harmless
+and is there to support depth-tested rendering.
+
 ## Crates
 
 | Crate | What it gives you |

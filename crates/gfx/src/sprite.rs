@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
+use crate::target::Targets;
 use crate::texture::{TextureId, TextureRegistry};
 
 #[repr(C)]
@@ -88,7 +89,11 @@ impl SpriteBatcher {
         surface_format: wgpu::TextureFormat,
         camera_bgl: &wgpu::BindGroupLayout,
         texture_bgl: &wgpu::BindGroupLayout,
+        sample_count: u32,
+        depth_format: Option<wgpu::TextureFormat>,
     ) -> Self {
+        let multisample = crate::target::multisample(sample_count);
+        let depth_stencil = depth_format.map(crate::target::no_write_depth);
         let quad_vb = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("sprite.quad_vb"),
             contents: bytemuck::cast_slice(QUAD_VERTS),
@@ -158,8 +163,8 @@ impl SpriteBatcher {
                     })],
                 }),
                 primitive: wgpu::PrimitiveState::default(),
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState::default(),
+                depth_stencil: depth_stencil.clone(),
+                multisample,
                 multiview_mask: None,
                 cache: None,
             })
@@ -251,7 +256,7 @@ impl SpriteBatcher {
         &self,
         layer: i16,
         encoder: &mut wgpu::CommandEncoder,
-        view: &wgpu::TextureView,
+        targets: &Targets,
         camera_bg: &wgpu::BindGroup,
         textures: &TextureRegistry,
     ) {
@@ -264,16 +269,8 @@ impl SpriteBatcher {
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("sprite.pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
+            color_attachments: &[Some(targets.color_attachment(wgpu::LoadOp::Load))],
+            depth_stencil_attachment: targets.depth_attachment(wgpu::LoadOp::Load),
             occlusion_query_set: None,
             timestamp_writes: None,
             multiview_mask: None,

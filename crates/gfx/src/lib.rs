@@ -6,9 +6,14 @@ mod graphics;
 mod painter;
 mod primitives;
 mod sprite;
+mod target;
 mod text;
 mod texture;
 mod tilemap;
+
+/// Re-export so downstream crates can name wgpu types (e.g. `wgpu::TextureFormat` for a
+/// depth format) without adding their own wgpu dependency or risking a version mismatch.
+pub use wgpu;
 
 pub use camera::Camera2D;
 pub use frame::Frame;

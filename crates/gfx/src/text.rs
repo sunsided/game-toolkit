@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::target::Targets;
 use glyphon::{
     Attrs, Buffer, Cache, Color, ColorMode, FontSystem, Metrics, Resolution, Shaping, SwashCache,
     TextArea, TextAtlas, TextBounds, TextRenderer, Viewport,
@@ -46,12 +47,15 @@ fn size_key(size_px: f32) -> u32 {
 }
 
 impl TextSystem {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         surface_format: wgpu::TextureFormat,
         width: u32,
         height: u32,
+        sample_count: u32,
+        depth_format: Option<wgpu::TextureFormat>,
     ) -> Self {
         let font_system = FontSystem::new();
         let swash_cache = SwashCache::new();
@@ -68,8 +72,8 @@ impl TextSystem {
         let renderer = TextRenderer::new(
             &mut atlas,
             device,
-            wgpu::MultisampleState::default(),
-            None,
+            crate::target::multisample(sample_count),
+            depth_format.map(crate::target::no_write_depth),
         );
         Self {
             font_system,
@@ -107,7 +111,7 @@ impl TextSystem {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
-        view: &wgpu::TextureView,
+        targets: &Targets,
     ) {
         if self.queued.is_empty() {
             return;
@@ -171,16 +175,8 @@ impl TextSystem {
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("text.pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
+            color_attachments: &[Some(targets.color_attachment(wgpu::LoadOp::Load))],
+            depth_stencil_attachment: targets.depth_attachment(wgpu::LoadOp::Load),
             occlusion_query_set: None,
             timestamp_writes: None,
             multiview_mask: None,

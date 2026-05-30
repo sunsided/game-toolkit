@@ -1,6 +1,8 @@
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
+use crate::target::Targets;
+
 #[repr(C)]
 #[derive(Copy, Clone, Pod, Zeroable)]
 struct PrimVertex {
@@ -39,6 +41,8 @@ impl PrimitiveBatcher {
         device: &wgpu::Device,
         surface_format: wgpu::TextureFormat,
         camera_bgl: &wgpu::BindGroupLayout,
+        sample_count: u32,
+        depth_format: Option<wgpu::TextureFormat>,
     ) -> Self {
         let quad_vb = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("prim.quad_vb"),
@@ -104,8 +108,8 @@ impl PrimitiveBatcher {
                 })],
             }),
             primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
+            depth_stencil: depth_format.map(crate::target::no_write_depth),
+            multisample: crate::target::multisample(sample_count),
             multiview_mask: None,
             cache: None,
         });
@@ -156,7 +160,7 @@ impl PrimitiveBatcher {
         &self,
         layer: i16,
         encoder: &mut wgpu::CommandEncoder,
-        view: &wgpu::TextureView,
+        targets: &Targets,
         camera_bg: &wgpu::BindGroup,
     ) {
         // `pending` is sorted by layer, so this layer's circles are a contiguous range.
@@ -168,16 +172,8 @@ impl PrimitiveBatcher {
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("prim.circle.pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
+            color_attachments: &[Some(targets.color_attachment(wgpu::LoadOp::Load))],
+            depth_stencil_attachment: targets.depth_attachment(wgpu::LoadOp::Load),
             occlusion_query_set: None,
             timestamp_writes: None,
             multiview_mask: None,

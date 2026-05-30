@@ -9,6 +9,7 @@ anyhow        = { workspace = true }
 log           = { workspace = true }
 pollster      = { workspace = true }
 winit         = { workspace = true }
+wgpu          = { workspace = true }
 toolkit-gfx    = { workspace = true }
 toolkit-input  = { workspace = true }
 toolkit-audio  = { workspace = true }

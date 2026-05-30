@@ -23,6 +23,7 @@ pub struct Context {
 }
 
 impl Context {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         event_loop: &ActiveEventLoop,
         title: &str,
@@ -30,12 +31,19 @@ impl Context {
         height: u32,
         vsync: bool,
         asset_root: std::path::PathBuf,
+        depth_format: Option<wgpu::TextureFormat>,
+        msaa_samples: u32,
     ) -> Result<Self> {
         let attrs = Window::default_attributes()
             .with_title(title)
             .with_inner_size(winit::dpi::LogicalSize::new(width, height));
         let window = Arc::new(event_loop.create_window(attrs)?);
-        let gfx = pollster::block_on(toolkit_gfx::Graphics::new(window.clone(), vsync))?;
+        let gfx = pollster::block_on(toolkit_gfx::Graphics::new(
+            window.clone(),
+            vsync,
+            depth_format,
+            msaa_samples,
+        ))?;
         let audio = match toolkit_audio::Audio::new() {
             Ok(a) => Some(a),
             Err(e) => {

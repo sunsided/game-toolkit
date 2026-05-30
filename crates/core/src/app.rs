@@ -19,6 +19,13 @@ pub struct AppConfig {
     pub fixed_timestep: Option<Duration>,
     /// Asset root directory. Defaults to `./assets`.
     pub asset_root: std::path::PathBuf,
+    /// Depth attachment format. `None` (default) keeps the 2D path depth-less; `Some(fmt)`
+    /// (e.g. `wgpu::TextureFormat::Depth32Float`) allocates a depth buffer for depth-tested
+    /// rendering. The built-in 2D pipelines never write depth, so enabling it is harmless.
+    pub depth_format: Option<wgpu::TextureFormat>,
+    /// MSAA sample count for the surface. `1` (default) disables MSAA; `2`/`4`/`8` enable it
+    /// (the value must be supported by the adapter for the surface format).
+    pub msaa_samples: u32,
 }
 
 impl Default for AppConfig {
@@ -30,6 +37,8 @@ impl Default for AppConfig {
             vsync: true,
             fixed_timestep: None,
             asset_root: std::path::PathBuf::from("assets"),
+            depth_format: None,
+            msaa_samples: 1,
         }
     }
 }
@@ -69,6 +78,8 @@ impl<G: Game> ApplicationHandler for AppRunner<G> {
             self.config.height,
             self.config.vsync,
             self.config.asset_root.clone(),
+            self.config.depth_format,
+            self.config.msaa_samples,
         ) {
             Ok(c) => c,
             Err(e) => {

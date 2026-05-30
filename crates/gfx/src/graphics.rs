@@ -10,6 +10,7 @@ use crate::camera::{Camera2D, CameraUniform};
 use crate::frame::Frame;
 use crate::primitives::PrimitiveBatcher;
 use crate::sprite::SpriteBatcher;
+use crate::target::Targets;
 use crate::text::TextSystem;
 use crate::texture::{TextureId, TextureRegistry};
 
@@ -28,10 +29,21 @@ pub struct Graphics {
     pub(crate) textures: TextureRegistry,
     pub(crate) clear_color: [f32; 4],
     texture_paths: HashMap<PathBuf, TextureId>,
+    sample_count: u32,
+    depth_format: Option<wgpu::TextureFormat>,
+    /// Multisampled color target (resolved to the surface) when `sample_count > 1`.
+    msaa_view: Option<wgpu::TextureView>,
+    /// Depth attachment when `depth_format` is set. Recreated on resize.
+    depth_view: Option<wgpu::TextureView>,
 }
 
 impl Graphics {
-    pub async fn new(window: Arc<Window>, vsync: bool) -> Result<Self> {
+    pub async fn new(
+        window: Arc<Window>,
+        vsync: bool,
+        depth_format: Option<wgpu::TextureFormat>,
+        msaa_samples: u32,
+    ) -> Result<Self> {
         let size = window.inner_size();
         let (width, height) = (size.width.max(1), size.height.max(1));
 
@@ -116,10 +128,29 @@ impl Graphics {
             }],
         });
 
+        let sample_count = msaa_samples.max(1);
         let textures = TextureRegistry::new(&device, &queue);
-        let sprites = SpriteBatcher::new(&device, format, &camera_bgl, &textures.layout);
-        let primitives = PrimitiveBatcher::new(&device, format, &camera_bgl);
-        let text = TextSystem::new(&device, &queue, format, width, height);
+        let sprites = SpriteBatcher::new(
+            &device,
+            format,
+            &camera_bgl,
+            &textures.layout,
+            sample_count,
+            depth_format,
+        );
+        let primitives =
+            PrimitiveBatcher::new(&device, format, &camera_bgl, sample_count, depth_format);
+        let text = TextSystem::new(
+            &device,
+            &queue,
+            format,
+            width,
+            height,
+            sample_count,
+            depth_format,
+        );
+        let (msaa_view, depth_view) =
+            make_attachments(&device, &surface_config, sample_count, depth_format);
 
         Ok(Self {
             device,
@@ -136,6 +167,10 @@ impl Graphics {
             textures,
             clear_color: [0.0, 0.0, 0.0, 1.0],
             texture_paths: HashMap::new(),
+            sample_count,
+            depth_format,
+            msaa_view,
+            depth_view,
         })
     }
 
@@ -146,6 +181,14 @@ impl Graphics {
         self.surface_config.width = width;
         self.surface_config.height = height;
         self.surface.configure(&self.device, &self.surface_config);
+        let (msaa_view, depth_view) = make_attachments(
+            &self.device,
+            &self.surface_config,
+            self.sample_count,
+            self.depth_format,
+        );
+        self.msaa_view = msaa_view;
+        self.depth_view = depth_view;
         self.camera.resize(width as f32, height as f32);
         self.text.resize(&self.queue, width, height);
     }
@@ -283,24 +326,30 @@ impl Graphics {
         self.sprites.upload(&self.device, &self.queue);
         self.primitives.upload(&self.device, &self.queue);
 
-        // Clear the target once up front; every layer pass then loads onto it.
+        // When multisampling, draws target the MSAA texture and resolve to the surface;
+        // otherwise they target the surface directly.
+        let (color, resolve) = match self.msaa_view.as_ref() {
+            Some(msaa) => (msaa, Some(&frame.view)),
+            None => (&frame.view, None),
+        };
+        let targets = Targets {
+            color,
+            resolve,
+            depth: self.depth_view.as_ref(),
+        };
+
+        // Clear color (and depth) once up front; every layer pass then loads onto it.
         let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("clear.pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &frame.view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: frame.clear_color[0] as f64,
-                        g: frame.clear_color[1] as f64,
-                        b: frame.clear_color[2] as f64,
-                        a: frame.clear_color[3] as f64,
-                    }),
-                    store: wgpu::StoreOp::Store,
+            color_attachments: &[Some(targets.color_attachment(wgpu::LoadOp::Clear(
+                wgpu::Color {
+                    r: frame.clear_color[0] as f64,
+                    g: frame.clear_color[1] as f64,
+                    b: frame.clear_color[2] as f64,
+                    a: frame.clear_color[3] as f64,
                 },
-            })],
-            depth_stencil_attachment: None,
+            )))],
+            depth_stencil_attachment: targets.depth_attachment(wgpu::LoadOp::Clear(1.0)),
             occlusion_query_set: None,
             timestamp_writes: None,
             multiview_mask: None,
@@ -308,16 +357,59 @@ impl Graphics {
 
         for &layer in &layers {
             self.sprites
-                .draw_layer(layer, encoder, &frame.view, &self.camera_bg, &self.textures);
-            self.primitives
-                .draw_layer(layer, encoder, &frame.view, &self.camera_bg);
+                .draw_layer(layer, encoder, &targets, &self.camera_bg, &self.textures);
+            self.primitives.draw_layer(layer, encoder, &targets, &self.camera_bg);
         }
 
         self.text
-            .flush(&self.device, &self.queue, encoder, &frame.view);
+            .flush(&self.device, &self.queue, encoder, &targets);
 
         self.sprites.clear();
         self.primitives.clear();
         frame.flushed = true;
     }
+}
+
+/// Allocate the MSAA color target (when `sample_count > 1`) and depth target (when a depth
+/// format is set), both sized to the surface. Returns `(msaa_view, depth_view)`.
+fn make_attachments(
+    device: &wgpu::Device,
+    config: &wgpu::SurfaceConfiguration,
+    sample_count: u32,
+    depth_format: Option<wgpu::TextureFormat>,
+) -> (Option<wgpu::TextureView>, Option<wgpu::TextureView>) {
+    let size = wgpu::Extent3d {
+        width: config.width,
+        height: config.height,
+        depth_or_array_layers: 1,
+    };
+    let msaa_view = (sample_count > 1).then(|| {
+        device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("msaa.color"),
+                size,
+                mip_level_count: 1,
+                sample_count,
+                dimension: wgpu::TextureDimension::D2,
+                format: config.format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            })
+            .create_view(&wgpu::TextureViewDescriptor::default())
+    });
+    let depth_view = depth_format.map(|format| {
+        device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("depth"),
+                size,
+                mip_level_count: 1,
+                sample_count,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            })
+            .create_view(&wgpu::TextureViewDescriptor::default())
+    });
+    (msaa_view, depth_view)
 }

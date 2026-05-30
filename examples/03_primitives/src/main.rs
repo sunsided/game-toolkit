@@ -55,6 +55,10 @@ fn main() -> Result<()> {
         title: "03_primitives".into(),
         width: 800,
         height: 600,
+        // 4x MSAA smooths the SDF circle and thin-line edges; the depth buffer is allocated
+        // but unused by the 2D pipelines (exercises the depth path without changing output).
+        msaa_samples: 4,
+        depth_format: Some(wgpu::TextureFormat::Depth32Float),
         ..Default::default()
     })
 }
