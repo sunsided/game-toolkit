@@ -20,6 +20,11 @@ impl<'a> Painter<'a> {
         self.frame.clear_color = color;
     }
 
+    /// World-space rectangle currently visible through the 2D camera, as `(min, max)`.
+    pub fn visible_rect(&self) -> ([f32; 2], [f32; 2]) {
+        self.gfx.camera.visible_rect()
+    }
+
     pub fn sprite(&mut self, tex: TextureId, pos: [f32; 2], size: [f32; 2]) {
         self.gfx
             .sprites

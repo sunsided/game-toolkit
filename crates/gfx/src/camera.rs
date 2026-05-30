@@ -37,6 +37,17 @@ impl Camera2D {
         self.center = [top_left[0] + w * 0.5 / z, top_left[1] + h * 0.5 / z];
     }
 
+    /// World-space rectangle currently visible, as `(min, max)` corners. Useful for culling.
+    pub fn visible_rect(&self) -> ([f32; 2], [f32; 2]) {
+        let z = self.zoom.max(1e-4);
+        let hw = self.viewport[0] * 0.5 / z;
+        let hh = self.viewport[1] * 0.5 / z;
+        (
+            [self.center[0] - hw, self.center[1] - hh],
+            [self.center[0] + hw, self.center[1] + hh],
+        )
+    }
+
     pub fn view_proj(&self) -> [[f32; 4]; 4] {
         let z = self.zoom.max(1e-4);
         let hw = self.viewport[0] * 0.5 / z;
