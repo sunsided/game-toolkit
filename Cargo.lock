@@ -236,7 +236,7 @@ dependencies = [
 
 [[package]]
 name = "atlas-packer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -310,7 +310,7 @@ dependencies = [
 
 [[package]]
 name = "bouncing_ball"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -930,7 +930,7 @@ dependencies = [
 
 [[package]]
 name = "ex_01_window"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -938,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "ex_02_sprite"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -946,7 +946,7 @@ dependencies = [
 
 [[package]]
 name = "ex_03_primitives"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -954,7 +954,7 @@ dependencies = [
 
 [[package]]
 name = "ex_04_text"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -962,7 +962,7 @@ dependencies = [
 
 [[package]]
 name = "ex_05_tilemap"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -970,7 +970,7 @@ dependencies = [
 
 [[package]]
 name = "ex_06_egui"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -978,7 +978,7 @@ dependencies = [
 
 [[package]]
 name = "ex_07_3d"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -986,7 +986,7 @@ dependencies = [
 
 [[package]]
 name = "ex_07_audio"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -995,7 +995,7 @@ dependencies = [
 
 [[package]]
 name = "ex_08_hot_reload"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -1004,7 +1004,7 @@ dependencies = [
 
 [[package]]
 name = "ex_09_aseprite"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -1013,7 +1013,7 @@ dependencies = [
 
 [[package]]
 name = "ex_10_gamepad"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -1021,7 +1021,7 @@ dependencies = [
 
 [[package]]
 name = "ex_11_ecs"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -1031,7 +1031,7 @@ dependencies = [
 
 [[package]]
 name = "ex_12_vector"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "game-toolkit",
@@ -1216,7 +1216,7 @@ dependencies = [
 
 [[package]]
 name = "game-toolkit"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "game-toolkit-aseprite",
@@ -1232,7 +1232,7 @@ dependencies = [
 
 [[package]]
 name = "game-toolkit-aseprite"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ah-asefile",
  "anyhow",
@@ -1246,7 +1246,7 @@ dependencies = [
 
 [[package]]
 name = "game-toolkit-assets"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "log",
@@ -1255,7 +1255,7 @@ dependencies = [
 
 [[package]]
 name = "game-toolkit-audio"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "kira",
@@ -1265,7 +1265,7 @@ dependencies = [
 
 [[package]]
 name = "game-toolkit-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "game-toolkit-assets",
@@ -1280,11 +1280,11 @@ dependencies = [
 
 [[package]]
 name = "game-toolkit-ecs"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "game-toolkit-gfx"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -1300,7 +1300,7 @@ dependencies = [
 
 [[package]]
 name = "game-toolkit-input"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "gilrs",
  "log",
@@ -1309,7 +1309,7 @@ dependencies = [
 
 [[package]]
 name = "game-toolkit-ui"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "egui",
