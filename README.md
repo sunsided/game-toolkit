@@ -1,6 +1,9 @@
 # game-toolkit
 
+[![Crates.io](https://img.shields.io/crates/v/game-toolkit.svg)](https://crates.io/crates/game-toolkit)
+[![docs.rs](https://img.shields.io/docsrs/game-toolkit)](https://docs.rs/game-toolkit)
 [![license](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](#license)
+[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
 
 A Rust workspace of small, focused crates for 2D-first game jams. Drop in, implement
 `Game::init` / `update` / `render`, and ship. Each subsystem is its own crate, so a jam
@@ -200,5 +203,5 @@ ECS integration, an atlas-packer CLI, a `cargo-generate` jam template, and gamep
 ## License
 
 Licensed under the European Union Public Licence v. 1.2 (EUPL-1.2). See
-[LICENSE](LICENSE), or the
+[LICENSE](https://github.com/sunsided/game-toolkit/blob/main/LICENSE), or the
 [official text](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).

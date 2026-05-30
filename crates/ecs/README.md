@@ -1,5 +1,10 @@
 # game-toolkit-ecs
 
+[![Crates.io](https://img.shields.io/crates/v/game-toolkit-ecs.svg)](https://crates.io/crates/game-toolkit-ecs)
+[![docs.rs](https://img.shields.io/docsrs/game-toolkit-ecs)](https://docs.rs/game-toolkit-ecs)
+[![license](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](https://github.com/sunsided/game-toolkit/blob/main/LICENSE)
+[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
+
 Small glue for using the [sillyecs](https://github.com/sunsided/sillyecs) compile-time
 archetype ECS with [**game-toolkit**](https://github.com/sunsided/game-toolkit): a `Vec2` to
 alias as component data and a `ChannelQueue` command queue.

@@ -1,5 +1,10 @@
 # game-toolkit-core
 
+[![Crates.io](https://img.shields.io/crates/v/game-toolkit-core.svg)](https://crates.io/crates/game-toolkit-core)
+[![docs.rs](https://img.shields.io/docsrs/game-toolkit-core)](https://docs.rs/game-toolkit-core)
+[![license](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](https://github.com/sunsided/game-toolkit/blob/main/LICENSE)
+[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
+
 The app/runtime core of [**game-toolkit**](https://github.com/sunsided/game-toolkit): the
 `Game` trait (`init` / `update` / `render`), the winit 0.30 run loop, `Context`, and frame
 timing with an optional fixed timestep.

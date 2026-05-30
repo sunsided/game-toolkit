@@ -1,5 +1,10 @@
 # game-toolkit
 
+[![Crates.io](https://img.shields.io/crates/v/game-toolkit.svg)](https://crates.io/crates/game-toolkit)
+[![docs.rs](https://img.shields.io/docsrs/game-toolkit)](https://docs.rs/game-toolkit)
+[![license](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](https://github.com/sunsided/game-toolkit/blob/main/LICENSE)
+[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
+
 A 2D-first Rust toolkit for game jams. This umbrella crate is the one dependency you add;
 `use game_toolkit::prelude::*;` pulls in the runtime types from the `game-toolkit-*` crates
 (the `Game` trait, `Context`, `Painter`, input, audio, assets, ...).
