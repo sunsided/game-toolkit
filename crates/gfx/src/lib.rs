@@ -1,7 +1,5 @@
 //! Graphics subsystem: wgpu init, 2D sprite batcher, primitives, text, tilemap, painter API.
 
-#![deny(unsafe_code)]
-
 mod camera;
 mod frame;
 mod graphics;

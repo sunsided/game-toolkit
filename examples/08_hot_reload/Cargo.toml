@@ -12,3 +12,6 @@ path = "src/main.rs"
 toolkit-prelude = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
+
+[lints]
+workspace = true

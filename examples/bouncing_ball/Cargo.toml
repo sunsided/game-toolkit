@@ -7,3 +7,6 @@ license.workspace = true
 [dependencies]
 toolkit-prelude = { workspace = true }
 env_logger      = { workspace = true }
+
+[lints]
+workspace = true

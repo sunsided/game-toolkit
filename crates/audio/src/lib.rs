@@ -3,8 +3,6 @@
 //! Minimal first-cut API: load static sound buffers from disk and play them on the main track.
 //! Mixer tracks, tweens, spatial audio and streaming are intentionally deferred.
 
-#![deny(unsafe_code)]
-
 use std::collections::HashMap;
 use std::path::Path;
 

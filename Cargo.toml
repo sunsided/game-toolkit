@@ -28,6 +28,9 @@ license = "EUPL-1.2"
 repository = "https://github.com/sunsided/game-toolkit"
 authors = ["Markus Mayer"]
 
+[workspace.lints.rust]
+unsafe_code = "deny"
+
 [workspace.dependencies]
 toolkit-core    = { path = "crates/core" }
 toolkit-gfx     = { path = "crates/gfx" }

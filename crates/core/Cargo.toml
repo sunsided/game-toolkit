@@ -13,3 +13,6 @@ toolkit-gfx    = { workspace = true }
 toolkit-input  = { workspace = true }
 toolkit-audio  = { workspace = true }
 toolkit-assets = { workspace = true }
+
+[lints]
+workspace = true

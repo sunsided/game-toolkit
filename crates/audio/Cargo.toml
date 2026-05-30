@@ -8,3 +8,6 @@ license.workspace = true
 anyhow = { workspace = true }
 kira   = { workspace = true }
 log    = { workspace = true }
+
+[lints]
+workspace = true

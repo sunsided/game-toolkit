@@ -3,8 +3,6 @@
 //! Call [`Input::handle_window_event`] for every `winit::event::WindowEvent`, then
 //! [`Input::end_frame`] once per frame after game `update` to clear edge state.
 
-#![deny(unsafe_code)]
-
 use std::collections::HashSet;
 
 pub use winit::keyboard::KeyCode as Key;

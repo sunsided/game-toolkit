@@ -1,7 +1,5 @@
 //! Curated re-exports. `use toolkit_prelude::*;` and go.
 
-#![deny(unsafe_code)]
-
 pub use anyhow;
 pub use anyhow::Result;
 pub use winit;

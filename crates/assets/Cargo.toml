@@ -8,3 +8,6 @@ license.workspace = true
 anyhow = { workspace = true }
 log    = { workspace = true }
 notify = { workspace = true }
+
+[lints]
+workspace = true

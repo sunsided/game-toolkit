@@ -19,3 +19,6 @@ anyhow           = { workspace = true }
 default = []
 ui = ["dep:toolkit-ui"]
 aseprite = ["dep:toolkit-aseprite"]
+
+[lints]
+workspace = true
