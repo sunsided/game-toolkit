@@ -21,7 +21,20 @@ impl Camera2D {
     }
 
     pub fn resize(&mut self, w: f32, h: f32) {
+        // Keep the top-left world coordinate anchored so screen pixels keep
+        // mapping to the same world origin as the window grows or shrinks.
+        // Without this, `center` stays at the old viewport's midpoint and the
+        // projection drifts: the visible edges no longer line up with world
+        // [0, size], which makes pixel-space content appear off-centre after a
+        // resize. A follow camera overwrites `center` each frame, so it is
+        // unaffected.
+        let z = self.zoom.max(1e-4);
+        let top_left = [
+            self.center[0] - self.viewport[0] * 0.5 / z,
+            self.center[1] - self.viewport[1] * 0.5 / z,
+        ];
         self.viewport = [w, h];
+        self.center = [top_left[0] + w * 0.5 / z, top_left[1] + h * 0.5 / z];
     }
 
     pub fn view_proj(&self) -> [[f32; 4]; 4] {
