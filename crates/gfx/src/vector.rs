@@ -37,7 +37,9 @@ impl VectorPass {
             device,
             RendererOptions {
                 use_cpu: false,
-                antialiasing_support: AaSupport::area_only(),
+                // MSAA (not area AA): vello's analytic area AA leaves square conflation
+                // artifacts along diagonal edges. `all()` compiles the MSAA pipelines too.
+                antialiasing_support: AaSupport::all(),
                 num_init_threads: NonZeroUsize::new(1),
                 pipeline_cache: None,
             },
@@ -161,7 +163,7 @@ impl VectorPass {
             base_color: vello::peniko::Color::TRANSPARENT,
             width: self.width,
             height: self.height,
-            antialiasing_method: AaConfig::Area,
+            antialiasing_method: AaConfig::Msaa16,
         };
         match self.renderer.render_to_texture(
             device,
