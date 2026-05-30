@@ -179,6 +179,13 @@ tasks:
       - task: run
         vars: {EXAMPLE: ex_07_3d}
 
+  example:vector:
+    desc: Run the vello vector-graphics example
+    aliases: [run:vector]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_12_vector}
+
   atlas:
     desc: 'Run the atlas packer (e.g. task atlas -- --input sprites/ --output a.png --metadata a.json)'
     preconditions:
