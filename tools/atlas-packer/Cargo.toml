@@ -1,0 +1,20 @@
+[package]
+name = "atlas-packer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Pack a directory of PNGs into a texture atlas plus an Aseprite-compatible JSON sidecar."
+
+[[bin]]
+name = "atlas-packer"
+path = "src/main.rs"
+
+[dependencies]
+clap       = { workspace = true }
+image      = { workspace = true }
+etagere    = { workspace = true }
+serde_json = { workspace = true }
+anyhow     = { workspace = true }
+
+[lints]
+workspace = true

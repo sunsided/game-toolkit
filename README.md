@@ -125,6 +125,18 @@ let (uv_min, uv_max) = player.current_uv(&sheet);
 Both the hash and array `frames` layouts of the exported JSON are accepted, and tag
 directions (forward / reverse / ping-pong) drive playback.
 
+## Tools
+
+`tools/atlas-packer` is an offline CLI that packs a directory of PNGs into one atlas:
+
+```sh
+cargo run -p atlas-packer -- --input sprites/ --output atlas.png --metadata atlas.json
+# options: --max-size 2048 --padding 2
+```
+
+It writes the atlas PNG plus an Aseprite-compatible JSON sidecar, so the result loads with
+no extra code via `SpriteSheet::from_aseprite_json(&mut ctx.gfx, "atlas.png", "atlas.json")`.
+
 ## 3D
 
 A small instanced static-mesh path renders under the 2D layers (which composite on top).
