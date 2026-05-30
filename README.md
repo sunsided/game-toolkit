@@ -185,6 +185,7 @@ task               # list tasks
 task ci            # fmt check + clippy + tests
 task run:3d        # run an example (see task --list for example:* shortcuts)
 task atlas -- --input sprites/ --output a.png --metadata a.json
+task publish:dry   # trial publish all crates in order (task publish releases for real)
 ```
 
 The generated jam templates ship their own `Taskfile.yaml` too.

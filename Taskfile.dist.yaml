@@ -211,6 +211,41 @@ tasks:
       - task: check
       - task: test
 
+  publish:
+    desc: Publish all crates to crates.io in dependency order (prompts; cannot be undone)
+    prompt: "Publish all toolkit crates to crates.io? This is permanent."
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    cmds:
+      - task: publish:run
+
+  publish:dry:
+    desc: 'Dry-run the publish in order (dependent crates fail until their deps are live)'
+    aliases: [publish:check]
+    cmds:
+      - task: publish:run
+        vars: {DRY: "--dry-run"}
+
+  publish:run:
+    internal: true
+    # Dependency order: leaves first, then aseprite/ui/core, then prelude. `cargo publish`
+    # waits for each crate to propagate to the index before the next one builds.
+    cmds:
+      - for:
+          [
+            toolkit-gfx,
+            toolkit-input,
+            toolkit-audio,
+            toolkit-assets,
+            toolkit-ecs,
+            toolkit-aseprite,
+            toolkit-ui,
+            toolkit-core,
+            toolkit-prelude,
+          ]
+        cmd: cargo publish -p {{.ITEM}} --locked {{.DRY}} {{.CLI_ARGS}}
+
   update:
     desc: Update dependencies in Cargo.lock
     cmds:
