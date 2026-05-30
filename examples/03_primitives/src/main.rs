@@ -10,6 +10,9 @@ impl Game for App {
         if ctx.input.key_pressed(Key::Escape) {
             ctx.quit();
         }
+        if ctx.input.key_pressed(Key::F12) {
+            ctx.gfx.request_screenshot("screenshot.png");
+        }
     }
     fn render(&mut self, ctx: &mut Context, frame: &mut Frame) {
         let (w, h) = ctx.gfx.size();

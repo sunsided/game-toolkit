@@ -94,7 +94,7 @@ Run any example with `cargo run -p <package>`.
 |-----|---------|-------|
 | `01_window` | `ex_01_window` | Minimal window with an animated clear color; Esc quits. |
 | `02_sprite` | `ex_02_sprite` | Load a PNG via `load_texture`, draw it plain, spinning, and tinted. |
-| `03_primitives` | `ex_03_primitives` | SDF circles, rings, lines, and rectangles. |
+| `03_primitives` | `ex_03_primitives` | SDF circles, rings, lines, rectangles; F12 saves a screenshot. |
 | `04_text` | `ex_04_text` | Text rendering through glyphon. |
 | `05_tilemap` | `ex_05_tilemap` | Instanced atlas tilemap. |
 | `06_egui` | `ex_06_egui` | egui debug overlay (uses the `ui` feature). |
@@ -136,6 +136,9 @@ cargo run -p atlas-packer -- --input sprites/ --output atlas.png --metadata atla
 
 It writes the atlas PNG plus an Aseprite-compatible JSON sidecar, so the result loads with
 no extra code via `SpriteSheet::from_aseprite_json(&mut ctx.gfx, "atlas.png", "atlas.json")`.
+
+`ctx.gfx.request_screenshot("shot.png")` saves a PNG of the next presented frame (read back
+from the surface, encoded with [miniscreenshot](https://github.com/sunsided/miniscreenshot)).
 
 ## 3D
 

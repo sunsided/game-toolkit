@@ -43,6 +43,10 @@ pub struct Graphics {
     camera3d_bg: wgpu::BindGroup,
     meshes: MeshRegistry,
     mesh_batcher: MeshBatcher,
+    /// Whether the surface supports `COPY_SRC` (required to read frames back for screenshots).
+    capture_copy_src: bool,
+    /// Path to write a screenshot of the next presented frame, set by `request_screenshot`.
+    pending_screenshot: Option<PathBuf>,
 }
 
 impl Graphics {
@@ -94,8 +98,16 @@ impl Graphics {
         } else {
             wgpu::PresentMode::AutoNoVsync
         };
+        // Add COPY_SRC when the surface supports it so frames can be read back for
+        // screenshots; fall back to render-only otherwise (screenshots become a no-op).
+        let capture_copy_src = caps.usages.contains(wgpu::TextureUsages::COPY_SRC);
+        let surface_usage = if capture_copy_src {
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC
+        } else {
+            wgpu::TextureUsages::RENDER_ATTACHMENT
+        };
         let surface_config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            usage: surface_usage,
             format,
             width,
             height,
@@ -204,6 +216,8 @@ impl Graphics {
             camera3d_bg,
             meshes,
             mesh_batcher,
+            capture_copy_src,
+            pending_screenshot: None,
         })
     }
 
@@ -301,6 +315,16 @@ impl Graphics {
         self.mesh_batcher.push(mesh, instance);
     }
 
+    /// Save a PNG of the next presented frame to `path`. The read-back stalls that frame, so
+    /// this is for debug/dev use. A no-op (with a warning) if the surface lacks `COPY_SRC`.
+    pub fn request_screenshot(&mut self, path: impl Into<PathBuf>) {
+        if !self.capture_copy_src {
+            log::warn!("screenshot unsupported: surface does not allow COPY_SRC read-back");
+            return;
+        }
+        self.pending_screenshot = Some(path.into());
+    }
+
     pub fn begin_frame(&mut self) -> Result<Frame> {
         self.queue.write_buffer(
             &self.camera_buf,
@@ -343,12 +367,102 @@ impl Graphics {
         if !frame.flushed {
             self.flush_into(&mut frame);
         }
+
         if let Some(encoder) = frame.encoder.take() {
             self.queue.submit(std::iter::once(encoder.finish()));
         }
+
+        // Capture the just-submitted surface before presenting (the queue runs the read-back
+        // copy after the render submit, so it sees the finished frame).
+        let shot_path = self.pending_screenshot.take();
+        if let (Some(path), Some(st)) = (&shot_path, frame.surface_texture.as_ref()) {
+            self.save_screenshot(&st.texture, path);
+        }
+
         if let Some(st) = frame.surface_texture.take() {
             self.window.pre_present_notify();
             st.present();
+        }
+    }
+
+    /// Read the surface texture back to the CPU and save it via `miniscreenshot`. Synchronous
+    /// (maps with a blocking poll), so only used for the occasional debug screenshot.
+    fn save_screenshot(&self, texture: &wgpu::Texture, path: &Path) {
+        let width = self.surface_config.width;
+        let height = self.surface_config.height;
+        let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+        let padded_bpr = (width * 4).div_ceil(align) * align;
+
+        let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("screenshot.readback"),
+            size: (padded_bpr * height) as u64,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("screenshot.encoder"),
+            });
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(padded_bpr),
+                    rows_per_image: Some(height),
+                },
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        let slice = buffer.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |res| {
+            let _ = tx.send(res);
+        });
+        let _ = self.device.poll(wgpu::PollType::wait_indefinitely());
+        if !matches!(rx.recv(), Ok(Ok(()))) {
+            log::warn!("screenshot read-back failed to map");
+            return;
+        }
+
+        // Strip per-row padding and swizzle BGRA surfaces to the RGBA miniscreenshot wants.
+        let bgra = matches!(
+            self.surface_config.format,
+            wgpu::TextureFormat::Bgra8UnormSrgb | wgpu::TextureFormat::Bgra8Unorm
+        );
+        let row_bytes = (width * 4) as usize;
+        let data = slice.get_mapped_range();
+        let mut rgba = Vec::with_capacity(row_bytes * height as usize);
+        for row in 0..height as usize {
+            let start = row * padded_bpr as usize;
+            let line = &data[start..start + row_bytes];
+            if bgra {
+                for px in line.chunks_exact(4) {
+                    rgba.extend_from_slice(&[px[2], px[1], px[0], px[3]]);
+                }
+            } else {
+                rgba.extend_from_slice(line);
+            }
+        }
+        drop(data);
+        buffer.unmap();
+
+        match miniscreenshot::Screenshot::from_rgba(width, height, rgba).save(path) {
+            Ok(()) => log::info!("saved screenshot {}", path.display()),
+            Err(e) => log::warn!("screenshot save failed: {e}"),
         }
     }
 
