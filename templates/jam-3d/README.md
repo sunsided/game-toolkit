@@ -17,6 +17,7 @@ A window opens, spins a cube, and quits on `Esc`.
 Cargo.toml      depends on toolkit-prelude (with the `ui` egui-overlay feature)
 src/main.rs     your Game: uploads a mesh, drives camera3d, draws meshes + 2D HUD
 assets/         art, audio, fonts; AppConfig::asset_root points here
+Taskfile.yaml   task run / build / test / lint / fmt (needs go-task)
 ```
 
 Meshes (`MeshVertex` positions + normals) are uploaded once with `ctx.gfx.create_mesh` and

@@ -1,0 +1,47 @@
+# https://taskfile.dev
+version: '3'
+
+vars:
+  PROFILE: '{{ .PROFILE | default "debug" }}'
+  PROFILE_FLAG: '{{ if eq .PROFILE "release" }}--release{{ end }}'
+
+tasks:
+  default:
+    cmds:
+      - task --list --sort=none
+    silent: true
+
+  run:
+    desc: Run the game (PROFILE=debug|release)
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    cmds:
+      - cargo run {{.PROFILE_FLAG}} -- {{.CLI_ARGS}}
+
+  build:
+    desc: Build (PROFILE=debug|release)
+    cmds:
+      - cargo build {{.PROFILE_FLAG}} {{.CLI_ARGS}}
+
+  test:
+    desc: Run tests
+    cmds:
+      - cargo test {{.CLI_ARGS}}
+
+  fmt:
+    desc: Format sources
+    aliases: [format]
+    cmds:
+      - cargo fmt --all
+
+  lint:
+    desc: Clippy (warnings as errors)
+    cmds:
+      - cargo clippy --all-targets -- -D warnings
+
+  check:
+    desc: Format check + clippy
+    cmds:
+      - cargo fmt --all --check
+      - cargo clippy --all-targets -- -D warnings

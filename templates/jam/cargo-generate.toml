@@ -1,2 +1,4 @@
 [template]
 description = "A 2D-first game-jam starter built on game-toolkit"
+# Copy the Taskfile verbatim: its go-task `{{ }}` would clash with the template engine.
+exclude = ["Taskfile.yaml"]

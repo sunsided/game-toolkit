@@ -88,7 +88,7 @@ tasks:
         fi
 
   run:
-    desc: 'Run an example binary (EXAMPLE=bouncing_ball|ex_01_window|ex_03_primitives|ex_04_text|ex_05_tilemap|ex_06_egui)'
+    desc: 'Run an example by package (EXAMPLE=ex_02_sprite); see `task --list` for example:* shortcuts'
     preconditions:
       - sh: command -v cargo
         msg: "cargo not found — install Rust from https://rustup.rs/"
@@ -136,6 +136,56 @@ tasks:
     cmds:
       - task: run
         vars: {EXAMPLE: bouncing_ball}
+
+  example:sprite:
+    desc: Run the PNG sprite example
+    aliases: [run:sprite]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_02_sprite}
+
+  example:audio:
+    desc: Run the audio example (WAV + synth effects)
+    aliases: [run:audio]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_07_audio}
+
+  example:hotreload:
+    desc: Run the texture hot-reload example
+    aliases: [run:hotreload]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_08_hot_reload}
+
+  example:aseprite:
+    desc: Run the Aseprite animation example
+    aliases: [run:aseprite]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_09_aseprite}
+
+  example:gamepad:
+    desc: Run the gamepad overlay example
+    aliases: [run:gamepad]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_10_gamepad}
+
+  example:3d:
+    desc: Run the 3D spinning-cubes example
+    aliases: [run:3d]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_07_3d}
+
+  atlas:
+    desc: 'Run the atlas packer (e.g. task atlas -- --input sprites/ --output a.png --metadata a.json)'
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    cmds:
+      - cargo run {{.PROFILE_FLAG}} -p atlas-packer -- {{.CLI_ARGS}}
 
   docs:
     desc: Build rustdoc for the workspace

@@ -157,6 +157,19 @@ p.mesh(cube, model, [0.4, 0.8, 0.45, 1.0]);
 Lighting is forward-unlit (Lambert from the vertex normal). glTF loading and a perspective
 follow-camera are future work.
 
+## Development
+
+Common tasks run through [go-task](https://taskfile.dev) (`Taskfile.dist.yaml`):
+
+```sh
+task               # list tasks
+task ci            # fmt check + clippy + tests
+task run:3d        # run an example (see task --list for example:* shortcuts)
+task atlas -- --input sprites/ --output a.png --metadata a.json
+```
+
+The generated jam templates ship their own `Taskfile.yaml` too.
+
 ## Status
 
 Pre-1.0. The 2D runtime, input, audio, assets, text, tilemap, egui overlay, Aseprite
