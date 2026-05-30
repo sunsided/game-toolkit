@@ -46,7 +46,13 @@ impl Game for BouncingBall {
     fn render(&mut self, ctx: &mut Context, frame: &mut Frame) {
         let mut p = frame.painter(&mut ctx.gfx);
         p.clear([0.05, 0.06, 0.09, 1.0]);
-        p.rect(self.pos, self.size, [1.0, 0.4, 0.2, 1.0]);
+
+        let r = self.size[0] * 0.5;
+        let center = [self.pos[0] + r, self.pos[1] + r];
+        p.circle(center, r, [1.0, 0.4, 0.2, 1.0]);
+        // Offset specular highlight so it reads as a sphere, not a disc.
+        let hl = [center[0] - r * 0.3, center[1] - r * 0.3];
+        p.circle(hl, r * 0.35, [1.0, 0.75, 0.55, 0.9]);
     }
 }
 
