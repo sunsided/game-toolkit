@@ -10,11 +10,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
-use kira::Frame;
-use kira::manager::backend::DefaultBackend;
-use kira::manager::{AudioManager, AudioManagerSettings};
 use kira::sound::static_sound::{StaticSoundData, StaticSoundHandle, StaticSoundSettings};
-use kira::tween::Tween;
+use kira::{AudioManager, AudioManagerSettings, Decibels, DefaultBackend, Frame, Tween};
 
 #[cfg(feature = "synth")]
 mod synth;
@@ -81,10 +78,14 @@ impl Audio {
             .map_err(|e| anyhow!("kira play: {e}"))
     }
 
-    /// Master volume on the default main track. `1.0` is unity gain.
+    /// Master volume on the default main track, as a linear amplitude
+    /// (`1.0` is unity gain, `0.0` is silence). Converted to decibels for kira.
     pub fn set_master_volume(&mut self, volume: f32) {
-        self.manager
-            .main_track()
-            .set_volume(volume as f64, Tween::default());
+        let gain = if volume <= 0.0 {
+            Decibels::SILENCE
+        } else {
+            Decibels::from(20.0 * volume.log10())
+        };
+        self.manager.main_track().set_volume(gain, Tween::default());
     }
 }
