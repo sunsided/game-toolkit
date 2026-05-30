@@ -1,4 +1,5 @@
-use anyhow::Result;
+use std::collections::HashMap;
+
 use glyphon::{
     Attrs, Buffer, Cache, Color, ColorMode, FontSystem, Metrics, Resolution, Shaping, SwashCache,
     TextArea, TextAtlas, TextBounds, TextRenderer, Viewport,
@@ -13,6 +14,17 @@ struct Queued {
     color: [u8; 4],
 }
 
+/// A shaped `cosmic_text::Buffer` kept across frames, tagged with the frame it was last
+/// drawn on so stale entries can be evicted.
+struct CachedBuffer {
+    buffer: Buffer,
+    last_used: u64,
+}
+
+/// Drop cached buffers untouched for this many frames (~4s at 60fps). Bounds memory when
+/// text changes every frame (e.g. a live counter) without thrashing steady-state HUD text.
+const EVICT_AFTER_FRAMES: u64 = 240;
+
 pub(crate) struct TextSystem {
     font_system: FontSystem,
     swash_cache: SwashCache,
@@ -22,6 +34,15 @@ pub(crate) struct TextSystem {
     viewport: Viewport,
     renderer: TextRenderer,
     queued: Vec<Queued>,
+    /// Shaped buffers cached across frames, keyed by quantized size then text so a cache hit
+    /// needs no allocation. Nested maps let the inner lookup borrow `&str` directly.
+    buffers: HashMap<u32, HashMap<String, CachedBuffer>>,
+    frame: u64,
+}
+
+/// Quantize a pixel size into a stable integer cache key (hundredths of a pixel).
+fn size_key(size_px: f32) -> u32 {
+    (size_px.max(0.0) * 100.0).round() as u32
 }
 
 impl TextSystem {
@@ -58,6 +79,8 @@ impl TextSystem {
             viewport,
             renderer,
             queued: Vec::new(),
+            buffers: HashMap::new(),
+            frame: 0,
         }
     }
 
@@ -86,12 +109,15 @@ impl TextSystem {
         if self.queued.is_empty() {
             return;
         }
+        self.frame += 1;
 
-        // Build buffers up-front; the prepare() call borrows them.
-        let buffers: Vec<Buffer> = self
-            .queued
-            .iter()
-            .map(|q| {
+        // Build (or refresh) the cached buffer for every queued string. Shaping happens once
+        // per distinct (size, text); a repeated string in steady state allocates nothing.
+        for q in &self.queued {
+            let inner = self.buffers.entry(size_key(q.size_px)).or_default();
+            if let Some(c) = inner.get_mut(&q.text) {
+                c.last_used = self.frame;
+            } else {
                 let metrics = Metrics::new(q.size_px, q.size_px * 1.2);
                 let mut buf = Buffer::new(&mut self.font_system, metrics);
                 buf.set_text(
@@ -102,16 +128,21 @@ impl TextSystem {
                     None,
                 );
                 buf.shape_until_scroll(&mut self.font_system, false);
-                buf
-            })
-            .collect();
+                inner.insert(
+                    q.text.clone(),
+                    CachedBuffer {
+                        buffer: buf,
+                        last_used: self.frame,
+                    },
+                );
+            }
+        }
 
         let areas: Vec<TextArea> = self
             .queued
             .iter()
-            .zip(buffers.iter())
-            .map(|(q, buf)| TextArea {
-                buffer: buf,
+            .map(|q| TextArea {
+                buffer: &self.buffers[&size_key(q.size_px)][&q.text].buffer,
                 left: q.left,
                 top: q.top,
                 scale: 1.0,
@@ -156,7 +187,15 @@ impl TextSystem {
         }
         drop(pass);
         self.queued.clear();
-        // Trim atlas if it grew unbounded.
-        let _: Result<()> = Ok(());
+        self.evict_stale();
+    }
+
+    /// Drop buffers not drawn within [`EVICT_AFTER_FRAMES`] so the cache stays bounded.
+    fn evict_stale(&mut self) {
+        let frame = self.frame;
+        self.buffers.retain(|_, inner| {
+            inner.retain(|_, c| c.last_used + EVICT_AFTER_FRAMES >= frame);
+            !inner.is_empty()
+        });
     }
 }
