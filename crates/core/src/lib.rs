@@ -4,10 +4,12 @@
 
 mod app;
 mod context;
+mod rng;
 mod time;
 
 pub use app::{AppConfig, run};
 pub use context::{Context, GameEvent};
+pub use rng::Rng;
 pub use time::Time;
 
 pub trait Game: 'static + Sized {

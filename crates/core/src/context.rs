@@ -4,6 +4,7 @@ use anyhow::Result;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::Window;
 
+use crate::Rng;
 use crate::time::Time;
 
 pub enum GameEvent {
@@ -18,6 +19,7 @@ pub struct Context {
     pub input: game_toolkit_input::Input,
     pub assets: game_toolkit_assets::Assets,
     pub time: Time,
+    pub rng: Rng,
     pub window: Arc<Window>,
     pub(crate) quit_requested: bool,
 }
@@ -31,6 +33,7 @@ impl Context {
         height: u32,
         vsync: bool,
         asset_root: std::path::PathBuf,
+        random_seed: u64,
         depth_format: Option<wgpu::TextureFormat>,
         msaa_samples: u32,
     ) -> Result<Self> {
@@ -65,6 +68,7 @@ impl Context {
             input,
             assets,
             time: Time::new(),
+            rng: Rng::new(random_seed),
             window,
             quit_requested: false,
         })

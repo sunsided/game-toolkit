@@ -15,7 +15,7 @@ pub mod prelude {
 
     pub use game_toolkit_assets::Assets;
     pub use game_toolkit_audio::{Audio, SoundId};
-    pub use game_toolkit_core::{AppConfig, Context, Game, GameEvent, Time, run};
+    pub use game_toolkit_core::{AppConfig, Context, Game, GameEvent, Rng, Time, run};
     pub use game_toolkit_gfx::{
         BlendMode, Camera, Camera2D, Camera3D, CircleInstance, Frame, Graphics, Mat4, MeshId,
         MeshInstance, MeshVertex, Painter, SpriteInstance, TextureId, Tilemap, transform, wgpu,
