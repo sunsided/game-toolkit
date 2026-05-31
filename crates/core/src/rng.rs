@@ -11,6 +11,10 @@ pub struct Rng {
 impl Rng {
     /// Fallback state used when a zero seed is supplied.
     pub const DEFAULT_SEED: u64 = 0x4d59_5df4_d0f3_3173;
+    /// xorshift64* output scrambler multiplier.
+    const XORSHIFT64_STAR_MULTIPLIER: u64 = 0x2545_f491_4f6c_dd1d;
+    /// Number of random mantissa bits used for a uniform `f32` in `[0, 1)`.
+    const F32_MANTISSA_BITS: u32 = 24;
 
     /// Creates a new deterministic generator from `seed`.
     pub const fn new(seed: u64) -> Self {
@@ -32,7 +36,7 @@ impl Rng {
         x ^= x << 25;
         x ^= x >> 27;
         self.state = x;
-        x.wrapping_mul(0x2545_f491_4f6c_dd1d)
+        x.wrapping_mul(Self::XORSHIFT64_STAR_MULTIPLIER)
     }
 
     /// Returns the next `u32`.
@@ -58,8 +62,8 @@ impl Rng {
     /// Returns a uniform `f32` in `[0, 1)`.
     #[must_use]
     pub fn next_f32(&mut self) -> f32 {
-        const INV_2_POW_24: f32 = 1.0 / ((1u32 << 24) as f32);
-        ((self.next_u32() >> 8) as f32) * INV_2_POW_24
+        const INV_2_POW_24: f32 = 1.0 / ((1u32 << Rng::F32_MANTISSA_BITS) as f32);
+        ((self.next_u32() >> (u32::BITS - Self::F32_MANTISSA_BITS)) as f32) * INV_2_POW_24
     }
 
     fn uniform_below_u32(&mut self, upper_exclusive: u32) -> u32 {
