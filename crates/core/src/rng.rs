@@ -85,13 +85,15 @@ impl Rng {
     }
 
     fn uniform_below_usize(&mut self, upper_exclusive: usize) -> usize {
-        let zone = usize::MAX - (usize::MAX % upper_exclusive);
+        // Reject-sample entirely in u64 so range_usize yields the same sequence on 32- and
+        // 64-bit targets, honouring the across-platforms determinism guarantee. The accepted
+        // value is already < upper_exclusive, so the cast back to usize is lossless on both.
+        let upper = upper_exclusive as u64;
+        let zone = u64::MAX - (u64::MAX % upper);
         loop {
-            // On 64-bit targets this is the full word; on 32-bit it keeps the low 32 bits, which
-            // the xorshift64* output scrambler already mixes well enough for a uniform draw.
-            let value = self.next_u64() as usize;
+            let value = self.next_u64();
             if value < zone {
-                return value % upper_exclusive;
+                return (value % upper) as usize;
             }
         }
     }
