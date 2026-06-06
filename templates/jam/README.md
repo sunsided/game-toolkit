@@ -17,6 +17,7 @@ Cargo.toml      depends on game-toolkit (with the `ui` egui-overlay feature)
 src/main.rs     your Game: init / update / render
 assets/         art, audio, fonts; AppConfig::asset_root points here
 Taskfile.yaml   task run / build / test / lint / fmt (needs go-task)
+CLAUDE.md       agent cheatsheet for the game-toolkit API
 ```
 
 Write your game by filling in `Game::update` (input + simulation) and `Game::render`

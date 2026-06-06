@@ -47,6 +47,25 @@ tasks:
     cmds:
       - cargo fmt --all --check
       - cargo clippy --workspace --all-targets -- -D warnings
+      - task: check:templates
+
+  sync:templates:
+    desc: Stamp the canonical jam agent guide into each template as CLAUDE.md
+    cmds:
+      - cp templates/jam-agent-guide.md templates/jam/CLAUDE.md
+      - cp templates/jam-agent-guide.md templates/jam-3d/CLAUDE.md
+
+  check:templates:
+    desc: Verify each template's bundled CLAUDE.md matches the canonical jam agent guide
+    cmds:
+      - |
+        for t in jam jam-3d; do
+          if ! cmp -s templates/jam-agent-guide.md "templates/$t/CLAUDE.md"; then
+            echo "templates/$t/CLAUDE.md is out of sync with templates/jam-agent-guide.md" >&2
+            echo "run: task sync:templates" >&2
+            exit 1
+          fi
+        done
 
   build:
     desc: Build the whole workspace (PROFILE=debug|release)

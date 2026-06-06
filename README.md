@@ -72,6 +72,8 @@ cargo generate --git https://github.com/sunsided/game-toolkit templates/jam-3d -
 
 Each template is a minimal `Game` (window + Esc-to-quit + a drawn title) depending on
 `game-toolkit` with the `ui` feature on, plus an `assets/` directory. `cd my-jam && cargo run`.
+Generated projects also include a `CLAUDE.md` cheatsheet of the toolkit API, so coding agents
+working in the new repo are productive without first spelunking the toolkit source.
 
 ## Crates
 
