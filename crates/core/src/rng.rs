@@ -23,8 +23,8 @@ impl Rng {
         }
     }
 
-    /// Reseeds the generator.
-    pub fn reseed(&mut self, seed: u64) {
+    /// Reseeds the generator. A zero seed falls back to [`Self::DEFAULT_SEED`].
+    pub const fn reseed(&mut self, seed: u64) {
         self.state = if seed == 0 { Self::DEFAULT_SEED } else { seed };
     }
 
@@ -45,14 +45,22 @@ impl Rng {
         (self.next_u64() >> 32) as u32
     }
 
-    /// Returns a uniform `u32` sampled from `range`.
+    /// Returns a uniform `u32` sampled from the half-open `range`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `range` is empty (`range.start >= range.end`).
     #[must_use]
     pub fn range_u32(&mut self, range: Range<u32>) -> u32 {
         assert!(range.start < range.end, "range must be non-empty");
         range.start + self.uniform_below_u32(range.end - range.start)
     }
 
-    /// Returns a uniform `usize` sampled from `range`.
+    /// Returns a uniform `usize` sampled from the half-open `range`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `range` is empty (`range.start >= range.end`).
     #[must_use]
     pub fn range_usize(&mut self, range: Range<usize>) -> usize {
         assert!(range.start < range.end, "range must be non-empty");
@@ -79,11 +87,20 @@ impl Rng {
     fn uniform_below_usize(&mut self, upper_exclusive: usize) -> usize {
         let zone = usize::MAX - (usize::MAX % upper_exclusive);
         loop {
+            // On 64-bit targets this is the full word; on 32-bit it keeps the low 32 bits, which
+            // the xorshift64* output scrambler already mixes well enough for a uniform draw.
             let value = self.next_u64() as usize;
             if value < zone {
                 return value % upper_exclusive;
             }
         }
+    }
+}
+
+impl Default for Rng {
+    /// Seeds from [`Rng::DEFAULT_SEED`].
+    fn default() -> Self {
+        Self::new(Self::DEFAULT_SEED)
     }
 }
 
@@ -110,11 +127,36 @@ mod tests {
     }
 
     #[test]
+    fn range_usize_stays_within_bounds() {
+        let mut rng = Rng::new(7);
+        for _ in 0..2000 {
+            let value = rng.range_usize(3..9);
+            assert!((3..9).contains(&value));
+        }
+    }
+
+    #[test]
     fn f32_is_in_zero_to_one() {
         let mut rng = Rng::new(1);
         for _ in 0..2000 {
             let value = rng.next_f32();
             assert!((0.0..1.0).contains(&value));
         }
+    }
+
+    #[test]
+    fn reseed_restores_the_sequence() {
+        let mut rng = Rng::new(99);
+        let first: Vec<u64> = (0..8).map(|_| rng.next_u64()).collect();
+        rng.reseed(99);
+        let second: Vec<u64> = (0..8).map(|_| rng.next_u64()).collect();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn zero_seed_falls_back_to_default() {
+        // A zero seed must not freeze the generator at state 0 (xorshift is a no-op there).
+        assert_eq!(Rng::new(0).next_u64(), Rng::new(Rng::DEFAULT_SEED).next_u64());
+        assert_eq!(Rng::default().next_u64(), Rng::new(Rng::DEFAULT_SEED).next_u64());
     }
 }
