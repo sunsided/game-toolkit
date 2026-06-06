@@ -9,6 +9,10 @@ use winit::window::WindowId;
 use crate::Game;
 use crate::context::{Context, GameEvent};
 
+/// Runtime configuration passed to [`run`].
+///
+/// Construct it with `..Default::default()` so new fields added in future minor releases don't
+/// break your call site: `AppConfig { title: "game".into(), ..Default::default() }`.
 #[derive(Clone)]
 pub struct AppConfig {
     pub title: String,

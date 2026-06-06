@@ -3,6 +3,10 @@ use std::ops::Range;
 /// Deterministic xorshift64* pseudo-random number generator.
 ///
 /// Same seed always yields the same sequence across runs and platforms.
+///
+/// Not cryptographically secure: the full state is recoverable from the output, so never use it
+/// for security-sensitive values (tokens, secrets, nonces). It is meant for gameplay - procedural
+/// generation, spawn jitter, AI variation - where reproducibility matters and predictability does not.
 #[derive(Clone, Debug)]
 pub struct Rng {
     state: u64,
