@@ -43,7 +43,7 @@ tasks:
       - task: fmt
 
   check:
-    desc: Static checks - format check plus clippy
+    desc: Static checks - format check, clippy, and template sync
     cmds:
       - cargo fmt --all --check
       - cargo clippy --workspace --all-targets -- -D warnings

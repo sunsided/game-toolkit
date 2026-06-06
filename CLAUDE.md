@@ -70,8 +70,9 @@ copies only the chosen subdir, so each ships its **own** bundled agent doc as `C
 
 ## Generating test assets
 
-ffmpeg is broken in this environment. For audio test assets use Python's `wave` module; for
-sprites use the Aseprite CLI. Do not reach for ffmpeg.
+Don't rely on ffmpeg for generating assets - it isn't installed in CI and may be absent locally,
+so anything that shells out to it won't reproduce. Use Python's `wave` module for audio test
+assets and the Aseprite CLI for sprites.
 
 ## Releasing
 

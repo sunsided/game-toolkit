@@ -71,10 +71,12 @@ feature: `p.vector(|scene| { /* vello::Scene */ })`.
 ctx.input.key_pressed(Key::Space)   // also key_held / key_released
 ctx.input.mouse_pressed(MouseButton::Left) // mouse_held / mouse_released / mouse_pos() / mouse_delta() / scroll()
 if let Some(pad) = ctx.input.first_gamepad() {
-    pad.button_held(Button::South);
-    pad.axis(Axis::LeftStickX);     // -1.0..=1.0
+    let id = pad.id();
+    let move_x = pad.axis(Axis::LeftStickX);   // -1.0..=1.0, feed into movement
+    if pad.button_held(Button::South) {        // also button_pressed / button_released
+        ctx.input.set_rumble(id, 0.6, 200);    // magnitude, duration_ms
+    }
 }
-ctx.input.set_rumble(pad_id, 0.6, 200); // magnitude, duration_ms
 ```
 
 ## Audio (`Option`)
