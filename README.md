@@ -58,7 +58,8 @@ asset_root: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"),
 `AppConfig` also exposes `msaa_samples` (e.g. `4` for anti-aliasing; default `1`) and
 `depth_format` (`Some(wgpu::TextureFormat::Depth32Float)` to allocate a depth buffer;
 default `None`). The built-in 2D pipelines never write depth, so enabling it is harmless
-and is there to support depth-tested rendering.
+and is there to support depth-tested rendering. `AppConfig::random_seed` seeds the deterministic
+per-`Context` RNG (`ctx.rng`); a fixed seed reproduces a run.
 
 ## Start a new jam
 
@@ -79,7 +80,7 @@ working in the new repo are productive without first spelunking the toolkit sour
 
 | Crate | What it gives you |
 |-------|-------------------|
-| `game-toolkit-core` | App loop on winit 0.30 `ApplicationHandler`, the `Game` trait, `Context`, time, optional fixed timestep. |
+| `game-toolkit-core` | App loop on winit 0.30 `ApplicationHandler`, the `Game` trait, `Context`, time, optional fixed timestep, and a deterministic seedable RNG (`ctx.rng`). |
 | `game-toolkit-gfx` | wgpu init + surface management, sprite batcher, SDF circle/ring primitives, glyphon text, atlas tilemap, the `Painter` API. |
 | `game-toolkit-input` | Keyboard, mouse and gamepads (via gilrs) with held / just-pressed / just-released semantics, hot-plug, and rumble. |
 | `game-toolkit-audio` | Sound loading + playback on `kira`; degrades gracefully to muted when no device is available. Optional chiptune synthesis (`synth` feature, via `synthie`). |
@@ -181,6 +182,19 @@ p.vector(|scene| {
 });
 ```
 
+## Randomness
+
+`game-toolkit-core` ships a small deterministic xorshift64* generator, exposed per-`Context` as
+`ctx.rng` and seeded by `AppConfig::random_seed`. The same seed reproduces the same sequence across
+runs and platforms, which is handy for debugging and replays. It is not cryptographically secure -
+use it for gameplay (procedural generation, jitter, AI variation), not secrets.
+
+```rust
+let r = ctx.rng.next_f32();         // [0.0, 1.0)
+let face = ctx.rng.range_u32(1..7); // 1..=6
+ctx.rng.reseed(seed);               // restart the stream
+```
+
 ## Development
 
 Common tasks run through [go-task](https://taskfile.dev) (`Taskfile.dist.yaml`):
@@ -199,8 +213,8 @@ The generated jam templates ship their own `Taskfile.yaml` too.
 
 First crates.io release: `0.1.0`. The 2D runtime, input (keyboard / mouse / gamepad),
 audio, assets, text, tilemap, egui overlay, Aseprite loading, optional depth/MSAA, a
-first-cut 3D mesh path, ECS glue, the atlas-packer CLI, and `cargo-generate` jam templates
-are all in place. Still pre-1.0, so the API may shift between minor versions; roadmap and
+first-cut 3D mesh path, a deterministic seedable RNG, ECS glue, the atlas-packer CLI, and
+`cargo-generate` jam templates are all in place. Still pre-1.0, so the API may shift between minor versions; roadmap and
 open workstreams live in the [toolkit epic](https://github.com/sunsided/game-toolkit/issues/15).
 
 ## License
