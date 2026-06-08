@@ -42,6 +42,7 @@ fixed `dt` (possibly several times per frame); leave it `None` for variable `dt`
 | `ctx.audio` | `Option<Audio>` | sound - `None` when no device (runs muted); guard with `if let Some(a) = &mut ctx.audio` |
 | `ctx.assets` | `Assets` | asset-path resolution + hot-reload watcher |
 | `ctx.time` | `Time` | `elapsed`, `delta` (`Duration`), `frame: u64`, `fps: f32` |
+| `ctx.rng` | `Rng` | deterministic xorshift64* RNG: `next_f32()`, `range_u32(a..b)`, `range_usize(a..b)`, `reseed(seed)` |
 | `ctx.window` | `Arc<Window>` | the winit window |
 | `ctx.quit()` | | request shutdown |
 
@@ -88,6 +89,20 @@ if let Some(audio) = &mut ctx.audio {
 }
 ```
 
+## Randomness
+
+`ctx.rng` is a deterministic xorshift64* generator: the same `AppConfig::random_seed` reproduces
+the same run, which is handy for debugging and replays.
+
+```rust
+let r = ctx.rng.next_f32();                  // [0.0, 1.0)
+let face = ctx.rng.range_u32(1..7);          // 1..=6
+let i = ctx.rng.range_usize(0..items.len()); // panics if the range is empty
+ctx.rng.reseed(42);                          // restart the stream
+```
+
+Not cryptographically secure - gameplay use only (procedural generation, jitter, AI variation).
+
 ## Graphics essentials
 
 ```rust
@@ -116,9 +131,10 @@ fn main() -> Result<()> {
 ```
 
 All fields: `title`, `width`, `height`, `vsync` (default `true`), `fixed_timestep: Option<Duration>`
-(default `None`), `asset_root` (default `./assets`), `depth_format: Option<wgpu::TextureFormat>`
-(default `None`; set `Some(wgpu::TextureFormat::Depth32Float)` for 3D), `msaa_samples` (default `1`;
-`4` for anti-aliasing).
+(default `None`), `asset_root` (default `./assets`), `random_seed: u64` (seeds `ctx.rng`; default is
+a fixed nonzero constant, so runs are reproducible until you change it), `depth_format:
+Option<wgpu::TextureFormat>` (default `None`; set `Some(wgpu::TextureFormat::Depth32Float)` for 3D),
+`msaa_samples` (default `1`; `4` for anti-aliasing).
 
 ## Features
 
