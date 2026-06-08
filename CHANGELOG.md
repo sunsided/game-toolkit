@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-08
+
+### Added
+
+- Deterministic pseudo-random generator in `game-toolkit-core` (`Rng`, an xorshift64* generator),
+  exposed as `ctx.rng` and seeded by the new `AppConfig::random_seed` field; re-exported from the
+  prelude. For a given seed the sequence is reproducible across runs and platforms. Not
+  cryptographically secure - intended for gameplay randomness only.
+- A bundled `CLAUDE.md` agent cheatsheet in the generated jam templates (2D and 3D), documenting
+  the toolkit API surface so freshly generated projects carry it. It is kept byte-identical to the
+  canonical `templates/jam-agent-guide.md` by a `task sync:templates` step and a CI drift guard. A
+  contributor-focused root `CLAUDE.md` was added alongside it.
+
+### Fixed
+
+- Stop Cargo from parsing the jam template manifests when `game-toolkit` is consumed as a git
+  dependency.
+
 ## [0.1.0] - 2026-05-30
 
 Initial public release. A 2D-first Rust game-jam toolkit split into focused crates behind
@@ -38,5 +56,6 @@ the `game-toolkit` umbrella; add one dependency and `use game_toolkit::prelude::
 - Top-level and per-crate `README.md`s, crates.io metadata, and `#![forbid(unsafe_code)]`
   across every crate.
 
-[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/sunsided/game-toolkit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sunsided/game-toolkit/releases/tag/v0.1.0
