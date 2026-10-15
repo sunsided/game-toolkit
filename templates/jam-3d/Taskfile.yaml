@@ -45,3 +45,40 @@ tasks:
     cmds:
       - cargo fmt --all --check
       - cargo clippy --all-targets -- -D warnings
+
+  check:wasm:
+    desc: Clippy for the browser target (wasm32-unknown-unknown)
+    preconditions:
+      - sh: rustup target list --installed | grep -qx wasm32-unknown-unknown
+        msg: "wasm target missing — run: rustup target add wasm32-unknown-unknown"
+    cmds:
+      - cargo clippy --target wasm32-unknown-unknown --all-targets -- -D warnings
+
+  web:
+    desc: Run in the browser with live rebuild at http://localhost:8080 (needs trunk)
+    preconditions: &web-preconditions
+      - sh: command -v trunk
+        msg: "trunk not found — run: cargo install trunk --locked"
+      - sh: rustup target list --installed | grep -qx wasm32-unknown-unknown
+        msg: "wasm target missing — run: rustup target add wasm32-unknown-unknown"
+    deps: [assets:manifest]
+    cmds:
+      - trunk serve {{.PROFILE_FLAG}} {{.CLI_ARGS}}
+
+  web:build:
+    desc: Build for the browser into dist/ (PROFILE=release, then zip dist/ for itch.io)
+    preconditions: *web-preconditions
+    deps: [assets:manifest]
+    cmds:
+      - trunk build {{.PROFILE_FLAG}} {{.CLI_ARGS}}
+
+  assets:manifest:
+    desc: Regenerate assets/manifest.txt, the list of files the web build preloads
+    dir: assets
+    cmds:
+      - |
+        {
+          echo "# Files the web build preloads before Game::init (one path per line, relative to assets/)."
+          echo "# Regenerate with: task assets:manifest"
+          find . -type f ! -name manifest.txt ! -name '.*' | sed 's|^\./||' | LC_ALL=C sort
+        } > manifest.txt

@@ -11,13 +11,27 @@ cargo run
 
 A window opens, spins a cube, and quits on `Esc`.
 
+## Run in the browser
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install trunk --locked
+task web                         # http://localhost:8080, rebuilds on save
+PROFILE=release task web:build   # dist/ - zip it and upload to itch.io as an HTML game
+```
+
+Files under `assets/` are fetched before the game starts, from the list in
+`assets/manifest.txt` (the `web` tasks regenerate it). Sound starts after the first click or key
+press. See `CLAUDE.md` ("Shipping to the browser") for the details.
+
 ## Layout
 
 ```
 Cargo.toml      depends on game-toolkit (with the `ui` egui-overlay feature)
 src/main.rs     your Game: uploads a mesh, drives camera3d, draws meshes + 2D HUD
 assets/         art, audio, fonts; AppConfig::asset_root points here
-Taskfile.yaml   task run / build / test / lint / fmt (needs go-task)
+index.html      page for the browser build (trunk); Trunk.toml configures it
+Taskfile.yaml   task run / build / test / lint / fmt / web (needs go-task)
 CLAUDE.md       agent cheatsheet for the game-toolkit API
 ```
 

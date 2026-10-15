@@ -56,6 +56,7 @@ impl Game for Game1 {
 }
 
 fn main() -> Result<()> {
+    #[cfg(not(target_arch = "wasm32"))]
     env_logger::init();
     run::<Game1>(AppConfig {
         title: "{{project-name}}".into(),
@@ -64,7 +65,11 @@ fn main() -> Result<()> {
         // 3D needs a depth buffer; MSAA smooths the cube edges.
         depth_format: Some(wgpu::TextureFormat::Depth32Float),
         msaa_samples: 4,
-        asset_root: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"),
+        // The crate's assets/ natively (so `cargo run` works from anywhere); on the web,
+        // "assets" next to index.html.
+        asset_root: asset_root!(),
+        // On the web, render into index.html's <canvas id="game">.
+        canvas_id: Some("game".into()),
         ..Default::default()
     })
 }
