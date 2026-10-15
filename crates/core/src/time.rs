@@ -1,4 +1,8 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+// `std::time::Instant::now` panics on wasm32-unknown-unknown; web-time re-exports std's
+// `Instant` on native and uses `performance.now()` in the browser.
+use web_time::Instant;
 
 pub struct Time {
     pub elapsed: Duration,

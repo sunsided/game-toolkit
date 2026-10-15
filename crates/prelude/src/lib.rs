@@ -7,6 +7,9 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "aseprite")]
+mod aseprite_ext;
+
 /// Everything you need to write a game: `use game_toolkit::prelude::*;`.
 pub mod prelude {
     pub use anyhow;
@@ -15,7 +18,7 @@ pub mod prelude {
 
     pub use game_toolkit_assets::Assets;
     pub use game_toolkit_audio::{Audio, SoundId};
-    pub use game_toolkit_core::{AppConfig, Context, Game, GameEvent, Rng, Time, run};
+    pub use game_toolkit_core::{AppConfig, Context, Game, GameEvent, Rng, Time, asset_root, run};
     pub use game_toolkit_gfx::{
         BlendMode, Camera, Camera2D, Camera3D, CircleInstance, Frame, Graphics, Mat4, MeshId,
         MeshInstance, MeshVertex, Painter, SpriteInstance, TextureId, Tilemap, transform, wgpu,
@@ -25,6 +28,8 @@ pub mod prelude {
     #[cfg(feature = "ui")]
     pub use game_toolkit_ui::{self, Ui, egui};
 
+    #[cfg(feature = "aseprite")]
+    pub use crate::aseprite_ext::LoadAseprite;
     #[cfg(feature = "aseprite")]
     pub use game_toolkit_aseprite::{
         self, Animation, AnimationPlayer, Direction, FrameRect, SpriteSheet,

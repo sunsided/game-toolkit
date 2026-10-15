@@ -12,13 +12,21 @@ categories = ["game-development"]
 [dependencies]
 anyhow        = { workspace = true }
 log           = { workspace = true }
-pollster      = { workspace = true }
 winit         = { workspace = true }
+web-time      = { workspace = true }
 wgpu          = { workspace = true }
 game-toolkit-gfx    = { workspace = true }
 game-toolkit-input  = { workspace = true }
 game-toolkit-audio  = { workspace = true }
 game-toolkit-assets = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+pollster      = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen         = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys              = { workspace = true, features = ["console", "Document", "Element", "HtmlCanvasElement", "Window"] }
 
 [lints]
 workspace = true
