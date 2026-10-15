@@ -75,6 +75,7 @@ impl Graphics {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await
             .context("no compatible adapter")?;
@@ -101,7 +102,7 @@ impl Graphics {
             .formats
             .iter()
             .copied()
-            .find(|f| f.is_srgb())
+            .find(wgpu::TextureFormat::is_srgb)
             .unwrap_or(caps.formats[0]);
         let present_mode = if vsync {
             wgpu::PresentMode::AutoVsync
@@ -125,6 +126,7 @@ impl Graphics {
             desired_maximum_frame_latency: 2,
             alpha_mode: caps.alpha_modes[0],
             view_formats: vec![],
+            color_space: wgpu::SurfaceColorSpace::Auto,
         };
         surface.configure(&device, &surface_config);
 
@@ -400,7 +402,7 @@ impl Graphics {
 
         if let Some(st) = frame.surface_texture.take() {
             self.window.pre_present_notify();
-            st.present();
+            self.queue.present(st);
         }
     }
 

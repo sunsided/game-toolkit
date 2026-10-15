@@ -2,6 +2,7 @@
 name = "game-toolkit-gfx"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "wgpu rendering for game-toolkit: sprite/primitive/text batchers, tilemaps, 3D meshes, optional vello."

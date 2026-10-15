@@ -57,7 +57,7 @@ impl PrimitiveBatcher {
         let capacity = 1024usize;
         let instance_vb = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("prim.circle_instances"),
-            size: (capacity * std::mem::size_of::<CircleInstance>()) as u64,
+            size: (capacity * size_of::<CircleInstance>()) as u64,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -80,13 +80,13 @@ impl PrimitiveBatcher {
                 entry_point: Some("vs_main"),
                 compilation_options: Default::default(),
                 buffers: &[
-                    wgpu::VertexBufferLayout {
-                        array_stride: std::mem::size_of::<PrimVertex>() as u64,
+                    Some(wgpu::VertexBufferLayout {
+                        array_stride: size_of::<PrimVertex>() as u64,
                         step_mode: wgpu::VertexStepMode::Vertex,
                         attributes: &wgpu::vertex_attr_array![0 => Float32x2],
-                    },
-                    wgpu::VertexBufferLayout {
-                        array_stride: std::mem::size_of::<CircleInstance>() as u64,
+                    }),
+                    Some(wgpu::VertexBufferLayout {
+                        array_stride: size_of::<CircleInstance>() as u64,
                         step_mode: wgpu::VertexStepMode::Instance,
                         attributes: &wgpu::vertex_attr_array![
                             2 => Float32x2,
@@ -94,7 +94,7 @@ impl PrimitiveBatcher {
                             4 => Float32,
                             5 => Float32x4,
                         ],
-                    },
+                    }),
                 ],
             },
             fragment: Some(wgpu::FragmentState {
@@ -145,7 +145,7 @@ impl PrimitiveBatcher {
             self.capacity = self.pending.len().next_power_of_two();
             self.instance_vb = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("prim.circle_instances"),
-                size: (self.capacity * std::mem::size_of::<CircleInstance>()) as u64,
+                size: (self.capacity * size_of::<CircleInstance>()) as u64,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
@@ -160,7 +160,7 @@ impl PrimitiveBatcher {
         &self,
         layer: i16,
         encoder: &mut wgpu::CommandEncoder,
-        targets: &Targets,
+        targets: &Targets<'_>,
         camera_bg: &wgpu::BindGroup,
     ) {
         // `pending` is sorted by layer, so this layer's circles are a contiguous range.

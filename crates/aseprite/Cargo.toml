@@ -2,6 +2,7 @@
 name = "game-toolkit-aseprite"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Load native .aseprite files and exported PNG+JSON sheets into GPU-ready sprite sheets for game-toolkit."

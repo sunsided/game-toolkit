@@ -1,5 +1,6 @@
 [workspace]
-resolver = "2"
+# MSRV-aware resolution: picks dependency versions compatible with `rust-version`.
+resolver = "3"
 members = [
     "crates/core",
     "crates/gfx",
@@ -36,9 +37,22 @@ edition = "2024"
 license = "EUPL-1.2"
 repository = "https://github.com/sunsided/game-toolkit"
 authors = ["Markus Mayer"]
+# egui 0.37 sets the floor. CI runs an MSRV job against this exact toolchain.
+rust-version = "1.95"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
+rust_2018_idioms = { level = "warn", priority = -1 }
+unused_qualifications = "warn"
+
+# CI and `task lint` run clippy with `-D warnings`, so `warn` here is a hard gate.
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+manual_let_else = "warn"
+redundant_closure_for_method_calls = "warn"
+semicolon_if_nothing_returned = "warn"
+uninlined_format_args = "warn"
 
 [workspace.dependencies]
 # `version` (matching workspace.package.version) lets these path deps publish to crates.io;
@@ -57,17 +71,18 @@ anyhow      = "1"
 bytemuck    = { version = "1.25", features = ["derive"] }
 log         = "0.4"
 env_logger  = "0.11"
-pollster    = "0.4"
-wgpu        = "29"
+pollster    = "1"
+wgpu        = "30"
 winit       = "0.30"
 image       = { version = "0.25", default-features = false, features = ["png"] }
 kira        = "0.12"
-glyphon     = "0.11"
+glyphon     = "0.12"
 notify      = "8"
 gilrs       = "0.11"
-egui        = "0.34"
-egui-wgpu   = "0.34"
-egui-winit  = "0.34"
+# `default_fonts` stopped being a default feature in egui 0.37; without it no text renders.
+egui        = { version = "0.37", features = ["default_fonts"] }
+egui-wgpu   = "0.37"
+egui-winit  = "0.37"
 ah-asefile  = "0.4"
 serde       = { version = "1", features = ["derive"] }
 serde_json  = "1"
@@ -76,8 +91,8 @@ clap        = { version = "4", features = ["derive"] }
 etagere     = "0.3"
 sillyecs     = "0.0.6"
 tracing      = "0.1"
-vello        = "0.9"
-# Defaults to wgpu_28; pin the feature to our wgpu 29 so the texture types match.
-miniscreenshot-wgpu = { version = "0.2.1", default-features = false, features = ["wgpu-29"] }
+vello        = "0.11"
+# Pin the wgpu track to our wgpu 30 so the texture types match.
+miniscreenshot-wgpu = { version = "0.3.1", default-features = false, features = ["wgpu-30"] }
 # Synthesis only (no `io`, which would pull cpal and fight kira for the audio device).
 synthie     = { version = "0.4", default-features = false, features = ["std"] }

@@ -174,7 +174,7 @@ impl Tilemap {
 
     /// Rebuild dirty chunks, then emit the instances of every chunk that overlaps the
     /// camera's visible rectangle into the sprite batcher.
-    pub fn draw(&mut self, painter: &mut Painter) {
+    pub fn draw(&mut self, painter: &mut Painter<'_>) {
         // Moving the origin shifts every tile's world position, so all caches go stale.
         if self.origin != self.last_origin {
             self.mark_all_dirty();

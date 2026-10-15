@@ -32,12 +32,12 @@ impl Game for Game1 {
         self.pos[1] += self.vel[1] * dt;
 
         // Bounce off each edge, keeping the ball fully on screen.
-        for axis in 0..2 {
+        for (axis, &bound) in bounds.iter().enumerate() {
             if self.pos[axis] - self.radius < 0.0 {
                 self.pos[axis] = self.radius;
                 self.vel[axis] = self.vel[axis].abs();
-            } else if self.pos[axis] + self.radius > bounds[axis] {
-                self.pos[axis] = bounds[axis] - self.radius;
+            } else if self.pos[axis] + self.radius > bound {
+                self.pos[axis] = bound - self.radius;
                 self.vel[axis] = -self.vel[axis].abs();
             }
         }

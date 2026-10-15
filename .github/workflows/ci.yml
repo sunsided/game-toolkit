@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [main]
 
+# A newer push to the same branch / PR supersedes the running check.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -14,7 +22,7 @@ jobs:
     name: clippy · test · docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # The jam templates ship a bundled CLAUDE.md synced from templates/jam-agent-guide.md.
       # Fail fast (no toolchain needed) if a copy drifted; `task sync:templates` re-stamps them.
@@ -27,11 +35,11 @@ jobs:
             fi
           done
 
-      # ALSA headers for kira (cpal backend), udev for gilrs gamepad input.
+      # ALSA + D-Bus headers for kira (cpal backend; dbus via audio_thread_priority), udev for gilrs.
       - name: Install Linux build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev pkg-config
+          sudo apt-get install -y --no-install-recommends libasound2-dev libdbus-1-dev libudev-dev pkg-config
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -43,6 +51,10 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
+      # Prelude features (`synth`, ...) not every example turns on.
+      - name: Clippy (all features)
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
       - name: Test
         run: cargo test --workspace --locked
 
@@ -51,3 +63,22 @@ jobs:
         run: cargo doc --workspace --no-deps --locked
         env:
           RUSTDOCFLAGS: -D warnings
+
+  msrv:
+    name: MSRV (rust-version)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libasound2-dev libdbus-1-dev libudev-dev pkg-config
+
+      # Keep in sync with `rust-version` in the workspace Cargo.toml.
+      - uses: dtolnay/rust-toolchain@1.95
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check
+        run: cargo check --workspace --all-targets --all-features --locked

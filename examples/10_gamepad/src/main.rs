@@ -43,7 +43,7 @@ fn snapshot(pad: &Gamepad) -> Pad {
     }
 }
 
-fn stick(p: &mut Painter, center: [f32; 2], axes: [f32; 2], clicked: bool, label: &str) {
+fn stick(p: &mut Painter<'_>, center: [f32; 2], axes: [f32; 2], clicked: bool, label: &str) {
     let r = 70.0;
     // Clicking the stick (L3/R3) fills the ring to highlight it.
     if clicked {
@@ -66,7 +66,7 @@ fn stick(p: &mut Painter, center: [f32; 2], axes: [f32; 2], clicked: bool, label
     );
 }
 
-fn button(p: &mut Painter, center: [f32; 2], on: bool, label: &str) {
+fn button(p: &mut Painter<'_>, center: [f32; 2], on: bool, label: &str) {
     let color = if on {
         [1.0, 0.85, 0.2, 1.0]
     } else {
@@ -95,7 +95,7 @@ impl Game for App {
             .input
             .first_gamepad()
             .filter(|p| p.button_pressed(Button::South))
-            .map(|p| p.id());
+            .map(Gamepad::id);
         if let Some(id) = rumble {
             ctx.input.set_rumble(id, 0.7, 200);
         }

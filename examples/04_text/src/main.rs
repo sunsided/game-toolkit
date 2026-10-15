@@ -25,7 +25,7 @@ impl Game for App {
         );
         p.text(
             [20.0, 110.0],
-            &format!("{:.1} fps", fps),
+            &format!("{fps:.1} fps"),
             18.0,
             [0.6, 1.0, 0.6, 1.0],
         );

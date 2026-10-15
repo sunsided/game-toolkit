@@ -65,11 +65,12 @@ impl Ui {
         gfx.flush_pending(frame);
 
         let raw_input = self.state.take_egui_input(&self.window);
-        // `Context::run` was deprecated in favor of `run_ui` (which yields a `&mut Ui` instead
-        // of a `&Context`), but our public API still hands users the `Context` so they can
-        // open windows / panels — they aren't editing a single root `Ui`. Silence the warning.
-        #[allow(deprecated)]
-        let full_output = self.ctx.run(raw_input, build);
+        // `run_pass` (not `run_ui`): our public API hands users the `Context` so they can open
+        // windows / panels rather than editing a single root `Ui`.
+        let full_output = self.ctx.run_pass(raw_input, build);
+        // egui asserts (debug builds) that every texture delta is consumed before the
+        // `TexturesDelta` drops, so own it and drain it below rather than borrowing.
+        let mut textures_delta = full_output.textures_delta;
         self.state
             .handle_platform_output(&self.window, full_output.platform_output);
 
@@ -81,9 +82,12 @@ impl Ui {
             pixels_per_point,
         };
 
-        for (id, image_delta) in &full_output.textures_delta.set {
-            self.renderer
-                .update_texture(gfx.device(), gfx.queue(), *id, image_delta);
+        // A texture can receive several deltas per frame; apply them in order.
+        for (id, image_deltas) in textures_delta.set.drain() {
+            for image_delta in &image_deltas {
+                self.renderer
+                    .update_texture(gfx.device(), gfx.queue(), id, image_delta);
+            }
         }
 
         let (view, encoder) = frame.view_and_encoder();
@@ -116,8 +120,8 @@ impl Ui {
             self.renderer.render(&mut pass, &clipped, &screen);
         }
 
-        for id in &full_output.textures_delta.free {
-            self.renderer.free_texture(id);
+        for id in textures_delta.free.drain() {
+            self.renderer.free_texture(&id);
         }
     }
 }

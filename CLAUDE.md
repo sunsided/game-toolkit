@@ -36,6 +36,11 @@ into `game-toolkit-core`, and do not create back-edges that the consumer would n
   local `task check`/`task ci` do run `cargo fmt --all --check`, but since CI won't fail on format,
   don't churn the whole workspace with reformatting. (Generated jam projects *do* gate on fmt via
   their own `task check`; that rule is theirs, not ours.)
+- CI runs clippy twice - default features and `--all-features` - and an MSRV job that checks
+  the workspace on the toolchain named by `rust-version` in the root `Cargo.toml`. Bump the two
+  together (`dtolnay/rust-toolchain@<msrv>` in `.github/workflows/ci.yml`).
+- Workspace lints (`[workspace.lints]`) are `warn`-level but `-D warnings` makes them a hard
+  gate. sillyecs-generated code in `examples/11_ecs` opts out via a crate-level `allow`.
 - Docs build under `RUSTDOCFLAGS=-D warnings` (`cargo doc --workspace --no-deps`) - broken
   intra-doc links fail CI before docs.rs sees them.
 - `Cargo.lock` is committed for reproducible CI; CI builds `--locked`.
@@ -51,7 +56,11 @@ task test                  # nextest if present, else cargo test; doctests run s
 task run EXAMPLE=ex_05_tilemap   # run an example by package; see example:* / run:* aliases
 task atlas -- --input sprites/ --output a.png --metadata a.json   # atlas-packer CLI
 task publish:dry           # trial publish in dependency order
+task labels                # create/update GitHub PR labels (gh); keep in sync with .github/labeler.yml
 ```
+
+PRs are labelled by changed paths (`.github/workflows/labeler.yml`, config in
+`.github/labeler.yml`). Adding a crate or top-level area means a new entry there and in `task labels`.
 
 Examples live in `examples/` (`ex_01_window` … `ex_12_vector`, `bouncing_ball`); the offline
 atlas-packer is in `tools/atlas-packer`.
