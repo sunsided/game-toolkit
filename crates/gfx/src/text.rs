@@ -106,7 +106,7 @@ impl TextSystem {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
-        targets: &Targets,
+        targets: &Targets<'_>,
     ) {
         if self.queued.is_empty() {
             return;
@@ -122,13 +122,7 @@ impl TextSystem {
             } else {
                 let metrics = Metrics::new(q.size_px, q.size_px * 1.2);
                 let mut buf = Buffer::new(&mut self.font_system, metrics);
-                buf.set_text(
-                    &mut self.font_system,
-                    &q.text,
-                    &Attrs::new(),
-                    Shaping::Advanced,
-                    None,
-                );
+                buf.set_text(&q.text, &Attrs::new(), Shaping::Advanced, None);
                 buf.shape_until_scroll(&mut self.font_system, false);
                 inner.insert(
                     q.text.clone(),
@@ -140,7 +134,7 @@ impl TextSystem {
             }
         }
 
-        let areas: Vec<TextArea> = self
+        let areas: Vec<TextArea<'_>> = self
             .queued
             .iter()
             .map(|q| TextArea {

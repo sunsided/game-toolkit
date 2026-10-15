@@ -36,6 +36,11 @@ into `game-toolkit-core`, and do not create back-edges that the consumer would n
   local `task check`/`task ci` do run `cargo fmt --all --check`, but since CI won't fail on format,
   don't churn the whole workspace with reformatting. (Generated jam projects *do* gate on fmt via
   their own `task check`; that rule is theirs, not ours.)
+- CI runs clippy twice - default features and `--all-features` - and an MSRV job that checks
+  the workspace on the toolchain named by `rust-version` in the root `Cargo.toml`. Bump the two
+  together (`dtolnay/rust-toolchain@<msrv>` in `.github/workflows/ci.yml`).
+- Workspace lints (`[workspace.lints]`) are `warn`-level but `-D warnings` makes them a hard
+  gate. sillyecs-generated code in `examples/11_ecs` opts out via a crate-level `allow`.
 - Docs build under `RUSTDOCFLAGS=-D warnings` (`cargo doc --workspace --no-deps`) - broken
   intra-doc links fail CI before docs.rs sees them.
 - `Cargo.lock` is committed for reproducible CI; CI builds `--locked`.

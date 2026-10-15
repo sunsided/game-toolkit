@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** moved the render stack to wgpu 30 - glyphon 0.12, egui / egui-wgpu / egui-winit
+  0.37 and vello 0.11 move with it. Consumer code that names `wgpu`, `egui` or `vello` types
+  directly must follow those crates' upgrade notes (e.g. `Context::run` → `Context::run_pass`).
+- egui is built with `default_fonts`, which egui 0.37 no longer enables by default; without it the
+  debug overlay rendered no text.
+- Minimum supported Rust version is now declared: `rust-version = "1.95"` (set by egui 0.37), with
+  Cargo's MSRV-aware resolver 3 and a CI job that checks the workspace on exactly that toolchain.
+- pollster 1.0; lockfile refreshed to the latest compatible versions.
+
+### Fixed
+
+- The 2D jam template no longer fails its own `task check` on clippy's `needless_range_loop`.
+
 ## [0.2.0] - 2026-06-08
 
 ### Added

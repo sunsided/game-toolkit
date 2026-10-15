@@ -2,6 +2,7 @@
 name = "game-toolkit-assets"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Asset path resolution and optional hot-reload (notify) for game-toolkit."

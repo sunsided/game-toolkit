@@ -109,7 +109,7 @@ impl MeshBatcher {
         let capacity = 256usize;
         let instance_vb = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("mesh.instances"),
-            size: (capacity * std::mem::size_of::<MeshInstance>()) as u64,
+            size: (capacity * size_of::<MeshInstance>()) as u64,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -132,13 +132,13 @@ impl MeshBatcher {
                 entry_point: Some("vs_main"),
                 compilation_options: Default::default(),
                 buffers: &[
-                    wgpu::VertexBufferLayout {
-                        array_stride: std::mem::size_of::<MeshVertex>() as u64,
+                    Some(wgpu::VertexBufferLayout {
+                        array_stride: size_of::<MeshVertex>() as u64,
                         step_mode: wgpu::VertexStepMode::Vertex,
                         attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
-                    },
-                    wgpu::VertexBufferLayout {
-                        array_stride: std::mem::size_of::<MeshInstance>() as u64,
+                    }),
+                    Some(wgpu::VertexBufferLayout {
+                        array_stride: size_of::<MeshInstance>() as u64,
                         step_mode: wgpu::VertexStepMode::Instance,
                         attributes: &wgpu::vertex_attr_array![
                             2 => Float32x4,
@@ -147,7 +147,7 @@ impl MeshBatcher {
                             5 => Float32x4,
                             6 => Float32x4,
                         ],
-                    },
+                    }),
                 ],
             },
             fragment: Some(wgpu::FragmentState {
@@ -187,7 +187,7 @@ impl MeshBatcher {
         queue: &wgpu::Queue,
         registry: &MeshRegistry,
         encoder: &mut wgpu::CommandEncoder,
-        targets: &Targets,
+        targets: &Targets<'_>,
         camera_bg: &wgpu::BindGroup,
     ) {
         if self.pending.is_empty() {
@@ -199,7 +199,7 @@ impl MeshBatcher {
             self.capacity = self.pending.len().next_power_of_two();
             self.instance_vb = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("mesh.instances"),
-                size: (self.capacity * std::mem::size_of::<MeshInstance>()) as u64,
+                size: (self.capacity * size_of::<MeshInstance>()) as u64,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });

@@ -2,6 +2,7 @@
 name = "game-toolkit-core"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Game loop, the Game trait, Context and time for the game-toolkit game-jam kit."

@@ -2,6 +2,7 @@
 name = "game-toolkit"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "A 2D-first Rust game-jam toolkit - umbrella crate; use game_toolkit::prelude::* and go."

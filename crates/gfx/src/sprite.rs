@@ -120,7 +120,7 @@ impl SpriteBatcher {
         let instance_capacity = 4096usize;
         let instance_vb = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("sprite.instances"),
-            size: (instance_capacity * std::mem::size_of::<SpriteInstance>()) as u64,
+            size: (instance_capacity * size_of::<SpriteInstance>()) as u64,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -145,13 +145,13 @@ impl SpriteBatcher {
                     entry_point: Some("vs_main"),
                     compilation_options: Default::default(),
                     buffers: &[
-                        wgpu::VertexBufferLayout {
-                            array_stride: std::mem::size_of::<QuadVertex>() as u64,
+                        Some(wgpu::VertexBufferLayout {
+                            array_stride: size_of::<QuadVertex>() as u64,
                             step_mode: wgpu::VertexStepMode::Vertex,
                             attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x2],
-                        },
-                        wgpu::VertexBufferLayout {
-                            array_stride: std::mem::size_of::<SpriteInstance>() as u64,
+                        }),
+                        Some(wgpu::VertexBufferLayout {
+                            array_stride: size_of::<SpriteInstance>() as u64,
                             step_mode: wgpu::VertexStepMode::Instance,
                             attributes: &wgpu::vertex_attr_array![
                                 2 => Float32x2,
@@ -161,7 +161,7 @@ impl SpriteBatcher {
                                 6 => Float32x4,
                                 7 => Float32,
                             ],
-                        },
+                        }),
                     ],
                 },
                 fragment: Some(wgpu::FragmentState {
@@ -253,7 +253,7 @@ impl SpriteBatcher {
             self.instance_capacity = self.pending.len().next_power_of_two();
             self.instance_vb = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("sprite.instances"),
-                size: (self.instance_capacity * std::mem::size_of::<SpriteInstance>()) as u64,
+                size: (self.instance_capacity * size_of::<SpriteInstance>()) as u64,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
@@ -268,7 +268,7 @@ impl SpriteBatcher {
         &self,
         layer: i16,
         encoder: &mut wgpu::CommandEncoder,
-        targets: &Targets,
+        targets: &Targets<'_>,
         camera_bg: &wgpu::BindGroup,
         textures: &TextureRegistry,
     ) {
