@@ -35,11 +35,11 @@ jobs:
             fi
           done
 
-      # ALSA headers for kira (cpal backend), udev for gilrs gamepad input.
+      # ALSA + D-Bus headers for kira (cpal backend; dbus via audio_thread_priority), udev for gilrs.
       - name: Install Linux build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev pkg-config
+          sudo apt-get install -y --no-install-recommends libasound2-dev libdbus-1-dev libudev-dev pkg-config
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -73,7 +73,7 @@ jobs:
       - name: Install Linux build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev pkg-config
+          sudo apt-get install -y --no-install-recommends libasound2-dev libdbus-1-dev libudev-dev pkg-config
 
       # Keep in sync with `rust-version` in the workspace Cargo.toml.
       - uses: dtolnay/rust-toolchain@1.95
