@@ -162,7 +162,13 @@ mod tests {
     #[test]
     fn zero_seed_falls_back_to_default() {
         // A zero seed must not freeze the generator at state 0 (xorshift is a no-op there).
-        assert_eq!(Rng::new(0).next_u64(), Rng::new(Rng::DEFAULT_SEED).next_u64());
-        assert_eq!(Rng::default().next_u64(), Rng::new(Rng::DEFAULT_SEED).next_u64());
+        assert_eq!(
+            Rng::new(0).next_u64(),
+            Rng::new(Rng::DEFAULT_SEED).next_u64()
+        );
+        assert_eq!(
+            Rng::default().next_u64(),
+            Rng::new(Rng::DEFAULT_SEED).next_u64()
+        );
     }
 }
