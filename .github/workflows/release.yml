@@ -6,6 +6,10 @@ on:
   push:
     tags: ["v*"]
 
+# `gh release create` needs to write to the repository.
+permissions:
+  contents: write
+
 jobs:
   publish:
     name: Publish to crates.io
@@ -32,3 +36,24 @@ jobs:
         run: cargo release publish --workspace --no-confirm --execute --allow-branch HEAD
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      # Release notes are the tag's CHANGELOG.md section. Its hard-wrapped lines are joined,
+      # because GitHub renders single newlines in release bodies as line breaks. Falls back to
+      # generated notes when the changelog has no section for this version.
+      - name: Create GitHub release
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            /^## \[/ { if (p) exit; if (index($0, "## [" v "]") == 1) { p = 1; next } }
+            !p { next }
+            /^$/ || /^#/ || /^- / { if (buf != "") print buf; buf = $0; if ($0 == "" || /^#/) { print buf; buf = "" }; next }
+            { sub(/^ +/, ""); buf = (buf == "" ? $0 : buf " " $0) }
+            END { if (buf != "") print buf }
+          ' CHANGELOG.md | sed -e '/./,$!d' > release-notes.md
+          if [ -s release-notes.md ]; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --verify-tag --notes-file release-notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --verify-tag --generate-notes
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
