@@ -88,6 +88,7 @@ impl TextureRegistry {
         self.map.get(&id)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load_file(
         &mut self,
         device: &wgpu::Device,
@@ -106,6 +107,21 @@ impl TextureRegistry {
             rgba.as_raw(),
             path.file_name().and_then(|s| s.to_str()),
         ))
+    }
+
+    /// Decode an encoded image (PNG) held in memory and upload it.
+    pub fn load_bytes(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        bytes: &[u8],
+        label: Option<&str>,
+    ) -> Result<TextureId> {
+        let img = image::load_from_memory(bytes)
+            .with_context(|| format!("decoding {}", label.unwrap_or("image")))?;
+        let rgba = img.to_rgba8();
+        let (w, h) = rgba.dimensions();
+        Ok(self.create_from_rgba(device, queue, w, h, rgba.as_raw(), label))
     }
 
     /// Replace the contents of `id` with a freshly decoded copy of `path`. Keeps the same

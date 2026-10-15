@@ -140,10 +140,13 @@ impl<'a> Painter<'a> {
     }
 
     /// Draw vector graphics with vello (feature `vector`). The closure receives the frame's
-    /// [`vello::Scene`]; vector content composites on top of all other layers.
+    /// [`vello::Scene`]; vector content composites on top of all other layers. The closure is
+    /// not called on adapters without compute shaders (WebGL2).
     #[cfg(feature = "vector")]
     pub fn vector<F: FnOnce(&mut vello::Scene)>(&mut self, f: F) {
-        f(self.gfx.vector.scene());
+        if let Some(vector) = self.gfx.vector.as_mut() {
+            f(vector.scene());
+        }
     }
 }
 

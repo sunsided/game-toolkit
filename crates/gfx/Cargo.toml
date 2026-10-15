@@ -14,12 +14,15 @@ anyhow   = { workspace = true }
 bytemuck = { workspace = true }
 image    = { workspace = true }
 log      = { workspace = true }
-pollster = { workspace = true }
 wgpu     = { workspace = true }
 winit    = { workspace = true }
 glyphon  = { workspace = true }
 miniscreenshot-wgpu = { workspace = true }
 vello    = { workspace = true, optional = true }
+
+# Web: WebGPU (a wgpu default) plus the WebGL2 fallback for browsers without it.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wgpu     = { workspace = true, features = ["webgl"] }
 
 [features]
 # Vello vector-graphics backend (compute-based; needs higher device limits).
