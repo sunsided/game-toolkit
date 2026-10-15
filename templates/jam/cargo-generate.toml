@@ -1,3 +1,5 @@
+# The manifest ships as `Cargo.toml.liquid`: cargo-generate strips the `.liquid` suffix, and Cargo
+# never parses it as a real (placeholder-named) package when this repo is a git dependency.
 [template]
 description = "A 2D-first game-jam starter built on game-toolkit"
 # Copy the Taskfile verbatim: its go-task `{{ }}` would clash with the template engine.
