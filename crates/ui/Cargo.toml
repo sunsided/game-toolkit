@@ -19,11 +19,11 @@ egui-wgpu   = { workspace = true }
 game-toolkit-gfx = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-egui-winit  = { workspace = true }
+egui-winit  = { workspace = true, features = ["default"] }
 
 # egui-winit's default `clipboard` feature pulls arboard, which has no web backend.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-egui-winit  = { workspace = true, default-features = false, features = ["links"] }
+egui-winit  = { workspace = true, features = ["links"] }
 
 [lints]
 workspace = true

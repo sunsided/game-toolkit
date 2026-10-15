@@ -83,7 +83,9 @@ gilrs       = "0.11"
 # `default_fonts` stopped being a default feature in egui 0.37; without it no text renders.
 egui        = { version = "0.37", features = ["default_fonts"] }
 egui-wgpu   = "0.37"
-egui-winit  = "0.37"
+# Defaults off here so members can choose per target: the default `clipboard` feature pulls
+# arboard, which has no web backend (crates/ui turns defaults back on natively).
+egui-winit  = { version = "0.37", default-features = false }
 ah-asefile  = "0.4"
 serde       = { version = "1", features = ["derive"] }
 serde_json  = "1"
