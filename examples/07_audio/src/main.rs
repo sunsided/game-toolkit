@@ -17,18 +17,15 @@ struct AudioDemo {
 
 impl Game for AudioDemo {
     fn init(ctx: &mut Context) -> Result<Self> {
-        let path = ctx.assets.resolve("blip.wav");
-        // Resolve the path before borrowing `ctx.audio` so both borrows don't overlap.
-        let sound = match ctx.audio.as_mut() {
-            Some(audio) => match audio.load_sound(&path) {
-                Ok(id) => Some(id),
-                Err(e) => {
-                    log::warn!("could not load {}: {e}", path.display());
-                    None
-                }
-            },
-            None => {
+        // `Ok(None)` means the audio backend is unavailable and the game runs muted.
+        let sound = match ctx.load_sound("blip.wav") {
+            Ok(Some(id)) => Some(id),
+            Ok(None) => {
                 log::warn!("audio backend unavailable; running muted");
+                None
+            }
+            Err(e) => {
+                log::warn!("could not load blip.wav: {e}");
                 None
             }
         };

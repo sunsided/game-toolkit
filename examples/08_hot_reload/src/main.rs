@@ -16,8 +16,9 @@ struct HotReload {
 
 impl Game for HotReload {
     fn init(ctx: &mut Context) -> Result<Self> {
+        // `ctx.load_texture` registers the file for `refresh_textures` below.
+        let tex = ctx.load_texture("reload_me.png")?;
         let path = ctx.assets.resolve("reload_me.png");
-        let tex = ctx.gfx.load_texture(&path)?;
         ctx.assets.watch()?;
         log::info!("watching {} - edit it to see a live reload", path.display());
         Ok(Self { tex })

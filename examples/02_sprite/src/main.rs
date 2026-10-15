@@ -1,4 +1,4 @@
-//! Loads a PNG with `Graphics::load_texture` and draws it three ways: plain, spinning,
+//! Loads a PNG with `ctx.load_texture` and draws it three ways: plain, spinning,
 //! and tinted. Exercises the PNG decode -> upload -> render path end to end.
 
 use game_toolkit::prelude::*;
@@ -10,10 +10,9 @@ struct Sprite {
 
 impl Game for Sprite {
     fn init(ctx: &mut Context) -> Result<Self> {
-        // `resolve` joins against the asset root configured below, yielding an absolute
-        // path so the example loads regardless of the process working directory.
-        let path = ctx.assets.resolve("sprite.png");
-        let tex = ctx.gfx.load_texture(&path)?;
+        // Relative to the asset root configured below, so the example loads regardless of
+        // the process working directory.
+        let tex = ctx.load_texture("sprite.png")?;
         Ok(Self {
             tex,
             size: [128.0, 128.0],
