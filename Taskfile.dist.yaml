@@ -277,6 +277,33 @@ tasks:
     cmds:
       - cargo update {{.CLI_ARGS}}
 
+  labels:
+    desc: Create/update the PR labels used by .github/labeler.yml on GitHub (needs gh auth)
+    preconditions:
+      - sh: command -v gh
+        msg: "gh CLI not found"
+    cmds:
+      - |
+        while IFS='|' read -r name color desc; do
+          gh label create "$name" --color "$color" --description "$desc" --force
+        done <<'EOF'
+        area: core|1d76db|game-toolkit-core: app loop, Game trait, Context, Time
+        area: gfx|1d76db|game-toolkit-gfx: wgpu renderer, sprites, SDF, text, tilemap, 3D
+        area: input|1d76db|game-toolkit-input: keyboard, mouse, gamepad
+        area: audio|1d76db|game-toolkit-audio: kira playback, synth
+        area: assets|1d76db|game-toolkit-assets: path resolution, hot reload
+        area: aseprite|1d76db|game-toolkit-aseprite: .aseprite and sheet loading
+        area: ecs|1d76db|game-toolkit-ecs: sillyecs glue
+        area: ui|1d76db|game-toolkit-ui: egui debug overlay
+        area: prelude|1d76db|game-toolkit umbrella crate and prelude
+        area: examples|c5def5|examples/
+        area: templates|c5def5|cargo-generate jam templates
+        area: tools|c5def5|tools/ (atlas-packer)
+        area: ci|ededed|Workflows, Taskfile, release config
+        documentation|0075ca|Improvements or additions to documentation
+        dependencies|0366d6|Cargo.lock changes
+        EOF
+
   clean:
     desc: Remove all build artifacts
     status:

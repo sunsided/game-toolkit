@@ -1,0 +1,71 @@
+# Path-based PR labels, applied by .github/workflows/labeler.yml (actions/labeler v6 format).
+# A label matches when any changed file matches any of its globs. Labels missing from the repo
+# are created on first use; run `task labels` to create them with colors and descriptions.
+
+# --- Crates -------------------------------------------------------------------------------------
+
+"area: core":
+  - changed-files:
+      - any-glob-to-any-file: crates/core/**
+
+"area: gfx":
+  - changed-files:
+      - any-glob-to-any-file: crates/gfx/**
+
+"area: input":
+  - changed-files:
+      - any-glob-to-any-file: crates/input/**
+
+"area: audio":
+  - changed-files:
+      - any-glob-to-any-file: crates/audio/**
+
+"area: assets":
+  - changed-files:
+      - any-glob-to-any-file: crates/assets/**
+
+"area: aseprite":
+  - changed-files:
+      - any-glob-to-any-file: crates/aseprite/**
+
+"area: ecs":
+  - changed-files:
+      - any-glob-to-any-file: crates/ecs/**
+
+"area: ui":
+  - changed-files:
+      - any-glob-to-any-file: crates/ui/**
+
+"area: prelude":
+  - changed-files:
+      - any-glob-to-any-file: crates/prelude/**
+
+# --- Everything around the crates ---------------------------------------------------------------
+
+"area: examples":
+  - changed-files:
+      - any-glob-to-any-file: examples/**
+
+"area: templates":
+  - changed-files:
+      - any-glob-to-any-file: templates/**
+
+"area: tools":
+  - changed-files:
+      - any-glob-to-any-file: tools/**
+
+"area: ci":
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+          - Taskfile.dist.yaml
+          - release.toml
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: Cargo.lock
