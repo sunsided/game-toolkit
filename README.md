@@ -49,10 +49,13 @@ fn main() -> Result<()> {
 ```
 
 `AppConfig::asset_root` defaults to `./assets` relative to the working directory. Binaries
-that load files and want to run from anywhere should set it explicitly:
+that load files and want to run from anywhere (and in the browser) should set it with the
+`asset_root!()` macro: the crate's `assets/` directory natively, `assets` next to `index.html`
+on the web. Load files through `ctx.load_texture("player.png")` / `ctx.load_sound("boom.wav")`
+(and `ctx.load_aseprite(..)` with the `aseprite` feature), which resolve against it.
 
 ```rust
-asset_root: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"),
+asset_root: asset_root!(),
 ```
 
 `AppConfig` also exposes `msaa_samples` (e.g. `4` for anti-aliasing; default `1`) and
@@ -84,7 +87,7 @@ working in the new repo are productive without first spelunking the toolkit sour
 | `game-toolkit-gfx` | wgpu init + surface management, sprite batcher, SDF circle/ring primitives, glyphon text, atlas tilemap, the `Painter` API. |
 | `game-toolkit-input` | Keyboard, mouse and gamepads (via gilrs) with held / just-pressed / just-released semantics, hot-plug, and rumble. |
 | `game-toolkit-audio` | Sound loading + playback on `kira`; degrades gracefully to muted when no device is available. Optional chiptune synthesis (`synth` feature, via `synthie`). |
-| `game-toolkit-assets` | Asset path resolution + optional hot-reload watcher (`notify`). |
+| `game-toolkit-assets` | Asset path resolution, in-memory/preloaded assets (web), optional hot-reload watcher (`notify`). |
 | `game-toolkit-aseprite` | Load native `.aseprite` files and exported PNG + JSON sheets into a GPU-ready `SpriteSheet` with animation playback. |
 | `game-toolkit-ecs` | Small glue (component data, command queue) for the `sillyecs` compile-time archetype ECS. |
 | `game-toolkit-ui` | egui overlay integration for debug tooling (feature-gated). |
@@ -100,7 +103,7 @@ Run any example with `cargo run -p <package>`.
 | Run | Package | Shows |
 |-----|---------|-------|
 | `01_window` | `ex_01_window` | Minimal window with an animated clear color; Esc quits. |
-| `02_sprite` | `ex_02_sprite` | Load a PNG via `load_texture`, draw it plain, spinning, and tinted. |
+| `02_sprite` | `ex_02_sprite` | Load a PNG via `ctx.load_texture`, draw it plain, spinning, and tinted. |
 | `03_primitives` | `ex_03_primitives` | SDF circles, rings, lines, rectangles; F12 saves a screenshot. |
 | `04_text` | `ex_04_text` | Text rendering through glyphon. |
 | `05_tilemap` | `ex_05_tilemap` | Instanced atlas tilemap. |
@@ -112,6 +115,7 @@ Run any example with `cargo run -p <package>`.
 | `10_gamepad` | `ex_10_gamepad` | Live gamepad overlay: sticks, buttons, stick-clicks, and rumble on A. |
 | `11_ecs` | `ex_11_ecs` | Bouncing particles driven by the `sillyecs` archetype ECS (build.rs codegen). |
 | `12_vector` | `ex_12_vector` | Vector graphics (filled circles, stroked path) via the optional vello backend. |
+| `13_web` | `ex_13_web` | Same code natively and in the browser: sprite, text, sound on click, gamepad. `task web`. |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
 
 ## Aseprite
@@ -120,16 +124,21 @@ Run any example with `cargo run -p <package>`.
 
 ```rust
 // Native binary: frames are flattened and packed into one atlas texture.
-let sheet = SpriteSheet::load_aseprite(&mut ctx.gfx, "character.aseprite")?;
+let sheet = ctx.load_aseprite("character.aseprite")?;
 
 // Exported sprite sheet: a PNG atlas plus its Aseprite JSON sidecar.
-let sheet = SpriteSheet::from_aseprite_json(&mut ctx.gfx, "sheet.png", "sheet.json")?;
+let sheet = ctx.load_aseprite_json("sheet.png", "sheet.json")?;
 
 // Play a tag (or `sheet.full_animation()` when a sheet has no tags).
 let mut player = AnimationPlayer::new(&sheet, "walk").unwrap();
 player.advance(&sheet, dt);
 let (uv_min, uv_max) = player.current_uv(&sheet);
 ```
+
+`ctx.load_aseprite*` (from the prelude's `LoadAseprite` trait) read through `ctx.assets`, so
+they work on the web too. The underlying `SpriteSheet::from_aseprite_bytes` /
+`from_aseprite_json_bytes` take bytes; the path-taking `SpriteSheet::load_aseprite` /
+`from_aseprite_json` are native-only.
 
 Both the hash and array `frames` layouts of the exported JSON are accepted, and tag
 directions (forward / reverse / ping-pong) drive playback.
@@ -172,7 +181,8 @@ The optional `vector` feature adds a [vello](https://github.com/linebender/vello
 for high-quality 2D vector content. `painter.vector(|scene| ...)` hands the frame's
 `vello::Scene`; vello renders it to an offscreen target that composites on top of the
 sprite/primitive/text layers. It is compute-based and needs higher device limits, so it is
-off by default.
+off by default. On adapters without compute shaders (WebGL2 in the browser) vector drawing is
+skipped with a logged error.
 
 ```rust
 use vello::{kurbo::{Affine, Circle}, peniko::{Color, Fill}};
@@ -181,6 +191,41 @@ p.vector(|scene| {
                &Circle::new((400.0, 300.0), 120.0));
 });
 ```
+
+## Web (wasm32)
+
+The toolkit builds for the browser (`wasm32-unknown-unknown`) from the same game code. wgpu uses
+WebGPU where the browser has it and falls back to WebGL2 otherwise; audio goes through WebAudio and
+gamepads through the Gamepad API. [trunk](https://trunkrs.dev) does the bundling:
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install trunk --locked
+task web                              # serve examples/13_web at http://localhost:8080
+PROFILE=release task web:build        # dist/ ready to upload (itch.io, GitHub Pages)
+```
+
+A crate needs an `index.html` (`<link data-trunk rel="rust">` plus `<link data-trunk
+rel="copy-dir" href="assets">`) and a `Trunk.toml`; `examples/13_web` and both jam templates ship
+one. Differences from native:
+
+- **Assets are preloaded.** The browser can only fetch asynchronously, so before `Game::init`
+  the toolkit fetches every file listed in `assets/manifest.txt` (one path per line;
+  `task assets:manifest` regenerates it) or in `AppConfig::web_preload`. After that,
+  `ctx.load_*` and `ctx.assets.read` work synchronously as usual. The path-taking
+  `Graphics::load_texture` / `Audio::load_sound` are native-only; use the `*_bytes` variants or
+  the `ctx.load_*` helpers.
+- **Audio starts on the first key press, click or touch** (browsers block audio before a user
+  gesture). Sounds can be loaded right away; `Audio::play` errors until then.
+- **Not available:** hot-reload (`Assets::watch` is a no-op), `Graphics::request_screenshot`,
+  and vello on WebGL2. `ctx.quit()` stops the loop but leaves the page.
+- **Text** uses an embedded DejaVu Sans, since there are no system fonts
+  (`Graphics::load_font_bytes` adds more).
+- Logs and panics go to the browser console (unless the game installs its own logger).
+- `AppConfig::canvas_id` renders into an existing `<canvas id="...">`; by default a canvas is
+  appended to `<body>`.
+
+A release build of `13_web` is about 6.8 MB of wasm (2.6 MB gzipped).
 
 ## Randomness
 
@@ -203,6 +248,8 @@ Common tasks run through [go-task](https://taskfile.dev) (`Taskfile.dist.yaml`):
 task               # list tasks
 task ci            # fmt check + clippy + tests
 task run:3d        # run an example (see task --list for example:* shortcuts)
+task web           # serve examples/13_web in the browser (WEB_DIR=... for another crate)
+task check:wasm    # clippy for wasm32-unknown-unknown (part of task check)
 task atlas -- --input sprites/ --output a.png --metadata a.json
 task publish:dry   # trial publish all crates in order (task publish releases for real)
 ```
@@ -213,7 +260,7 @@ The generated jam templates ship their own `Taskfile.yaml` too.
 
 First crates.io release: `0.1.0`. The 2D runtime, input (keyboard / mouse / gamepad),
 audio, assets, text, tilemap, egui overlay, Aseprite loading, optional depth/MSAA, a
-first-cut 3D mesh path, a deterministic seedable RNG, ECS glue, the atlas-packer CLI, and
+first-cut 3D mesh path, a deterministic seedable RNG, browser (wasm32) builds, ECS glue, the atlas-packer CLI, and
 `cargo-generate` jam templates are all in place. Still pre-1.0, so the API may shift between minor versions; roadmap and
 open workstreams live in the [toolkit epic](https://github.com/sunsided/game-toolkit/issues/15).
 
