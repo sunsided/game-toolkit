@@ -93,12 +93,6 @@ sillyecs     = "0.0.6"
 tracing      = "0.1"
 vello        = "0.11"
 # Pin the wgpu track to our wgpu 30 so the texture types match.
-miniscreenshot-wgpu = { version = "0.3", default-features = false, features = ["wgpu-30"] }
+miniscreenshot-wgpu = { version = "0.3.1", default-features = false, features = ["wgpu-30"] }
 # Synthesis only (no `io`, which would pull cpal and fight kira for the audio device).
 synthie     = { version = "0.4", default-features = false, features = ["std"] }
-
-# TEMPORARY: the wgpu-30 track is not on crates.io yet. Drop this once miniscreenshot-wgpu
-# with `wgpu-30` is published (CI builds --locked and cannot see ../miniscreenshot).
-[patch.crates-io]
-miniscreenshot-wgpu = { path = "../miniscreenshot/miniscreenshot-wgpu" }
-miniscreenshot      = { path = "../miniscreenshot/miniscreenshot" }

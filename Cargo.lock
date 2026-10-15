@@ -2143,14 +2143,18 @@ dependencies = [
 
 [[package]]
 name = "miniscreenshot"
-version = "0.3.0"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f75596213e3fe70dd6f29a7a0108ec742c43a9eac4c1ab33935b5b9e6e931e75"
 dependencies = [
  "png",
 ]
 
 [[package]]
 name = "miniscreenshot-wgpu"
-version = "0.3.0"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5827a1f07e333fc2e970d4640933311f960a98b915054466f0a326044410f67a"
 dependencies = [
  "miniscreenshot",
  "wgpu",
