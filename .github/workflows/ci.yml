@@ -64,6 +64,34 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
 
+  templates:
+    name: jam templates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # Same system deps as the main job: the generated games link kira and gilrs.
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libasound2-dev libdbus-1-dev libudev-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-generate
+
+      # Generates each template (short and long project name) against this checkout of the
+      # toolkit, then runs fmt --check and clippy (native + wasm32) like a fresh jam project.
+      - name: Generate and check the templates
+        run: tools/check-templates.sh
+
   wasm:
     name: wasm (browser)
     runs-on: ubuntu-latest

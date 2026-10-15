@@ -90,6 +90,12 @@ copies only the chosen subdir, so each ships its **own** bundled agent doc as `C
 - `task check:templates` (folded into `task check`) and a CI step both fail on drift.
 - Keep the guide free of literal `{{` - cargo-generate runs files through liquid templating and
   would choke (the same reason `Taskfile.yaml` is in `cargo-generate.toml`'s `exclude`).
+- The manifests are `Cargo.toml.liquid`: cargo-generate strips `.liquid`, and Cargo doesn't parse
+  them as packages when the repo is a git dependency. Don't rename them to anything else.
+- **`task test:templates`** (`tools/check-templates.sh`, also a CI job) generates each template
+  with a short and a long project name against this checkout and runs `cargo fmt --check` and
+  clippy (native + wasm32) on the result. Template code splices in `{{project-name}}`, so keep
+  lines that contain it rustfmt-stable for any name length (e.g. bind it to a `let`).
 
 ## Generating test assets
 

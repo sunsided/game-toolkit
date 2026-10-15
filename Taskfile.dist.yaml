@@ -79,6 +79,14 @@ tasks:
           fi
         done
 
+  test:templates:
+    desc: Generate each jam template against this checkout and run fmt --check + clippy on it (needs cargo-generate)
+    preconditions:
+      - sh: command -v cargo-generate
+        msg: "cargo-generate not found — run: cargo install cargo-generate --locked"
+    cmds:
+      - tools/check-templates.sh
+
   build:
     desc: Build the whole workspace (PROFILE=debug|release)
     preconditions:
