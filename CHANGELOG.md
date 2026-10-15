@@ -6,11 +6,45 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-15
+
+### Added
+
+- Browser support: the toolkit builds and runs on `wasm32-unknown-unknown` from the same game
+  code. wgpu uses WebGPU where the browser has it and falls back to WebGL2 (also when a browser
+  exposes WebGPU but offers no adapter); audio goes through WebAudio and gamepads through the
+  Gamepad API. Bundling is done with [trunk](https://trunkrs.dev).
+- On the web, the files listed in `assets/manifest.txt` (or the new `AppConfig::web_preload`)
+  are fetched before `Game::init`, so asset loading stays synchronous. `AppConfig::canvas_id`
+  renders into an existing `<canvas>`; by default one is appended to `<body>`. Logs and panics go
+  to the browser console, and audio starts on the first key press, click or touch.
+- `ctx.load_texture(path)` and `ctx.load_sound(path)`, which load from the asset root on every
+  platform (natively, `load_texture` still registers the file for hot-reload), and the prelude's
+  `LoadAseprite` trait for `ctx.load_aseprite` / `ctx.load_aseprite_json` (`aseprite` feature).
+- `asset_root!()`: the calling crate's `assets/` directory natively, `assets` next to the page on
+  the web.
+- Bytes-based loaders: `Graphics::load_texture_bytes`, `Graphics::load_font_bytes`,
+  `Audio::load_sound_bytes`, `SpriteSheet::from_aseprite_bytes` and
+  `SpriteSheet::from_aseprite_json_bytes`, plus `Assets::insert` / `Assets::is_loaded` for
+  in-memory assets (consulted before the filesystem).
+- `Audio::start` / `Audio::is_started`: on the web the audio backend opens lazily on the first
+  user gesture; natively it opens immediately as before.
+- `examples/13_web`, which runs natively and in the browser, and trunk setup (`index.html`,
+  `Trunk.toml`, `assets/manifest.txt`) plus `web`, `web:build`, `assets:manifest` and
+  `check:wasm` tasks in both jam templates.
+- A CI job that lints the workspace for wasm32 and builds the web example.
+
 ### Changed
 
 - **Breaking:** moved the render stack to wgpu 30 - glyphon 0.12, egui / egui-wgpu / egui-winit
   0.37 and vello 0.11 move with it. Consumer code that names `wgpu`, `egui` or `vello` types
   directly must follow those crates' upgrade notes (e.g. `Context::run` → `Context::run_pass`).
+- **Breaking:** `Graphics::load_texture`, `Audio::load_sound`, `SpriteSheet::load_aseprite` and
+  `SpriteSheet::from_aseprite_json` take file paths and are now native-only (they no longer exist
+  on wasm32). Prefer the new `ctx.load_*` helpers, which work everywhere.
+- The vello vector pass is skipped, with a logged error, on adapters without compute shaders
+  (WebGL2) instead of failing device setup.
+- Startup resizes the surface to the window's current size before `Game::init`.
 - egui is built with `default_fonts`, which egui 0.37 no longer enables by default; without it the
   debug overlay rendered no text.
 - Minimum supported Rust version is now declared: `rust-version = "1.95"` (set by egui 0.37), with
@@ -71,6 +105,7 @@ the `game-toolkit` umbrella; add one dependency and `use game_toolkit::prelude::
 - Top-level and per-crate `README.md`s, crates.io metadata, and `#![forbid(unsafe_code)]`
   across every crate.
 
-[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/sunsided/game-toolkit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sunsided/game-toolkit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sunsided/game-toolkit/releases/tag/v0.1.0
