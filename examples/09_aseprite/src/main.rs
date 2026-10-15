@@ -3,8 +3,7 @@
 //! packs them into one atlas texture, and exposes frames as UV rects - drawing a frame is
 //! an ordinary sprite with a UV sub-rect, so `game-toolkit-gfx` never learns about Aseprite.
 //!
-//! The exported PNG + JSON path is available too via
-//! `SpriteSheet::from_aseprite_json(gfx, png, json)`.
+//! The exported PNG + JSON path is available too via `ctx.load_aseprite_json(png, json)`.
 
 use game_toolkit::prelude::*;
 
@@ -16,8 +15,8 @@ struct AsepriteDemo {
 
 impl Game for AsepriteDemo {
     fn init(ctx: &mut Context) -> Result<Self> {
-        let path = ctx.assets.resolve("character.aseprite");
-        let sheet = SpriteSheet::load_aseprite(&mut ctx.gfx, &path)?;
+        // `LoadAseprite` (in the prelude) adds this to `Context`; it reads via `ctx.assets`.
+        let sheet = ctx.load_aseprite("character.aseprite")?;
         log::info!(
             "loaded {} frames, {} tag(s)",
             sheet.num_frames(),

@@ -7,4 +7,7 @@ publish = false
 [dependencies]
 # The `ui` feature pulls in the egui debug-overlay support, handy during a jam.
 game-toolkit = { git = "https://github.com/sunsided/game-toolkit", features = ["ui"] }
+
+# Native builds log via env_logger; on the web the toolkit logs to the browser console.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"

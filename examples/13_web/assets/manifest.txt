@@ -1,0 +1,4 @@
+# Files the web build preloads before Game::init (one path per line, relative to assets/).
+# Regenerate with: task assets:manifest WEB_DIR=examples/13_web
+blip.wav
+sprite.png

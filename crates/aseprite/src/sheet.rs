@@ -1,10 +1,13 @@
 //! Runtime sprite-sheet: a single atlas texture plus per-frame UV rects and named tags.
 
 use std::collections::HashMap;
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 
 use ah_asefile::{AnimationDirection, AsepriteFile};
-use anyhow::{Context, Result, anyhow};
+#[cfg(not(target_arch = "wasm32"))]
+use anyhow::Context;
+use anyhow::{Result, anyhow};
 use game_toolkit_gfx::{Graphics, TextureId};
 use image::RgbaImage;
 
@@ -34,17 +37,26 @@ pub struct SpriteSheet {
 
 impl SpriteSheet {
     /// Load a native `.aseprite`/`.ase` file: flatten every frame, pack them into a single
-    /// grid atlas, upload it, and lift the tags into [`Animation`]s.
+    /// grid atlas, upload it, and lift the tags into [`Animation`]s. Not available on the web;
+    /// use [`SpriteSheet::from_aseprite_bytes`].
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load_aseprite(gfx: &mut Graphics, path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
-        let ase = AsepriteFile::read_file(path)
-            .map_err(|e| anyhow!("read aseprite {}: {e}", path.display()))?;
+        let bytes = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
+        Self::from_aseprite_bytes(gfx, &bytes, &path.display().to_string())
+    }
+
+    /// `SpriteSheet::load_aseprite` from the file's bytes held in memory. `name` labels
+    /// error messages.
+    pub fn from_aseprite_bytes(gfx: &mut Graphics, bytes: &[u8], name: &str) -> Result<Self> {
+        let path = name;
+        let ase = AsepriteFile::read(bytes).map_err(|e| anyhow!("read aseprite {path}: {e}"))?;
 
         let fw = ase.width() as u32;
         let fh = ase.height() as u32;
         let n = ase.num_frames();
         if n == 0 || fw == 0 || fh == 0 {
-            return Err(anyhow!("{} has no drawable frames", path.display()));
+            return Err(anyhow!("{path} has no drawable frames"));
         }
 
         // All native frames share the canvas size, so a uniform grid packs them tightly.
@@ -96,7 +108,9 @@ impl SpriteSheet {
     }
 
     /// Load an exported sprite-sheet: a PNG atlas plus its Aseprite JSON sidecar. The PNG is
-    /// uploaded as-is and frame UVs are computed from the JSON pixel rects.
+    /// uploaded as-is and frame UVs are computed from the JSON pixel rects. Not available on
+    /// the web; use [`SpriteSheet::from_aseprite_json_bytes`].
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn from_aseprite_json(
         gfx: &mut Graphics,
         png_path: impl AsRef<Path>,
@@ -105,18 +119,40 @@ impl SpriteSheet {
         let json_path = json_path.as_ref();
         let bytes =
             std::fs::read(json_path).with_context(|| format!("read {}", json_path.display()))?;
-        let parsed = json::parse(&bytes)?;
+        let parsed = Self::parse_sheet_json(&bytes, &json_path.display().to_string())?;
+        let texture = gfx.load_texture(png_path.as_ref())?;
+        Ok(Self::from_parsed(texture, parsed))
+    }
+
+    /// `SpriteSheet::from_aseprite_json` from the PNG and JSON bytes held in memory. `name`
+    /// labels the texture and error messages.
+    pub fn from_aseprite_json_bytes(
+        gfx: &mut Graphics,
+        png: &[u8],
+        json: &[u8],
+        name: &str,
+    ) -> Result<Self> {
+        let parsed = Self::parse_sheet_json(json, name)?;
+        let texture = gfx.load_texture_bytes(png, Some(name))?;
+        Ok(Self::from_parsed(texture, parsed))
+    }
+
+    fn parse_sheet_json(bytes: &[u8], name: &str) -> Result<json::ParsedSheet> {
+        let parsed = json::parse(bytes)?;
         let (sw, sh) = parsed.sheet_size;
         if sw == 0 || sh == 0 {
-            return Err(anyhow!("{} reports a zero-size sheet", json_path.display()));
+            return Err(anyhow!("{name} reports a zero-size sheet"));
         }
         // Reject an empty sheet before uploading: a frameless SpriteSheet would panic the
         // moment anything indexes `frames[0]` (e.g. AnimationPlayer::current_uv).
         if parsed.frames.is_empty() {
-            return Err(anyhow!("{} contains no frames", json_path.display()));
+            return Err(anyhow!("{name} contains no frames"));
         }
+        Ok(parsed)
+    }
 
-        let texture = gfx.load_texture(png_path.as_ref())?;
+    fn from_parsed(texture: TextureId, parsed: json::ParsedSheet) -> Self {
+        let (sw, sh) = parsed.sheet_size;
         let frames = parsed
             .frames
             .into_iter()
@@ -128,12 +164,12 @@ impl SpriteSheet {
             .map(|a| (a.name.clone(), a))
             .collect();
 
-        Ok(Self {
+        Self {
             texture,
             size: [sw, sh],
             frames,
             animations,
-        })
+        }
     }
 
     /// Frame count.

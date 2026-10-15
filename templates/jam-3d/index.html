@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{project-name}}</title>
+    <!-- trunk: build the crate to wasm and copy the asset folder next to it. -->
+    <link data-trunk rel="rust" />
+    <link data-trunk rel="copy-dir" href="assets" />
+    <style>
+      html, body { margin: 0; height: 100%; background: #111; }
+      body { display: flex; align-items: center; justify-content: center; }
+      canvas { outline: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="game" tabindex="0"></canvas>
+  </body>
+</html>

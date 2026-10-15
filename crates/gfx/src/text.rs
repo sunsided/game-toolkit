@@ -46,6 +46,30 @@ fn size_key(size_px: f32) -> u32 {
     (size_px.max(0.0) * 100.0).round() as u32
 }
 
+/// Bundled fallback font for platforms without system fonts (the web).
+#[cfg(target_arch = "wasm32")]
+const DEFAULT_FONT: &[u8] = include_bytes!("../fonts/DejaVuSans.ttf");
+
+/// Native: system fonts via fontconfig/CoreText/DirectWrite. Web: there are no system fonts, so
+/// the bundled DejaVu Sans becomes every generic family.
+fn new_font_system() -> FontSystem {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        FontSystem::new()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let mut fs = FontSystem::new_with_fonts([glyphon::fontdb::Source::Binary(
+            std::sync::Arc::new(DEFAULT_FONT),
+        )]);
+        let db = fs.db_mut();
+        db.set_sans_serif_family("DejaVu Sans");
+        db.set_serif_family("DejaVu Sans");
+        db.set_monospace_family("DejaVu Sans");
+        fs
+    }
+}
+
 impl TextSystem {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -57,7 +81,7 @@ impl TextSystem {
         sample_count: u32,
         depth_format: Option<wgpu::TextureFormat>,
     ) -> Self {
-        let font_system = FontSystem::new();
+        let font_system = new_font_system();
         let swash_cache = SwashCache::new();
         let cache = Cache::new(device);
         let mut atlas =
@@ -81,6 +105,12 @@ impl TextSystem {
             buffers: HashMap::new(),
             frame: 0,
         }
+    }
+
+    /// Register an extra font (TTF/OTF bytes). Text keeps using the default sans-serif family;
+    /// the new face is used as a fallback for glyphs the default lacks.
+    pub fn load_font_bytes(&mut self, bytes: Vec<u8>) {
+        self.font_system.db_mut().load_font_data(bytes);
     }
 
     pub fn resize(&mut self, queue: &wgpu::Queue, width: u32, height: u32) {

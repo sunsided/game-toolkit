@@ -1,0 +1,8 @@
+[build]
+target = "index.html"
+dist = "dist"
+# Relative URLs so the build works from any sub-path (itch.io, GitHub Pages).
+public_url = "./"
+
+[serve]
+port = 8080

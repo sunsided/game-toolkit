@@ -10,6 +10,9 @@ vars:
   # Default example binary for `task run`. Override: task run EXAMPLE=ex_05_tilemap
   EXAMPLE: '{{ .EXAMPLE | default "bouncing_ball" }}'
 
+  # Crate directory (with index.html + Trunk.toml) for the `web*` tasks.
+  WEB_DIR: '{{ .WEB_DIR | default "examples/13_web" }}'
+
 tasks:
   default:
     cmds:
@@ -43,11 +46,20 @@ tasks:
       - task: fmt
 
   check:
-    desc: Static checks - format check, clippy, and template sync
+    desc: Static checks - format check, clippy (native + wasm), and template sync
     cmds:
       - cargo fmt --all --check
       - cargo clippy --workspace --all-targets -- -D warnings
+      - task: check:wasm
       - task: check:templates
+
+  check:wasm:
+    desc: Clippy the workspace for the browser target (wasm32-unknown-unknown, all features)
+    preconditions:
+      - sh: rustup target list --installed | grep -qx wasm32-unknown-unknown
+        msg: "wasm target missing — run: rustup target add wasm32-unknown-unknown"
+    cmds:
+      - cargo clippy --target wasm32-unknown-unknown --workspace --all-targets --all-features -- -D warnings {{.CLI_ARGS}}
 
   sync:templates:
     desc: Stamp the canonical jam agent guide into each template as CLAUDE.md
@@ -204,6 +216,36 @@ tasks:
     cmds:
       - task: run
         vars: {EXAMPLE: ex_12_vector}
+
+  web:
+    desc: 'Serve a crate in the browser with live rebuild (WEB_DIR=examples/13_web), http://localhost:8080'
+    aliases: [example:web, run:web]
+    preconditions: &web-preconditions
+      - sh: command -v trunk
+        msg: "trunk not found — run: cargo install trunk --locked"
+      - sh: rustup target list --installed | grep -qx wasm32-unknown-unknown
+        msg: "wasm target missing — run: rustup target add wasm32-unknown-unknown"
+    dir: '{{.WEB_DIR}}'
+    cmds:
+      - trunk serve {{.PROFILE_FLAG}} {{.CLI_ARGS}}
+
+  web:build:
+    desc: 'Build a crate for the browser into <WEB_DIR>/dist (PROFILE=release for an upload-ready build)'
+    preconditions: *web-preconditions
+    dir: '{{.WEB_DIR}}'
+    cmds:
+      - trunk build {{.PROFILE_FLAG}} {{.CLI_ARGS}}
+
+  assets:manifest:
+    desc: 'Regenerate <WEB_DIR>/assets/manifest.txt, the list of files the web build preloads'
+    dir: '{{.WEB_DIR}}/assets'
+    cmds:
+      - |
+        {
+          echo "# Files the web build preloads before Game::init (one path per line, relative to assets/)."
+          echo "# Regenerate with: task assets:manifest WEB_DIR={{.WEB_DIR}}"
+          find . -type f ! -name manifest.txt ! -name '.*' | sed 's|^\./||' | LC_ALL=C sort
+        } > manifest.txt
 
   atlas:
     desc: 'Run the atlas packer (e.g. task atlas -- --input sprites/ --output a.png --metadata a.json)'

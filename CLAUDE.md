@@ -27,6 +27,16 @@ into `game-toolkit-core`, and do not create back-edges that the consumer would n
 
 `#![forbid(unsafe_code)]` holds across the crates - keep it that way.
 
+**Every crate must also build for `wasm32-unknown-unknown`** (CI's `wasm` job and `task check:wasm`
+clippy the whole workspace for it, all features). Native-only code (filesystem paths, `notify`,
+`pollster`, blocking GPU read-backs) sits behind `#[cfg(not(target_arch = "wasm32"))]` and gets a
+bytes-based or no-op counterpart on the web; target-specific deps go in
+`[target.'cfg(...)'.dependencies]`. Use `web_time::Instant`, never `std::time::Instant`
+(it panics in the browser). Init on the web is async (`crates/core/src/app.rs` spawns it and
+finishes in `user_event`), and assets are preloaded from `assets/manifest.txt` before
+`Game::init`, which is how the synchronous `Game` API survives. Try changes in a browser with
+`task web` (`examples/13_web`).
+
 ## The quality gate
 
 - **Clippy with warnings-as-errors is the hard gate** (CI + `task lint`):
@@ -36,7 +46,8 @@ into `game-toolkit-core`, and do not create back-edges that the consumer would n
   local `task check`/`task ci` do run `cargo fmt --all --check`, but since CI won't fail on format,
   don't churn the whole workspace with reformatting. (Generated jam projects *do* gate on fmt via
   their own `task check`; that rule is theirs, not ours.)
-- CI runs clippy twice - default features and `--all-features` - and an MSRV job that checks
+- CI runs clippy twice - default features and `--all-features` - plus a wasm32 clippy +
+  `trunk build` of `examples/13_web`, and an MSRV job that checks
   the workspace on the toolchain named by `rust-version` in the root `Cargo.toml`. Bump the two
   together (`dtolnay/rust-toolchain@<msrv>` in `.github/workflows/ci.yml`).
 - Workspace lints (`[workspace.lints]`) are `warn`-level but `-D warnings` makes them a hard
@@ -54,6 +65,9 @@ task check                 # static checks; includes check:templates (see below)
 task lint                  # clippy -D warnings   (lint:fix to auto-fix + fmt)
 task test                  # nextest if present, else cargo test; doctests run separately
 task run EXAMPLE=ex_05_tilemap   # run an example by package; see example:* / run:* aliases
+task web                   # serve examples/13_web in a browser via trunk (WEB_DIR=... to switch)
+task check:wasm            # clippy for wasm32-unknown-unknown, all features
+task assets:manifest       # regenerate <WEB_DIR>/assets/manifest.txt (web preload list)
 task atlas -- --input sprites/ --output a.png --metadata a.json   # atlas-packer CLI
 task publish:dry           # trial publish in dependency order
 task labels                # create/update GitHub PR labels (gh); keep in sync with .github/labeler.yml
@@ -62,7 +76,7 @@ task labels                # create/update GitHub PR labels (gh); keep in sync w
 PRs are labelled by changed paths (`.github/workflows/labeler.yml`, config in
 `.github/labeler.yml`). Adding a crate or top-level area means a new entry there and in `task labels`.
 
-Examples live in `examples/` (`ex_01_window` … `ex_12_vector`, `bouncing_ball`); the offline
+Examples live in `examples/` (`ex_01_window` … `ex_13_web`, `bouncing_ball`); the offline
 atlas-packer is in `tools/atlas-packer`.
 
 ## Templates

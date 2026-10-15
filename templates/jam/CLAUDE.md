@@ -40,11 +40,13 @@ fixed `dt` (possibly several times per frame); leave it `None` for variable `dt`
 | `ctx.gfx` | `Graphics` | renderer: textures, meshes, cameras, screenshots, `size()` |
 | `ctx.input` | `Input` | keyboard / mouse / gamepad |
 | `ctx.audio` | `Option<Audio>` | sound - `None` when no device (runs muted); guard with `if let Some(a) = &mut ctx.audio` |
-| `ctx.assets` | `Assets` | asset-path resolution + hot-reload watcher |
+| `ctx.assets` | `Assets` | asset bytes (`read`), path resolution, hot-reload watcher |
 | `ctx.time` | `Time` | `elapsed`, `delta` (`Duration`), `frame: u64`, `fps: f32` |
 | `ctx.rng` | `Rng` | deterministic xorshift64* RNG: `next_f32()`, `range_u32(a..b)`, `range_usize(a..b)`, `reseed(seed)` |
 | `ctx.window` | `Arc<Window>` | the winit window |
 | `ctx.quit()` | | request shutdown |
+| `ctx.load_texture(p)` | `Result<TextureId>` | PNG from the asset root (native + web, hot-reloadable natively) |
+| `ctx.load_sound(p)` | `Result<Option<SoundId>>` | wav/ogg/flac/mp3 from the asset root; `Ok(None)` when muted |
 
 ## Drawing: the Painter
 
@@ -58,7 +60,7 @@ p.rect(pos, size, color);                 // also rect_outline(pos, size, thickn
 p.circle(center, radius, color);          // also circle_outline(center, radius, thickness, color)
 p.line(a, b, thickness, color);
 p.text(pos, "hi", 24.0, color);           // text always draws on top
-p.sprite(tex, pos, size);                 // tex: TextureId from ctx.gfx.load_texture(...)
+p.sprite(tex, pos, size);                 // tex: TextureId from ctx.load_texture(...)
 p.mesh(mesh, model, color);               // 3D, depth-tested under all 2D content
 ```
 
@@ -83,11 +85,17 @@ if let Some(pad) = ctx.input.first_gamepad() {
 ## Audio (`Option`)
 
 ```rust
-if let Some(audio) = &mut ctx.audio {
-    let id = audio.load_sound("boom.wav")?;   // returns SoundId
+// In init: load once. `None` = no audio device, the game runs muted.
+let boom: Option<SoundId> = ctx.load_sound("boom.wav")?;
+
+// Later:
+if let (Some(audio), Some(id)) = (&mut ctx.audio, boom) {
     audio.play(id)?;
 }
 ```
+
+In the browser, audio starts on the player's first key press / click / touch (a browser rule);
+`play` returns an error before that, so don't `?` it in `update` - log or ignore it.
 
 ## Randomness
 
@@ -107,10 +115,10 @@ Not cryptographically secure - gameplay use only (procedural generation, jitter,
 
 ```rust
 let (w, h) = ctx.gfx.size();
-let tex = ctx.gfx.load_texture("player.png")?;        // -> TextureId
+let tex = ctx.load_texture("player.png")?;            // -> TextureId (relative to asset_root)
 let mesh = ctx.gfx.create_mesh(&vertices, &indices);  // &[MeshVertex], &[u16] -> MeshId
 ctx.gfx.camera3d.eye = [2.5, 2.0, 3.5];               // perspective Camera3D (3D path)
-ctx.gfx.request_screenshot("shot.png");               // saves the next presented frame
+ctx.gfx.request_screenshot("shot.png");               // saves the next presented frame (native only)
 // ctx.gfx.camera is the 2D Camera2D.
 ```
 
@@ -118,20 +126,25 @@ ctx.gfx.request_screenshot("shot.png");               // saves the next presente
 
 ```rust
 fn main() -> Result<()> {
+    #[cfg(not(target_arch = "wasm32"))]
     env_logger::init();
     run::<MyGame>(AppConfig {
         title: "my-jam".into(),
         width: 1280,
         height: 720,
-        // Resolve assets relative to the crate so `cargo run` works from any directory:
-        asset_root: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"),
+        // The crate's assets/ natively (so `cargo run` works from any directory),
+        // "assets" next to index.html on the web:
+        asset_root: asset_root!(),
+        canvas_id: Some("game".into()), // web: render into index.html's <canvas id="game">
         ..Default::default()
     })
 }
 ```
 
 All fields: `title`, `width`, `height`, `vsync` (default `true`), `fixed_timestep: Option<Duration>`
-(default `None`), `asset_root` (default `./assets`), `random_seed: u64` (seeds `ctx.rng`; default is
+(default `None`), `asset_root` (default `./assets`), `web_preload: Option<Vec<String>>` (web: files to
+fetch instead of `assets/manifest.txt`), `canvas_id: Option<String>` (web: existing canvas; `None`
+appends one), `random_seed: u64` (seeds `ctx.rng`; default is
 a fixed nonzero constant, so runs are reproducible until you change it), `depth_format:
 Option<wgpu::TextureFormat>` (default `None`; set `Some(wgpu::TextureFormat::Depth32Float)` for 3D),
 `msaa_samples` (default `1`; `4` for anti-aliasing).
@@ -143,18 +156,39 @@ This template enables `ui`. All optional features and what they add to the prelu
 | Feature | Adds | For |
 |---------|------|-----|
 | `ui` | `Ui`, `egui` | egui debug overlays |
-| `aseprite` | `SpriteSheet`, `AnimationPlayer`, `Animation`, `Direction`, `FrameRect` | load `.aseprite` / exported sheets + play tagged animations |
+| `aseprite` | `SpriteSheet`, `AnimationPlayer`, `Animation`, `Direction`, `FrameRect`, `LoadAseprite` (`ctx.load_aseprite(p)`) | load `.aseprite` / exported sheets + play tagged animations |
 | `ecs` | `ChannelQueue`, `Vec2` (sillyecs glue) | archetype ECS |
 | `synth` | `Synth`, `synthie` | chiptune / procedural audio |
-| `vector` | `vello` | high-quality 2D vector graphics |
+| `vector` | `vello` | high-quality 2D vector graphics (WebGPU only: skipped on WebGL2) |
 
 Enable in `Cargo.toml`: `game-toolkit = { ..., features = ["ui", "aseprite"] }`.
 
 ## Assets
 
-Put art / audio / fonts under `assets/`. They load relative to `AppConfig::asset_root`. The
-`game-toolkit-assets` watcher can hot-reload changed files; `ctx.gfx.refresh_textures(paths)`
-re-uploads changed textures live.
+Put art / audio / fonts under `assets/`. They load relative to `AppConfig::asset_root`; use the
+`ctx.load_*` helpers (or `ctx.assets.read(p)` for raw bytes) so the same code works on the web.
+Natively, `ctx.assets.watch()` + `ctx.assets.drain_changes()` hot-reload changed files, and
+`ctx.gfx.refresh_textures(paths)` re-uploads textures loaded with `ctx.load_texture` live.
+
+## Shipping to the browser
+
+The same code builds for the web (wasm32, WebGPU with a WebGL2 fallback) via
+[trunk](https://trunkrs.dev): `rustup target add wasm32-unknown-unknown`,
+`cargo install trunk --locked`, then `task web` (dev server) or `PROFILE=release task web:build`
+(zip `dist/` and upload it to itch.io as an HTML game).
+
+What's different on the web:
+
+- **Assets are preloaded.** Before `init`, the toolkit fetches every file listed in
+  `assets/manifest.txt`; `task web` / `task web:build` regenerate it (`task assets:manifest`).
+  A file missing from the manifest fails to load at runtime.
+- **No filesystem paths.** Load through `ctx.load_texture` / `ctx.load_sound` /
+  `ctx.load_aseprite` / `ctx.assets.read`, not `std::fs` or the path-taking `ctx.gfx.load_texture`
+  (native only).
+- **Audio after the first gesture**, gamepads after the first button press (browser rules).
+- **Not available:** hot-reload (`watch` is a no-op), `request_screenshot`, `ctx.quit()` just
+  stops the loop. `std::time::Instant::now()` panics in wasm - use `ctx.time`.
+- Logs and panics go to the browser console.
 
 ## Commands
 
@@ -167,6 +201,9 @@ task test                # cargo test
 task lint                # clippy, warnings as errors
 task fmt                 # cargo fmt --all
 task check               # fmt --check AND clippy -D warnings  (run before you call it done)
+task check:wasm          # clippy for the browser target
+task web                 # serve in the browser at http://localhost:8080 (trunk)
+task web:build           # browser build into dist/ (PROFILE=release for upload)
 ```
 
 Plain `cargo run` works too. `task check` here enforces `rustfmt` - keep code formatted.
@@ -174,7 +211,7 @@ Plain `cargo run` works too. `task check` here enforces `rustfmt` - keep code fo
 ## Conventions
 
 - Reach for the prelude first; don't hand-roll types the toolkit already provides.
-- Set `asset_root` via `CARGO_MANIFEST_DIR` (above) so the binary runs from anywhere.
+- Set `asset_root: asset_root!()` (above) so the binary runs from anywhere and on the web.
 - 2D-first. The 3D mesh path needs `AppConfig::depth_format = Some(..)` (the jam-3d template's
   `src/main.rs` shows a full cube + 2D HUD).
 - Keep the `Game` struct small; push reusable systems into modules.
@@ -184,4 +221,4 @@ Plain `cargo run` works too. `task check` here enforces `rustfmt` - keep code fo
 Browse the [game-toolkit repo](https://github.com/sunsided/game-toolkit) `examples/` for runnable
 references: `01_window`, `02_sprite`, `03_primitives`, `04_text`, `05_tilemap`, `06_egui`,
 `07_3d`, `07_audio`, `08_hot_reload`, `09_aseprite`, `10_gamepad`, `11_ecs`, `12_vector`,
-`bouncing_ball`.
+`13_web` (runs natively and in the browser), `bouncing_ball`.

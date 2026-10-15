@@ -1089,6 +1089,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ex_13_web"
+version = "0.2.0"
+dependencies = [
+ "env_logger",
+ "game-toolkit",
+ "log",
+]
+
+[[package]]
 name = "extended"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1321,8 +1330,12 @@ name = "game-toolkit-assets"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "js-sys",
  "log",
  "notify",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
@@ -1346,6 +1359,10 @@ dependencies = [
  "game-toolkit-input",
  "log",
  "pollster",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "web-time",
  "wgpu",
  "winit",
 ]
@@ -1364,7 +1381,6 @@ dependencies = [
  "image",
  "log",
  "miniscreenshot-wgpu",
- "pollster",
  "vello",
  "wgpu",
  "winit",

@@ -1,13 +1,14 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
 use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
+use winit::event::{ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::window::WindowId;
+use winit::window::{Window, WindowId};
 
 use crate::Game;
-use crate::context::{Context, GameEvent};
+use crate::context::{self, Context, GameEvent, Parts};
 
 /// Runtime configuration passed to [`run`].
 ///
@@ -21,8 +22,14 @@ pub struct AppConfig {
     pub vsync: bool,
     /// `Some(d)` for deterministic fixed-step `update`; `None` for variable `dt`.
     pub fixed_timestep: Option<Duration>,
-    /// Asset root directory. Defaults to `./assets`.
+    /// Asset root directory. Defaults to `./assets`. On the web it is a URL path relative to
+    /// the page, and the files listed in its `manifest.txt` are fetched before `Game::init`.
     pub asset_root: std::path::PathBuf,
+    /// Web only: asset paths to preload instead of reading `manifest.txt`. Ignored natively.
+    pub web_preload: Option<Vec<String>>,
+    /// Web only: `id` of an existing `<canvas>` to render into. `None` (default) appends a new
+    /// canvas to `<body>`. Ignored natively.
+    pub canvas_id: Option<String>,
     /// Seed for deterministic runtime RNG (`ctx.rng`).
     pub random_seed: u64,
     /// Depth attachment format. `None` (default) keeps the 2D path depth-less; `Some(fmt)`
@@ -43,6 +50,8 @@ impl Default for AppConfig {
             vsync: true,
             fixed_timestep: None,
             asset_root: std::path::PathBuf::from("assets"),
+            web_preload: None,
+            canvas_id: None,
             random_seed: crate::Rng::DEFAULT_SEED,
             depth_format: None,
             msaa_samples: 1,
@@ -50,15 +59,37 @@ impl Default for AppConfig {
     }
 }
 
+/// Sent by the web init task once the GPU is up and the assets are preloaded. Unused natively,
+/// where init completes synchronously inside `resumed`.
+type InitDone = Box<(Arc<Window>, Result<Parts>)>;
+
+/// Open the window and run `G` until it quits.
+///
+/// Natively this blocks until the window closes. On the web it installs a panic hook and a
+/// console logger (unless a logger is already set), hands the loop to the browser and returns
+/// immediately; `G::init` runs once the GPU is ready and the assets are preloaded.
 pub fn run<G: Game>(config: AppConfig) -> Result<()> {
-    let event_loop = EventLoop::new()?;
+    #[cfg(target_arch = "wasm32")]
+    crate::web::install_hooks();
+    let event_loop = EventLoop::<InitDone>::with_user_event().build()?;
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+    #[cfg_attr(target_arch = "wasm32", allow(unused_mut))]
     let mut runner = AppRunner::<G> {
         config,
         state: None,
         accumulator: Duration::ZERO,
+        #[cfg(target_arch = "wasm32")]
+        proxy: event_loop.create_proxy(),
+        #[cfg(target_arch = "wasm32")]
+        initializing: false,
     };
+    #[cfg(not(target_arch = "wasm32"))]
     event_loop.run_app(&mut runner)?;
+    #[cfg(target_arch = "wasm32")]
+    {
+        use winit::platform::web::EventLoopExtWebSys;
+        event_loop.spawn_app(runner);
+    }
     Ok(())
 }
 
@@ -66,6 +97,11 @@ struct AppRunner<G: Game> {
     config: AppConfig,
     state: Option<RunState<G>>,
     accumulator: Duration,
+    #[cfg(target_arch = "wasm32")]
+    proxy: winit::event_loop::EventLoopProxy<InitDone>,
+    /// Set while the web init task is in flight, so another `resumed` doesn't start a second.
+    #[cfg(target_arch = "wasm32")]
+    initializing: bool,
 }
 
 struct RunState<G: Game> {
@@ -73,45 +109,63 @@ struct RunState<G: Game> {
     game: G,
 }
 
-impl<G: Game> ApplicationHandler for AppRunner<G> {
+impl<G: Game> ApplicationHandler<InitDone> for AppRunner<G> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.state.is_some() {
             return;
         }
-        let mut ctx = match Context::new(
-            event_loop,
-            &self.config.title,
-            self.config.width,
-            self.config.height,
-            self.config.vsync,
-            self.config.asset_root.clone(),
-            self.config.random_seed,
-            self.config.depth_format,
-            self.config.msaa_samples,
-        ) {
-            Ok(c) => c,
+        #[cfg(target_arch = "wasm32")]
+        if self.initializing {
+            return;
+        }
+        let window = match context::create_window(event_loop, &self.config) {
+            Ok(w) => w,
             Err(e) => {
-                log::error!("context init failed: {e:?}");
+                log::error!("window creation failed: {e:?}");
                 event_loop.exit();
                 return;
             }
         };
-        let game = match G::init(&mut ctx) {
-            Ok(g) => g,
-            Err(e) => {
-                log::error!("game init failed: {e:?}");
-                event_loop.exit();
-                return;
-            }
-        };
-        ctx.window.request_redraw();
-        self.state = Some(RunState { ctx, game });
+        // Adapter/device requests are async. Natively we can block on them; the browser main
+        // thread can't block, so there init runs as a task that reports back via `user_event`.
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let parts =
+                pollster::block_on(context::init_parts(window.clone(), self.config.clone()));
+            self.finish_init(event_loop, window, parts);
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.initializing = true;
+            let proxy = self.proxy.clone();
+            let config = self.config.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                let parts = context::init_parts(window.clone(), config).await;
+                if proxy.send_event(Box::new((window, parts))).is_err() {
+                    log::error!("event loop closed before init finished");
+                }
+            });
+        }
+    }
+
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: InitDone) {
+        let (window, parts) = *event;
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.initializing = false;
+        }
+        self.finish_init(event_loop, window, parts);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         let Some(state) = self.state.as_mut() else {
             return;
         };
+        // The first key, click or touch is the user gesture browsers require before audio may
+        // play. Natively the device is already open and this is a no-op.
+        if is_user_gesture(&event) {
+            state.ctx.start_audio();
+        }
         // Give the game's raw-event hook first crack (egui etc. needs this).
         let consumed = state.game.raw_window_event(&mut state.ctx, &event);
         match event {
@@ -161,7 +215,50 @@ impl<G: Game> ApplicationHandler for AppRunner<G> {
     }
 }
 
+fn is_user_gesture(event: &WindowEvent) -> bool {
+    match event {
+        WindowEvent::KeyboardInput { event, .. } => event.state == ElementState::Pressed,
+        WindowEvent::MouseInput { state, .. } => *state == ElementState::Pressed,
+        WindowEvent::Touch(_) => true,
+        _ => false,
+    }
+}
+
 impl<G: Game> AppRunner<G> {
+    /// Second half of startup, once the window, GPU and assets exist: build the [`Context`]
+    /// and call `G::init`.
+    fn finish_init(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window: Arc<Window>,
+        parts: Result<Parts>,
+    ) {
+        let parts = match parts {
+            Ok(p) => p,
+            Err(e) => {
+                log::error!("context init failed: {e:?}");
+                event_loop.exit();
+                return;
+            }
+        };
+        let mut ctx = Context::from_parts(window, parts, &self.config);
+        // On the web, init is async and the canvas's real size arrives as a `Resized` event
+        // while it runs, which `window_event` drops (no state yet). Catch up before `G::init`
+        // so it sees the true surface size.
+        let size = ctx.window.inner_size();
+        ctx.gfx.resize(size.width, size.height);
+        let game = match G::init(&mut ctx) {
+            Ok(g) => g,
+            Err(e) => {
+                log::error!("game init failed: {e:?}");
+                event_loop.exit();
+                return;
+            }
+        };
+        ctx.window.request_redraw();
+        self.state = Some(RunState { ctx, game });
+    }
+
     fn frame(&mut self, event_loop: &ActiveEventLoop) {
         let Some(state) = self.state.as_mut() else {
             return;

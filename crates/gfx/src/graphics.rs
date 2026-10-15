@@ -45,9 +45,10 @@ pub struct Graphics {
     camera3d_bg: wgpu::BindGroup,
     meshes: MeshRegistry,
     mesh_batcher: MeshBatcher,
-    /// Vello vector backend; composites over the 2D layers each frame.
+    /// Vello vector backend; composites over the 2D layers each frame. `None` on adapters
+    /// without compute shaders (WebGL2), where vector drawing is skipped.
     #[cfg(feature = "vector")]
-    pub(crate) vector: VectorPass,
+    pub(crate) vector: Option<VectorPass>,
     /// Whether the surface supports `COPY_SRC` (required to read frames back for screenshots).
     capture_copy_src: bool,
     /// Path to write a screenshot of the next presented frame, set by `request_screenshot`.
@@ -65,8 +66,16 @@ impl Graphics {
         let (width, height) = (size.width.max(1), size.height.max(1));
 
         let mut idesc = wgpu::InstanceDescriptor::new_without_display_handle();
-        idesc.backends = wgpu::Backends::PRIMARY;
-        let instance = wgpu::Instance::new(idesc);
+        // Web: WebGPU where the browser has it, WebGL2 otherwise. Native: Vulkan/Metal/DX12.
+        idesc.backends = if cfg!(target_arch = "wasm32") {
+            wgpu::Backends::BROWSER_WEBGPU | wgpu::Backends::GL
+        } else {
+            wgpu::Backends::PRIMARY
+        };
+        // A browser may expose `navigator.gpu` yet hand out no adapter (headless Chrome, blocked
+        // GPUs). This probes for a real WebGPU adapter and drops to WebGL2 when there is none;
+        // natively it is a plain `Instance::new`.
+        let instance = wgpu::util::new_instance_with_webgpu_detection(idesc).await;
         let surface = instance
             .create_surface(window.clone())
             .context("create_surface")?;
@@ -80,12 +89,18 @@ impl Graphics {
             .await
             .context("no compatible adapter")?;
 
-        // Vello needs the standard (non-downlevel) limits; bump them when the feature is on.
-        let required_limits = if cfg!(feature = "vector") {
-            wgpu::Limits::default().using_resolution(adapter.limits())
+        let backend = adapter.get_info().backend;
+        log::info!("wgpu adapter: {:?} ({backend:?})", adapter.get_info().name);
+        // WebGL2 can't meet even the downlevel limits (and has no compute, so no vello).
+        // Otherwise vello needs the standard (non-downlevel) limits; bump them when it's on.
+        let required_limits = if backend == wgpu::Backend::Gl {
+            wgpu::Limits::downlevel_webgl2_defaults()
+        } else if cfg!(feature = "vector") {
+            wgpu::Limits::default()
         } else {
-            wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits())
-        };
+            wgpu::Limits::downlevel_defaults()
+        }
+        .using_resolution(adapter.limits());
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("toolkit.device"),
@@ -204,7 +219,16 @@ impl Graphics {
         let mesh_batcher =
             MeshBatcher::new(&device, format, &camera_bgl, sample_count, depth_format);
         #[cfg(feature = "vector")]
-        let vector = VectorPass::new(&device, format, width, height);
+        let vector = if adapter
+            .get_downlevel_capabilities()
+            .flags
+            .contains(wgpu::DownlevelFlags::COMPUTE_SHADERS)
+        {
+            Some(VectorPass::new(&device, format, width, height))
+        } else {
+            log::error!("vector graphics disabled: adapter has no compute shaders ({backend:?})");
+            None
+        };
 
         Ok(Self {
             device,
@@ -256,7 +280,9 @@ impl Graphics {
         self.camera3d.resize(width as f32, height as f32);
         self.text.resize(&self.queue, width, height);
         #[cfg(feature = "vector")]
-        self.vector.resize(&self.device, width, height);
+        if let Some(vector) = self.vector.as_mut() {
+            vector.resize(&self.device, width, height);
+        }
     }
 
     pub fn window(&self) -> &Arc<Window> {
@@ -278,12 +304,28 @@ impl Graphics {
         &self.queue
     }
 
+    /// Load a PNG from disk and remember its path for [`Graphics::refresh_textures`]. Not
+    /// available on the web; use [`Graphics::load_texture_bytes`] (or `ctx.load_texture`,
+    /// which picks the right one per platform).
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load_texture(&mut self, path: impl AsRef<Path>) -> Result<TextureId> {
         let path = path.as_ref();
         let id = self.textures.load_file(&self.device, &self.queue, path)?;
         let canon = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         self.texture_paths.insert(canon, id);
         Ok(id)
+    }
+
+    /// Register an extra font face (TTF/OTF bytes) as a glyph fallback for text rendering.
+    pub fn load_font_bytes(&mut self, bytes: Vec<u8>) {
+        self.text.load_font_bytes(bytes);
+    }
+
+    /// Decode a PNG held in memory and upload it. `label` names the texture in GPU debuggers
+    /// and error messages.
+    pub fn load_texture_bytes(&mut self, bytes: &[u8], label: Option<&str>) -> Result<TextureId> {
+        self.textures
+            .load_bytes(&self.device, &self.queue, bytes, label)
     }
 
     /// Re-decode any texture whose backing file is in `changed_paths` and update its bind
@@ -337,8 +379,13 @@ impl Graphics {
     }
 
     /// Save a PNG of the next presented frame to `path`. The read-back stalls that frame, so
-    /// this is for debug/dev use. A no-op (with a warning) if the surface lacks `COPY_SRC`.
+    /// this is for debug/dev use. A no-op (with a warning) if the surface lacks `COPY_SRC`,
+    /// and on the web, where there is neither a blocking read-back nor a filesystem.
     pub fn request_screenshot(&mut self, path: impl Into<PathBuf>) {
+        if cfg!(target_arch = "wasm32") {
+            log::warn!("screenshot unsupported on the web");
+            return;
+        }
         if !self.capture_copy_src {
             log::warn!("screenshot unsupported: surface does not allow COPY_SRC read-back");
             return;
@@ -406,9 +453,13 @@ impl Graphics {
         }
     }
 
+    #[cfg(target_arch = "wasm32")]
+    fn save_screenshot(&self, _texture: &wgpu::Texture, _path: &Path) {}
+
     /// Read the surface texture back to the CPU and save it. Synchronous (blocks on a poll),
     /// so only used for the occasional debug screenshot. `miniscreenshot-wgpu` handles the
     /// staging copy, row-padding strip, and BGRA->RGBA conversion.
+    #[cfg(not(target_arch = "wasm32"))]
     fn save_screenshot(&self, texture: &wgpu::Texture, path: &Path) {
         match miniscreenshot_wgpu::capture(&self.device, &self.queue, texture) {
             Ok(shot) => match shot.save(path) {
@@ -498,8 +549,9 @@ impl Graphics {
 
         // Vector content composites on top of the 2D layers, directly onto the surface.
         #[cfg(feature = "vector")]
-        self.vector
-            .render_and_composite(&self.device, &self.queue, encoder, &frame.view);
+        if let Some(vector) = self.vector.as_mut() {
+            vector.render_and_composite(&self.device, &self.queue, encoder, &frame.view);
+        }
 
         self.sprites.clear();
         self.primitives.clear();
