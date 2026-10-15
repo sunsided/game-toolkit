@@ -10,6 +10,8 @@ struct Game1 {
 /// A unit cube centered at the origin, as 24 vertices with per-face normals.
 fn unit_cube() -> (Vec<MeshVertex>, Vec<u16>) {
     let h = 0.5;
+    // One row per face: (normal, corners). Kept as a table; rustfmt would split every row.
+    #[rustfmt::skip]
     let faces: [([f32; 3], [[f32; 3]; 4]); 6] = [
         ([1.0, 0.0, 0.0], [[h, -h, -h], [h, h, -h], [h, h, h], [h, -h, h]]),
         ([-1.0, 0.0, 0.0], [[-h, -h, h], [-h, h, h], [-h, h, -h], [-h, -h, -h]]),
@@ -51,7 +53,9 @@ impl Game for Game1 {
         let mut p = frame.painter(&mut ctx.gfx);
         p.clear([0.05, 0.06, 0.09, 1.0]);
         p.mesh(self.cube, model, [0.45, 0.75, 0.95, 1.0]);
-        p.text([16.0, 16.0], "{{project-name}} (Esc to quit)", 22.0, [0.9, 0.9, 0.95, 1.0]);
+        // A separate binding keeps the call below rustfmt-stable for any project-name length.
+        let title = "{{project-name}} (Esc to quit)";
+        p.text([16.0, 16.0], title, 22.0, [0.9, 0.9, 0.95, 1.0]);
     }
 }
 

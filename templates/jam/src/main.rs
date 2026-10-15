@@ -59,12 +59,9 @@ impl Game for Game1 {
         p.circle(marker, self.radius * 0.18, [1.0, 0.9, 0.3, 1.0]);
         p.circle_outline(self.pos, self.radius, 3.0, [1.0, 1.0, 1.0, 0.85]);
 
-        p.text(
-            [16.0, 16.0],
-            "{{project-name}} (Esc to quit)",
-            22.0,
-            [0.9, 0.9, 0.95, 1.0],
-        );
+        // A separate binding keeps the call below rustfmt-stable for any project-name length.
+        let title = "{{project-name}} (Esc to quit)";
+        p.text([16.0, 16.0], title, 22.0, [0.9, 0.9, 0.95, 1.0]);
     }
 }
 
