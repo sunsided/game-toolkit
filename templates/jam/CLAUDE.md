@@ -71,7 +71,8 @@ p.quad([a, b, c, d], color, layer);       // filled convex quad; also polygon(&p
 p.triangles(&verts, &indices, color, layer); // raw filled triangle list
 // gradients: quad_colored(points, [c0, c1, c2, c3], layer), polygon_colored, triangles_colored
 // blend modes: quad_ex / polygon_ex / triangles_ex(..., layer, BlendMode::Additive)
-// textured, perspective-correct (road segments, mode-7 floors; UVs clamp to 0..1):
+// textured, perspective-correct (road segments, mode-7 floors). UVs past 0..1 clamp, or
+// tile after ctx.gfx.set_texture_wrap(tex, TextureWrap::Repeat) (keep atlases on Clamp):
 p.quad_textured(tex, [a, b, c, d], [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], color, layer, BlendMode::Alpha);
 p.text(pos, "hi", 24.0, color);           // unlayered: on top of everything
 p.text_ex(pos, "hi", 24.0, color, layer); // layered: covered by higher layers (pause overlay)
@@ -208,7 +209,8 @@ Option<wgpu::TextureFormat>` (default `None`; set `Some(wgpu::TextureFormat::Dep
 
 ## Features
 
-This template enables `ui`. All optional features and what they add to the prelude:
+This template enables `ui`.
+All optional features and what they add to the prelude:
 
 | Feature | Adds | For |
 |---------|------|-----|
@@ -219,6 +221,17 @@ This template enables `ui`. All optional features and what they add to the prelu
 | `vector` | `vello` | high-quality 2D vector graphics (WebGPU only: skipped on WebGL2) |
 
 Enable in `Cargo.toml`: `game-toolkit = { ..., features = ["ui", "aseprite"] }`.
+
+## Fast dev builds
+
+Unoptimized dependencies make debug builds of a game slow enough to be unplayable (audio
+decoding, image decoding, thousands of sprites per frame). Optimize just the dependencies, so
+your own code still compiles fast and debugs well. The jam templates ship this in `Cargo.toml`:
+
+```toml
+[profile.dev.package."*"]
+opt-level = 3
+```
 
 ## Assets
 
@@ -232,13 +245,16 @@ Natively, `ctx.assets.watch()` + `ctx.assets.drain_changes()` hot-reload changed
 The same code builds for the web (wasm32, WebGPU with a WebGL2 fallback) via
 [trunk](https://trunkrs.dev): `rustup target add wasm32-unknown-unknown`,
 `cargo install trunk --locked`, then `task web` (dev server) or `PROFILE=release task web:build`
-(zip `dist/` and upload it to itch.io as an HTML game).
+in a jam-template project, or `trunk serve` / `trunk build --release` directly (zip `dist/`
+and upload it to itch.io as an HTML game).
 
 What's different on the web:
 
 - **Assets are preloaded.** Before `init`, the toolkit fetches every file listed in
   `assets/manifest.txt`; `task web` / `task web:build` regenerate it (`task assets:manifest`).
-  A file missing from the manifest fails to load at runtime.
+  A file missing from the manifest fails to load at runtime. Native debug builds warn
+  (`asset ... is not listed in .../manifest.txt`) when the game loads a file the manifest
+  doesn't list, so watch the log after adding assets.
 - **No filesystem paths.** Load through `ctx.load_texture` / `ctx.load_sound` /
   `ctx.load_aseprite` / `ctx.assets.read`, not `std::fs` or the path-taking `ctx.gfx.load_texture`
   (native only).

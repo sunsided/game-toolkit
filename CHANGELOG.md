@@ -25,6 +25,21 @@ All notable changes to this project are documented here. The format is based on
 - `channel_queue_impls!` implements sillyecs' generated `WorldUserCommand` /
   `WorldCommandSender` / `WorldCommandReceiver` traits on `ChannelQueue` in one line; in the
   prelude with the `ecs` feature (#43).
+- The jam agent guide is published as the umbrella crate's `game_toolkit::guide` module on
+  docs.rs, generated from the same source as the templates' `CLAUDE.md` (agent-only sections
+  are left out). The README links it and gains a Drawing section with the `Painter` calls and
+  draw-order rules (#49).
+- The jam templates optimize dependencies in dev builds (`[profile.dev.package."*"]
+  opt-level = 3`); the README and guide recommend it for other projects (#48).
+- Per-texture wrap modes: `Graphics::set_texture_wrap(id, TextureWrap::Repeat)` (or
+  `MirrorRepeat`) makes UVs outside `0..1` tile, so a scrolling road or a repeating floor is one
+  `quad_textured` instead of a quad per tile. `TextureWrap::Clamp` stays the default, so sprites
+  and atlas regions are unaffected; the mode survives hot-reloads. `Graphics::texture_wrap`
+  reads it back. `examples/03_primitives` scrolls a tiled road (#37).
+- Native debug builds check asset loads against the web preload list (`manifest.txt` under
+  the asset root, or `AppConfig::web_preload`) and log a warning, once per file, for files
+  the web build wouldn't preload. `Assets::check_web_listed` runs the check for files read by
+  path; `Assets::set_web_preload` replaces the list; `parse_manifest` is public (#46).
 - `Color` (`rgb` / `rgba` / `rgb8` / `rgba8` / `hex` / `hex_rgba`, named constants,
   `with_alpha`, `lerp`) and `Layer(i16)` (`DEFAULT`, `BOTTOM`, `TOP`). Painter calls take
   `impl Into<Color>` and `impl Into<Layer>`, so existing `[f32; 4]` and integer arguments keep
@@ -56,6 +71,8 @@ All notable changes to this project are documented here. The format is based on
   `channel_queue_impls!`.
 - `AppConfig::fixed_timestep` documents that `update` may run zero or several times per frame
   and that `render` runs once (#50).
+- `task sync:templates` / `task check:templates` and CI's sync check run
+  `tools/sync-guide.sh`, which also writes `crates/prelude/src/guide.md`.
 - `SpriteInstance::with_color` and `Painter::mesh` / `clear` take `impl Into<Color>`.
 - The text atlas is trimmed after each frame, so glyphs no longer drawn free their space.
 

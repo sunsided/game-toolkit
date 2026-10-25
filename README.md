@@ -12,6 +12,10 @@ pulls only what it uses.
 Built on `wgpu`, `winit` 0.30, `kira`, `glyphon` (cosmic-text), `image`, and `bytemuck`,
 with optional `egui` tooling overlays and Aseprite asset loading.
 
+The **[guide](https://docs.rs/game-toolkit/latest/game_toolkit/guide/)** covers the whole API on
+one page: the game loop, `Context`, drawing and draw order, input, audio, configuration,
+features, assets and the web build.
+
 ## Quick start
 
 ```rust
@@ -58,11 +62,48 @@ on the web. Load files through `ctx.load_texture("player.png")` / `ctx.load_soun
 asset_root: asset_root!(),
 ```
 
+Debug builds with unoptimized dependencies can be too slow to play (audio and image decoding,
+thousands of sprites a frame). Optimize just the dependencies in your game's `Cargo.toml`, so
+your own code still builds fast and debugs normally (the jam templates already do this):
+
+```toml
+[profile.dev.package."*"]
+opt-level = 3
+```
+
 `AppConfig` also exposes `msaa_samples` (e.g. `4` for anti-aliasing; default `1`) and
 `depth_format` (`Some(wgpu::TextureFormat::Depth32Float)` to allocate a depth buffer;
 default `None`). The built-in 2D pipelines never write depth, so enabling it is harmless
 and is there to support depth-tested rendering. `AppConfig::random_seed` seeds the deterministic
 per-`Context` RNG (`ctx.rng`); a fixed seed reproduces a run.
+
+## Drawing
+
+In `render`, `frame.painter(&mut ctx.gfx)` returns a `Painter`; it queues draw calls and
+flushes them when it drops. Positions are pixels from the top-left. Colors are a `Color`
+(`Color::hex(0xff8800)`, `Color::WHITE.with_alpha(0.5)`) or an `[r, g, b, a]` array in
+`0.0..=1.0`; layers are a `Layer` (`const HUD: Layer = Layer(3);`) or a plain integer.
+
+| Call | Draws |
+|------|-------|
+| `clear(color)` | the background |
+| `sprite(tex, pos, size)`, `sprite_region(tex, src_pos, src_size, pos, size)` | a texture, or a pixel rectangle of an atlas |
+| `sprite_ex(tex, SpriteInstance, layer, blend)` | a sprite with UVs, tint, rotation, flips, layer and `BlendMode` |
+| `rect`, `rect_outline`, `line` (+ `_ex` with layer and blend) | untextured rectangles and lines |
+| `circle`, `circle_outline`, `circle_ex` | SDF circles and rings |
+| `quad`, `polygon`, `triangles` (+ `_colored`, `_ex`, `_textured`) | filled convex shapes, gradients, perspective-textured quads |
+| `text(pos, s, size_px, color)`, `text_ex(.., layer)` | text on top of everything, or sorted with a layer |
+| `measure_text(s, size_px)` | a string's `[width, height]`, for aligning or sizing a box |
+| `draw_sprite(..)`, `draw_rect(..)`, `draw_text(..)` | builders for draws with options: `.region(..)`, `.flip_x()`, `.layer(..)`, `.blend(..)`, `.align(..)`, …; queued when dropped |
+| `mesh(mesh, model, color)` | a 3D mesh, depth-tested under all 2D content |
+
+**Draw order.** Lower layers draw under higher ones; the calls without a layer argument use
+layer 0. Within a layer: sprites and rects/lines first (grouped by blend mode, then texture;
+untextured shapes sort *under* textured sprites), then filled shapes, then circles, then
+layered text. Call order only holds within one such group, so put a HUD rect over a sprite
+scene on a higher layer with `rect_ex` rather than relying on call order. The [`Painter`
+docs](https://docs.rs/game-toolkit-gfx/latest/game_toolkit_gfx/struct.Painter.html) and the
+[guide](https://docs.rs/game-toolkit/latest/game_toolkit/guide/) have the details.
 
 ## Start a new jam
 
@@ -77,7 +118,9 @@ cargo generate --git https://github.com/sunsided/game-toolkit templates/jam-3d -
 Each template is a minimal `Game` (window + Esc-to-quit + a drawn title) depending on
 `game-toolkit` with the `ui` feature on, plus an `assets/` directory. `cd my-jam && cargo run`.
 Generated projects also include a `CLAUDE.md` cheatsheet of the toolkit API, so coding agents
-working in the new repo are productive without first spelunking the toolkit source.
+working in the new repo are productive without first spelunking the toolkit source. It's the
+same text as the [guide](https://docs.rs/game-toolkit/latest/game_toolkit/guide/), plus
+template-specific commands and conventions.
 
 ## Crates
 
@@ -233,7 +276,9 @@ one. Differences from native:
 - **Assets are preloaded.** The browser can only fetch asynchronously, so before `Game::init`
   the toolkit fetches every file listed in `assets/manifest.txt` (one path per line;
   `task assets:manifest` regenerates it) or in `AppConfig::web_preload`. After that,
-  `ctx.load_*` and `ctx.assets.read` work synchronously as usual. The path-taking
+  `ctx.load_*` and `ctx.assets.read` work synchronously as usual. Native debug builds read
+  the manifest too and log a warning when a loaded file isn't listed, so a forgotten entry
+  shows up before the web build breaks. The path-taking
   `Graphics::load_texture` / `Audio::load_sound` are native-only; use the `*_bytes` variants or
   the `ctx.load_*` helpers.
 - **Audio starts on the first key press, click or touch** (browsers block audio before a user

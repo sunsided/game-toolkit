@@ -24,16 +24,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # The jam templates ship a bundled CLAUDE.md synced from templates/jam-agent-guide.md.
-      # Fail fast (no toolchain needed) if a copy drifted; `task sync:templates` re-stamps them.
-      - name: Templates in sync
-        run: |
-          for t in jam jam-3d; do
-            if ! cmp -s templates/jam-agent-guide.md "templates/$t/CLAUDE.md"; then
-              echo "::error file=templates/$t/CLAUDE.md::out of sync with templates/jam-agent-guide.md; run: task sync:templates"
-              exit 1
-            fi
-          done
+      # templates/jam-agent-guide.md is stamped into the templates' CLAUDE.md and into
+      # crates/prelude/src/guide.md (docs.rs). Fail fast (no toolchain needed) if a copy
+      # drifted; `task sync:templates` re-stamps them.
+      - name: Guide copies in sync
+        run: tools/sync-guide.sh --check
 
       # ALSA + D-Bus headers for kira (cpal backend; dbus via audio_thread_priority), udev for gilrs.
       - name: Install Linux build deps
