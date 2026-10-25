@@ -45,6 +45,29 @@ impl<'a> Painter<'a> {
             .draw(tex, 0, BlendMode::Alpha, SpriteInstance::at(pos, size));
     }
 
+    /// Draw the `src_size` pixel rectangle at `src_pos` (top-left, in pixels) of `tex`, e.g. one
+    /// sprite of an atlas, into `pos`/`size` (layer 0, alpha blending). Does nothing for an
+    /// unknown texture. For flipping or an explicit layer, build the instance with
+    /// [`SpriteInstance::with_region`] and draw it with [`Painter::sprite_ex`].
+    pub fn sprite_region(
+        &mut self,
+        tex: TextureId,
+        src_pos: [f32; 2],
+        src_size: [f32; 2],
+        pos: [f32; 2],
+        size: [f32; 2],
+    ) {
+        if let Some(tex_size) = self.gfx.texture_size(tex) {
+            let inst = SpriteInstance::at(pos, size).with_region(src_pos, src_size, tex_size);
+            self.gfx.sprites.draw(tex, 0, BlendMode::Alpha, inst);
+        }
+    }
+
+    /// Pixel size of a loaded texture; see [`Graphics::texture_size`].
+    pub fn texture_size(&self, tex: TextureId) -> Option<[u32; 2]> {
+        self.gfx.texture_size(tex)
+    }
+
     /// Sprite on an explicit layer with an explicit blend mode. See the draw-order notes on
     /// [`Painter`].
     pub fn sprite_ex(

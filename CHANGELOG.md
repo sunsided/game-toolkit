@@ -13,6 +13,11 @@ All notable changes to this project are documented here. The format is based on
 - `Painter` docs describe the 2D draw order: layers first, then blend mode and texture, with
   call order kept only within one of those groups. Untextured shapes use the white texture,
   which sorts under every loaded texture on the same layer.
+- `Graphics::texture_size` / `Painter::texture_size`, the pixel size of a loaded texture
+  (follows hot-reloads) (#26).
+- `SpriteInstance::with_region(min, size, tex_size)` for drawing a pixel rectangle of an atlas,
+  `SpriteInstance::flip_x` / `flip_y` for mirroring any UV range, and
+  `Painter::sprite_region(tex, src_pos, src_size, pos, size)` as the layer-0 shorthand (#26).
 
 ## [0.3.1] - 2026-10-25
 
