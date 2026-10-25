@@ -107,7 +107,8 @@ impl ApplyPhysicsSystem for PhysicsSystem {
     }
 }
 
-/// Longer frames than this reset the world's clock instead of catching up.
+/// Longer frames than this reset the world's clock instead of catching up. Also passed as
+/// `AppConfig::max_frame_time`, so the toolkit and the ECS agree on what a long frame is.
 const MAX_FRAME_TIME: std::time::Duration = std::time::Duration::from_millis(250);
 
 struct EcsDemo {
@@ -184,6 +185,8 @@ fn main() -> Result<()> {
         title: "11_ecs".into(),
         width: 800,
         height: 600,
+        // The same cap the world's clock reset uses in `update`.
+        max_frame_time: MAX_FRAME_TIME,
         ..Default::default()
     })
 }
