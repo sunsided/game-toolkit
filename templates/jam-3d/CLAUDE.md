@@ -63,7 +63,8 @@ p.quad([a, b, c, d], color, layer);       // filled convex quad; also polygon(&p
 p.triangles(&verts, &indices, color, layer); // raw filled triangle list
 // gradients: quad_colored(points, [c0, c1, c2, c3], layer), polygon_colored, triangles_colored
 // blend modes: quad_ex / polygon_ex / triangles_ex(..., layer, BlendMode::Additive)
-// textured, perspective-correct (road segments, mode-7 floors; UVs clamp to 0..1):
+// textured, perspective-correct (road segments, mode-7 floors). UVs past 0..1 clamp, or
+// tile after ctx.gfx.set_texture_wrap(tex, TextureWrap::Repeat) (keep atlases on Clamp):
 p.quad_textured(tex, [a, b, c, d], [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], color, layer, BlendMode::Alpha);
 p.text(pos, "hi", 24.0, color);           // text always draws on top
 p.sprite(tex, pos, size);                 // tex: TextureId from ctx.load_texture(...)

@@ -15,7 +15,7 @@ use crate::shapes::ShapeBatcher;
 use crate::sprite::SpriteBatcher;
 use crate::target::Targets;
 use crate::text::TextSystem;
-use crate::texture::{TextureId, TextureRegistry};
+use crate::texture::{TextureId, TextureRegistry, TextureWrap};
 #[cfg(feature = "vector")]
 use crate::vector::VectorPass;
 
@@ -375,6 +375,25 @@ impl Graphics {
 
     pub fn white_texture(&self) -> TextureId {
         self.textures.white()
+    }
+
+    /// Choose what `id` shows for UVs outside `0..1`: [`TextureWrap::Clamp`] (the default for
+    /// every texture) stretches the edge texels, [`TextureWrap::Repeat`] and
+    /// [`TextureWrap::MirrorRepeat`] tile. Set `Repeat` on a texture to tile it across one
+    /// quad (`Painter::quad_textured` with UVs up to `[4.0, 10.0]`, a sprite with
+    /// [`crate::SpriteInstance::with_uv`] beyond `1.0`) instead of drawing a quad per tile.
+    /// Keep atlases on `Clamp`: their regions sample right up to the edge, and with wrapping
+    /// a UV of exactly `1.0` bleeds in the opposite edge. The mode survives hot-reloads.
+    /// Unknown ids are ignored.
+    pub fn set_texture_wrap(&mut self, id: TextureId, wrap: TextureWrap) {
+        if !self.textures.set_wrap(&self.device, id, wrap) {
+            log::warn!("set_texture_wrap: unknown {id:?}");
+        }
+    }
+
+    /// The [`TextureWrap`] mode of `id`, or `None` for an unknown id.
+    pub fn texture_wrap(&self, id: TextureId) -> Option<TextureWrap> {
+        self.textures.get(id).map(|t| t.wrap)
     }
 
     /// Pixel size `[width, height]` of a loaded texture, or `None` for an unknown id. Follows

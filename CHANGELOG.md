@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- Per-texture wrap modes: `Graphics::set_texture_wrap(id, TextureWrap::Repeat)` (or
+  `MirrorRepeat`) makes UVs outside `0..1` tile, so a scrolling road or a repeating floor is one
+  `quad_textured` instead of a quad per tile. `TextureWrap::Clamp` stays the default, so sprites
+  and atlas regions are unaffected; the mode survives hot-reloads. `Graphics::texture_wrap`
+  reads it back. `examples/03_primitives` scrolls a tiled road (#37).
+
 ## [0.4.0] - 2026-10-25
 
 ### Added
