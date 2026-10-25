@@ -72,8 +72,13 @@ impl SpriteInstance {
     }
     /// Sample the `size` pixel rectangle at `min` (top-left, in pixels) of a texture that is
     /// `tex_size` pixels large, e.g. one sprite of an atlas. Get `tex_size` from
-    /// `Graphics::texture_size` / `Painter::texture_size`.
+    /// `Graphics::texture_size` / `Painter::texture_size`, which never reports a zero side;
+    /// a zero `tex_size` side would produce non-finite UVs and is a debug-build panic.
     pub fn with_region(self, min: [f32; 2], size: [f32; 2], tex_size: [u32; 2]) -> Self {
+        debug_assert!(
+            tex_size[0] > 0 && tex_size[1] > 0,
+            "with_region: zero-sized texture {tex_size:?}"
+        );
         let [tw, th] = [tex_size[0] as f32, tex_size[1] as f32];
         self.with_uv(
             [min[0] / tw, min[1] / th],
@@ -350,6 +355,14 @@ mod tests {
         );
         assert_eq!(inst.uv_min, [0.25, 0.25]);
         assert_eq!(inst.uv_max, [0.375, 0.375]);
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "zero-sized texture")]
+    fn with_region_rejects_a_zero_sized_texture_in_debug_builds() {
+        let _ =
+            SpriteInstance::at([0.0, 0.0], [1.0, 1.0]).with_region([0.0, 0.0], [1.0, 1.0], [0, 64]);
     }
 
     #[test]
