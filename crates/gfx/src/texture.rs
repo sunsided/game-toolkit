@@ -31,8 +31,13 @@ impl TextureWrap {
         }
     }
 
+    /// Position in [`TextureWrap::ALL`] and the registry's sampler array.
     fn index(self) -> usize {
-        self as usize
+        match self {
+            Self::Clamp => 0,
+            Self::Repeat => 1,
+            Self::MirrorRepeat => 2,
+        }
     }
 }
 
@@ -43,6 +48,8 @@ pub struct Texture {
     pub(crate) texture: wgpu::Texture,
     pub(crate) view: wgpu::TextureView,
     pub(crate) wrap: TextureWrap,
+    /// Debug label, reapplied when the bind group is rebuilt for a new wrap mode.
+    pub(crate) label: Option<String>,
 }
 
 pub(crate) struct TextureRegistry {
@@ -126,7 +133,7 @@ impl TextureRegistry {
             return false;
         };
         if tex.wrap != wrap {
-            let bind_group = self.create_bind_group(device, &tex.view, wrap, None);
+            let bind_group = self.create_bind_group(device, &tex.view, wrap, tex.label.as_deref());
             let tex = self.map.get_mut(&id).expect("checked above");
             tex.bind_group = bind_group;
             tex.wrap = wrap;
@@ -290,8 +297,21 @@ impl TextureRegistry {
                 texture,
                 view,
                 wrap: TextureWrap::Clamp,
+                label: label.map(str::to_owned),
             },
         );
         id
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn index_matches_position_in_all() {
+        for (i, wrap) in TextureWrap::ALL.into_iter().enumerate() {
+            assert_eq!(wrap.index(), i);
+        }
     }
 }
