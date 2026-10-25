@@ -24,6 +24,13 @@ All notable changes to this project are documented here. The format is based on
   circles. `examples/03_primitives` shows them (#28).
 - Per-vertex colours for filled shapes, interpolated across each triangle:
   `Painter::quad_colored`, `polygon_colored` and `triangles_colored` (#33).
+- Blend modes for filled shapes: `Painter::quad_ex`, `polygon_ex` and `triangles_ex` take a
+  `BlendMode`, like `sprite_ex` (#32).
+- Textured filled shapes: `Painter::quad_textured` maps a texture onto a convex quad
+  perspective-correctly (as a flat rectangle seen in perspective, e.g. a road segment), and
+  `Painter::triangles_textured` maps per-vertex UVs affinely (#34). Within a layer, filled
+  shapes are now grouped by blend mode and then texture, like sprites; call order holds within
+  a group, so plain alpha-blended shapes keep their order.
 
 ## [0.3.1] - 2026-10-25
 

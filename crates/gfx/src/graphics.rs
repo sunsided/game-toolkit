@@ -206,7 +206,14 @@ impl Graphics {
         );
         let primitives =
             PrimitiveBatcher::new(&device, format, &camera_bgl, sample_count, depth_format);
-        let shapes = ShapeBatcher::new(&device, format, &camera_bgl, sample_count, depth_format);
+        let shapes = ShapeBatcher::new(
+            &device,
+            format,
+            &camera_bgl,
+            &textures.layout,
+            sample_count,
+            depth_format,
+        );
         let text = TextSystem::new(
             &device,
             &queue,
@@ -554,7 +561,7 @@ impl Graphics {
             self.sprites
                 .draw_layer(layer, encoder, &targets, &self.camera_bg, &self.textures);
             self.shapes
-                .draw_layer(layer, encoder, &targets, &self.camera_bg);
+                .draw_layer(layer, encoder, &targets, &self.camera_bg, &self.textures);
             self.primitives
                 .draw_layer(layer, encoder, &targets, &self.camera_bg);
         }

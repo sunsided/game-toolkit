@@ -1,10 +1,24 @@
 use game_toolkit::prelude::*;
 
-struct App;
+struct App {
+    /// 8x8 checkerboard, to make texture mapping on the road quads visible.
+    checker: TextureId,
+}
 
 impl Game for App {
-    fn init(_ctx: &mut Context) -> Result<Self> {
-        Ok(Self)
+    fn init(ctx: &mut Context) -> Result<Self> {
+        let rgba: Vec<u8> = (0..64)
+            .flat_map(|i| {
+                let light = (i % 8 + i / 8) % 2 == 0;
+                if light {
+                    [235, 235, 235, 255]
+                } else {
+                    [60, 60, 70, 255]
+                }
+            })
+            .collect();
+        let checker = ctx.gfx.create_texture_rgba(8, 8, &rgba, Some("checker"));
+        Ok(Self { checker })
     }
     fn update(&mut self, ctx: &mut Context, _dt: f32) {
         if ctx.input.key_pressed(Key::Escape) {
@@ -130,6 +144,61 @@ impl Game for App {
             [cx + 60.0, 120.0],
         ];
         p.triangles(&bowtie, &[0, 1, 2, 2, 3, 4], [1.0, 0.85, 0.2, 0.9], 0);
+
+        // Blend modes for shapes (#32): two additive "light beams" brighten where they overlap.
+        let beam = [1.0, 0.85, 0.5, 0.35];
+        p.quad_ex(
+            [
+                [70.0, 180.0],
+                [110.0, 180.0],
+                [190.0, 320.0],
+                [110.0, 320.0],
+            ],
+            beam,
+            1,
+            BlendMode::Additive,
+        );
+        p.quad_ex(
+            [
+                [130.0, 180.0],
+                [170.0, 180.0],
+                [130.0, 320.0],
+                [50.0, 320.0],
+            ],
+            beam,
+            1,
+            BlendMode::Additive,
+        );
+
+        // Textured shapes (#34): the same road segment twice. `quad_textured` (left) maps the
+        // checkerboard in perspective, so far rows shrink; `triangles_textured` (right) maps
+        // it affinely, and the two triangles visibly shear along the diagonal.
+        let uvs = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
+        let road = |x: f32| {
+            [
+                [x + 30.0, 200.0],
+                [x + 60.0, 200.0],
+                [x + 90.0, 400.0],
+                [x, 400.0],
+            ]
+        };
+        p.quad_textured(
+            self.checker,
+            road(590.0),
+            uvs,
+            [1.0; 4],
+            0,
+            BlendMode::Alpha,
+        );
+        p.triangles_textured(
+            self.checker,
+            &road(695.0),
+            &uvs,
+            &[0, 1, 2, 0, 2, 3],
+            [1.0; 4],
+            0,
+            BlendMode::Alpha,
+        );
     }
 }
 

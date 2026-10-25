@@ -106,6 +106,34 @@ pub enum BlendMode {
     Premultiplied,
 }
 
+impl BlendMode {
+    pub(crate) const ALL: [Self; 3] = [Self::Alpha, Self::Additive, Self::Premultiplied];
+
+    /// The wgpu blend state every batcher uses for this mode.
+    pub(crate) fn state(self) -> wgpu::BlendState {
+        match self {
+            Self::Alpha => wgpu::BlendState::ALPHA_BLENDING,
+            Self::Premultiplied => wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
+            Self::Additive => wgpu::BlendState {
+                color: wgpu::BlendComponent {
+                    src_factor: wgpu::BlendFactor::SrcAlpha,
+                    dst_factor: wgpu::BlendFactor::One,
+                    operation: wgpu::BlendOperation::Add,
+                },
+                alpha: wgpu::BlendComponent::OVER,
+            },
+        }
+    }
+
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Alpha => "alpha",
+            Self::Additive => "add",
+            Self::Premultiplied => "premul",
+        }
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 struct BatchKey {
     texture: TextureId,
@@ -163,7 +191,7 @@ impl SpriteBatcher {
             immediate_size: 0,
         });
 
-        let make_pipeline = |blend: wgpu::BlendState, label: &'static str| {
+        let make_pipeline = |blend: wgpu::BlendState, label: &str| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(label),
                 layout: Some(&layout),
@@ -209,32 +237,13 @@ impl SpriteBatcher {
             })
         };
 
-        let mut pipelines = HashMap::new();
-        pipelines.insert(
-            BlendMode::Alpha,
-            make_pipeline(wgpu::BlendState::ALPHA_BLENDING, "sprite.alpha"),
-        );
-        pipelines.insert(
-            BlendMode::Premultiplied,
-            make_pipeline(
-                wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
-                "sprite.premul",
-            ),
-        );
-        pipelines.insert(
-            BlendMode::Additive,
-            make_pipeline(
-                wgpu::BlendState {
-                    color: wgpu::BlendComponent {
-                        src_factor: wgpu::BlendFactor::SrcAlpha,
-                        dst_factor: wgpu::BlendFactor::One,
-                        operation: wgpu::BlendOperation::Add,
-                    },
-                    alpha: wgpu::BlendComponent::OVER,
-                },
-                "sprite.add",
-            ),
-        );
+        let pipelines = BlendMode::ALL
+            .into_iter()
+            .map(|blend| {
+                let label = format!("sprite.{}", blend.label());
+                (blend, make_pipeline(blend.state(), &label))
+            })
+            .collect();
 
         Self {
             quad_vb,
