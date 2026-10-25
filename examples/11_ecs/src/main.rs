@@ -13,7 +13,8 @@
     unsafe_op_in_unsafe_fn,
     mismatched_lifetime_syntaxes,
     elided_lifetimes_in_paths,
-    unused_qualifications
+    unused_qualifications,
+    unreachable_patterns
 )]
 #![allow(
     clippy::missing_safety_doc,
@@ -38,17 +39,33 @@ include!(concat!(env!("OUT_DIR"), "/archetypes_gen.rs"));
 include!(concat!(env!("OUT_DIR"), "/systems_gen.rs"));
 include!(concat!(env!("OUT_DIR"), "/world_gen.rs"));
 
+// The demo issues no game-specific commands, so the user-command slot is uninhabited.
+type UserCommand = std::convert::Infallible;
+type Command = WorldCommand<UserCommand>;
+
 // Implement the generated command-queue traits on the toolkit's mpsc-backed queue.
-impl WorldCommandSender for ChannelQueue<WorldCommand> {
-    type Error = std::sync::mpsc::SendError<WorldCommand>;
-    fn send(&self, command: WorldCommand) -> Result<(), Self::Error> {
+impl WorldUserCommand for ChannelQueue<Command> {
+    type UserCommand = UserCommand;
+}
+impl WorldCommandSender for ChannelQueue<Command> {
+    type Error = std::sync::mpsc::SendError<Command>;
+    fn send(&self, command: Command) -> Result<(), Self::Error> {
         ChannelQueue::send(self, command)
     }
 }
-impl WorldCommandReceiver for ChannelQueue<WorldCommand> {
+impl WorldCommandReceiver for ChannelQueue<Command> {
     type Error = std::sync::mpsc::TryRecvError;
-    fn recv(&self) -> Result<Option<WorldCommand>, Self::Error> {
+    fn recv(&self) -> Result<Option<Command>, Self::Error> {
         ChannelQueue::try_recv(self)
+    }
+}
+
+impl<E, Q> WorldUserCommandHandler for MainWorld<E, Q>
+where
+    Q: WorldUserCommand<UserCommand = UserCommand>,
+{
+    fn handle_user_command(&mut self, command: UserCommand) {
+        match command {}
     }
 }
 
@@ -103,8 +120,8 @@ impl ApplyPhysicsSystem for PhysicsSystem {
 }
 
 struct EcsDemo {
-    world: MainWorld<NoOpPhaseEvents, ChannelQueue<WorldCommand>>,
-    entities: Vec<EntityId>,
+    world: MainWorld<NoOpPhaseEvents, ChannelQueue<Command>>,
+    entities: Vec<sillyecs::EntityId>,
 }
 
 impl Game for EcsDemo {
@@ -142,7 +159,7 @@ impl Game for EcsDemo {
         let mut p = frame.painter(&mut ctx.gfx);
         p.clear([0.05, 0.06, 0.09, 1.0]);
         for (i, &id) in self.entities.iter().enumerate() {
-            if let Some(e) = self.world.get_particle(id) {
+            if let Some(e) = self.world.get_particle_entity(id) {
                 let hue = i as f32 / n;
                 let color = [0.4 + 0.5 * hue, 0.75, 1.0 - 0.5 * hue, 1.0];
                 p.circle([e.position.x, e.position.y], 7.0, color);

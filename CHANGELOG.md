@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** moved to sillyecs 0.0.7, which splits the code generator out into the
+  `sillyecs-build` crate. Games using `game-toolkit-ecs` now need `sillyecs-build` under
+  `[build-dependencies]` (with `use sillyecs_build::EcsCode;` in `build.rs`) and `sillyecs` under
+  `[dependencies]`, since the generated code refers to its runtime types (`sillyecs::EntityId`,
+  ...). Generated `WorldCommand` is now generic over a user-command type, so the command queue
+  must implement `WorldUserCommand` and the world `WorldUserCommandHandler`;
+  `std::convert::Infallible` works when a game has no custom commands. Per-entity lookups are
+  now `get_<archetype>_entity` from the generated `EntityAccess` trait. `examples/11_ecs` shows
+  the updated pattern.
+
 ## [0.3.0] - 2026-10-15
 
 ### Added

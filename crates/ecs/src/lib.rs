@@ -15,11 +15,14 @@
 //! in `Game::update` (it runs the fixed-update phases from real-time deltas) and reading
 //! components back in `Game::render`. See `examples/11_ecs` for the full pattern.
 //!
-//! Add the generator to the game's `Cargo.toml`:
+//! Add the generator and its runtime support crate to the game's `Cargo.toml`:
 //!
 //! ```toml
-//! [build-dependencies]
+//! [dependencies]
 //! sillyecs = "0.0"
+//!
+//! [build-dependencies]
+//! sillyecs-build = "0.0"
 //! ```
 
 #![forbid(unsafe_code)]
