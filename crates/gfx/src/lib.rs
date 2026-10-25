@@ -9,6 +9,7 @@ mod graphics;
 mod mesh;
 mod painter;
 mod primitives;
+mod shapes;
 mod sprite;
 mod target;
 mod text;

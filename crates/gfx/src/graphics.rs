@@ -11,6 +11,7 @@ use crate::camera3d::{Camera, Camera3D};
 use crate::frame::Frame;
 use crate::mesh::{MeshBatcher, MeshId, MeshInstance, MeshRegistry, MeshVertex};
 use crate::primitives::PrimitiveBatcher;
+use crate::shapes::ShapeBatcher;
 use crate::sprite::SpriteBatcher;
 use crate::target::Targets;
 use crate::text::TextSystem;
@@ -29,6 +30,7 @@ pub struct Graphics {
     pub(crate) camera_bg: wgpu::BindGroup,
     pub(crate) sprites: SpriteBatcher,
     pub(crate) primitives: PrimitiveBatcher,
+    pub(crate) shapes: ShapeBatcher,
     pub(crate) text: TextSystem,
     pub(crate) textures: TextureRegistry,
     pub(crate) clear_color: [f32; 4],
@@ -204,6 +206,7 @@ impl Graphics {
         );
         let primitives =
             PrimitiveBatcher::new(&device, format, &camera_bgl, sample_count, depth_format);
+        let shapes = ShapeBatcher::new(&device, format, &camera_bgl, sample_count, depth_format);
         let text = TextSystem::new(
             &device,
             &queue,
@@ -241,6 +244,7 @@ impl Graphics {
             camera_bg,
             sprites,
             primitives,
+            shapes,
             text,
             textures,
             clear_color: [0.0, 0.0, 0.0, 1.0],
@@ -476,7 +480,7 @@ impl Graphics {
         }
     }
 
-    /// Flush all queued 2D layers (sprites + primitives + text) into the current `frame`.
+    /// Flush all queued 2D layers (sprites + shapes + primitives + text) into the current `frame`.
     /// Called automatically when a [`crate::Painter`] is dropped; call manually before
     /// stacking other passes (e.g. egui) when no painter was created.
     pub fn flush_pending(&mut self, frame: &mut Frame) {
@@ -490,17 +494,20 @@ impl Graphics {
         let Some(encoder) = frame.encoder.as_mut() else {
             return;
         };
-        // Interleave sprites and circles by layer so a circle on layer -1 draws under a
-        // sprite on layer 0; within a layer, sprites draw under circles. Text renders once
-        // on top (glyphon prepares a single vertex buffer per call, so it is not layered).
+        // Interleave sprites, filled shapes and circles by layer so a circle on layer -1
+        // draws under a sprite on layer 0; within a layer, sprites draw first, then shapes,
+        // then circles. Text renders once on top (glyphon prepares a single vertex buffer per
+        // call, so it is not layered).
         let mut layers = std::collections::BTreeSet::new();
         self.sprites.collect_layers(&mut layers);
+        self.shapes.collect_layers(&mut layers);
         self.primitives.collect_layers(&mut layers);
 
         // Upload each batcher's instances exactly once before drawing: `queue.write_buffer`
         // is not part of the encoder command stream, so writing per layer pass would clobber
         // earlier layers' instance data.
         self.sprites.upload(&self.device, &self.queue);
+        self.shapes.upload(&self.device, &self.queue);
         self.primitives.upload(&self.device, &self.queue);
 
         // When multisampling, draws target the MSAA texture and resolve to the surface;
@@ -546,6 +553,8 @@ impl Graphics {
         for &layer in &layers {
             self.sprites
                 .draw_layer(layer, encoder, &targets, &self.camera_bg, &self.textures);
+            self.shapes
+                .draw_layer(layer, encoder, &targets, &self.camera_bg);
             self.primitives
                 .draw_layer(layer, encoder, &targets, &self.camera_bg);
         }
@@ -560,6 +569,7 @@ impl Graphics {
         }
 
         self.sprites.clear();
+        self.shapes.clear();
         self.primitives.clear();
         self.mesh_batcher.clear();
         frame.flushed = true;

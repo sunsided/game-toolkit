@@ -59,6 +59,8 @@ p.clear([0.07, 0.08, 0.11, 1.0]);
 p.rect(pos, size, color);                 // also rect_outline(pos, size, thickness, color)
 p.circle(center, radius, color);          // also circle_outline(center, radius, thickness, color)
 p.line(a, b, thickness, color);
+p.quad([a, b, c, d], color, layer);       // filled convex quad; also polygon(&points, color, layer)
+p.triangles(&verts, &indices, color, layer); // raw filled triangle list
 p.text(pos, "hi", 24.0, color);           // text always draws on top
 p.sprite(tex, pos, size);                 // tex: TextureId from ctx.load_texture(...)
 p.sprite_region(tex, src_pos, src_size, pos, size); // pixel rect of an atlas
@@ -72,7 +74,8 @@ feature: `p.vector(|scene| { /* vello::Scene */ })`.
 
 Draw order: lower layers draw under higher ones. Within one layer, call order holds only for
 draws with the same blend mode and texture, and untextured shapes (`rect`, `line`) sort under
-textured sprites. To draw a HUD rect over a sprite scene, give it a higher layer with `rect_ex`
+textured sprites. Filled shapes (`quad`, `polygon`, `triangles`) draw above a layer's sprites
+and rects, in call order, and below its circles. To draw a HUD rect over a sprite scene, give it a higher layer with `rect_ex`
 instead of relying on call order.
 
 Atlas sprites with a layer or mirroring: `ctx.gfx.texture_size(tex)` (or `p.texture_size(tex)`)

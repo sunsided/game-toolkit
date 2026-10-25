@@ -18,6 +18,10 @@ All notable changes to this project are documented here. The format is based on
 - `SpriteInstance::with_region(min, size, tex_size)` for drawing a pixel rectangle of an atlas,
   `SpriteInstance::flip_x` / `flip_y` for mirroring any UV range, and
   `Painter::sprite_region(tex, src_pos, src_size, pos, size)` as the layer-0 shorthand (#26).
+- Filled shapes that interleave with sprites and circles by layer: `Painter::quad` (convex
+  quad), `Painter::polygon` (convex, fan-triangulated) and `Painter::triangles` (indexed
+  triangle list). Within a layer they draw above sprites and rects, in call order, and below
+  circles. `examples/03_primitives` shows them (#28).
 
 ## [0.3.1] - 2026-10-25
 
