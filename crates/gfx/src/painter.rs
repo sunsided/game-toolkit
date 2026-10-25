@@ -219,7 +219,7 @@ impl<'a> Painter<'a> {
     }
 
     /// [`Painter::triangles`] with one colour per vertex, interpolated across each triangle.
-    /// Also draws nothing unless `colors.len() == vertices.len()`.
+    /// Also draws nothing unless `colors.len() == vertices.len()` (a debug-build panic).
     pub fn triangles_colored(
         &mut self,
         vertices: &[[f32; 2]],
