@@ -105,7 +105,22 @@ impl Game for App {
                 [hx + a.cos() * hr, hy + a.sin() * hr]
             })
             .collect();
-        p.polygon(&hexagon, [0.6, 0.4, 0.9, 0.8], 0);
+        // Per-vertex colours (#33) are interpolated across the shape.
+        let corner_colors = [
+            [0.95, 0.30, 0.30, 0.9],
+            [0.95, 0.85, 0.20, 0.9],
+            [0.30, 0.85, 0.40, 0.9],
+            [0.25, 0.80, 0.95, 0.9],
+            [0.40, 0.40, 0.95, 0.9],
+            [0.85, 0.35, 0.90, 0.9],
+        ];
+        p.polygon_colored(&hexagon, &corner_colors, 0);
+        let (sky_top, sky_bottom) = ([0.10, 0.15, 0.40, 1.0], [0.95, 0.55, 0.30, 1.0]);
+        p.quad_colored(
+            [[40.0, 180.0], [200.0, 180.0], [200.0, 320.0], [40.0, 320.0]],
+            [sky_top, sky_top, sky_bottom, sky_bottom],
+            0,
+        );
 
         let bowtie = [
             [cx - 60.0, 40.0],

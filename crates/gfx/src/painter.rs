@@ -2,6 +2,7 @@ use crate::frame::Frame;
 use crate::graphics::Graphics;
 use crate::mesh::{MeshId, MeshInstance};
 use crate::primitives::CircleInstance;
+use crate::shapes::Colors;
 use crate::sprite::{BlendMode, SpriteInstance};
 use crate::texture::TextureId;
 use crate::transform::Mat4;
@@ -172,19 +173,39 @@ impl<'a> Painter<'a> {
     /// Filled convex quad through `points` (in order, either winding), alpha-blended. Lands
     /// above this layer's sprites and rects and below its circles; see [`Painter`].
     pub fn quad(&mut self, points: [[f32; 2]; 4], color: [f32; 4], layer: i16) {
-        self.gfx.shapes.polygon(layer, &points, color);
+        self.gfx
+            .shapes
+            .polygon(layer, &points, Colors::Uniform(color));
+    }
+
+    /// [`Painter::quad`] with one colour per corner, interpolated across the quad (e.g. a
+    /// vertical gradient: the same colour on both top corners, another on both bottom ones).
+    pub fn quad_colored(&mut self, points: [[f32; 2]; 4], colors: [[f32; 4]; 4], layer: i16) {
+        self.gfx
+            .shapes
+            .polygon(layer, &points, Colors::PerVertex(&colors));
     }
 
     /// Filled convex polygon through `points` (in order, either winding), fan-triangulated
     /// from the first point and alpha-blended. Fewer than three points draw nothing. A
     /// concave polygon would draw wrong; split it or use [`Painter::triangles`].
     pub fn polygon(&mut self, points: &[[f32; 2]], color: [f32; 4], layer: i16) {
-        self.gfx.shapes.polygon(layer, points, color);
+        self.gfx
+            .shapes
+            .polygon(layer, points, Colors::Uniform(color));
+    }
+
+    /// [`Painter::polygon`] with one colour per point, interpolated across the polygon.
+    /// Draws nothing unless `colors.len() == points.len()` (a debug-build panic).
+    pub fn polygon_colored(&mut self, points: &[[f32; 2]], colors: &[[f32; 4]], layer: i16) {
+        self.gfx
+            .shapes
+            .polygon(layer, points, Colors::PerVertex(colors));
     }
 
     /// Filled triangle list: every three `indices` into `vertices` make one triangle,
     /// alpha-blended. Draws nothing if an index is out of range or `indices.len()` is not a
-    /// multiple of three (a debug-build panic).
+    /// multiple of three (a debug-build panic; release builds log one warning).
     pub fn triangles(
         &mut self,
         vertices: &[[f32; 2]],
@@ -192,7 +213,23 @@ impl<'a> Painter<'a> {
         color: [f32; 4],
         layer: i16,
     ) {
-        self.gfx.shapes.triangles(layer, vertices, indices, color);
+        self.gfx
+            .shapes
+            .triangles(layer, vertices, Colors::Uniform(color), indices);
+    }
+
+    /// [`Painter::triangles`] with one colour per vertex, interpolated across each triangle.
+    /// Also draws nothing unless `colors.len() == vertices.len()`.
+    pub fn triangles_colored(
+        &mut self,
+        vertices: &[[f32; 2]],
+        colors: &[[f32; 4]],
+        indices: &[u32],
+        layer: i16,
+    ) {
+        self.gfx
+            .shapes
+            .triangles(layer, vertices, Colors::PerVertex(colors), indices);
     }
 
     /// Filled disk (layer 0).
