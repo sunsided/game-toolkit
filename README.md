@@ -80,7 +80,7 @@ per-`Context` RNG (`ctx.rng`); a fixed seed reproduces a run.
 ## Drawing
 
 In `render`, `frame.painter(&mut ctx.gfx)` returns a `Painter`; it queues draw calls and
-flushes them when it drops. Positions are pixels from the top-left, colours `[r, g, b, a]` in
+flushes them when it drops. Positions are pixels from the top-left, colors `[r, g, b, a]` in
 `0.0..=1.0`.
 
 | Call | Draws |
