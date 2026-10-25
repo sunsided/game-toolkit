@@ -6,31 +6,41 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-25
+
 ### Added
 
-- `Painter::rect_ex`, `Painter::rect_outline_ex` and `Painter::line_ex`, which take a layer and
-  `BlendMode` like `sprite_ex`, so untextured shapes can draw above a sprite scene (#27).
-- `Painter` docs describe the 2D draw order: layers first, then blend mode and texture, with
-  call order kept only within one of those groups. Untextured shapes use the white texture,
-  which sorts under every loaded texture on the same layer.
-- `Graphics::texture_size` / `Painter::texture_size`, the pixel size of a loaded texture
-  (follows hot-reloads) (#26).
-- `SpriteInstance::with_region(min, size, tex_size)` for drawing a pixel rectangle of an atlas,
-  `SpriteInstance::flip_x` / `flip_y` for mirroring any UV range, and
-  `Painter::sprite_region(tex, src_pos, src_size, pos, size)` as the layer-0 shorthand (#26).
-- Filled shapes that interleave with sprites and circles by layer: `Painter::quad` (convex
-  quad), `Painter::polygon` (convex, fan-triangulated) and `Painter::triangles` (indexed
-  triangle list). Within a layer they draw above sprites and rects, in call order, and below
-  circles. `examples/03_primitives` shows them (#28).
+- Filled shapes in the layered 2D pass: `Painter::quad` (convex quad), `Painter::polygon`
+  (convex, fan-triangulated) and `Painter::triangles` (indexed triangle list). They interleave
+  with sprites and circles by layer; within a layer they draw above sprites and rects and below
+  circles, grouped by blend mode and then texture like sprites, with call order kept within a
+  group (so plain alpha-blended shapes on one layer keep their order). Malformed triangle
+  lists draw nothing: a debug-build panic, one logged warning in release builds (#28).
 - Per-vertex colours for filled shapes, interpolated across each triangle:
   `Painter::quad_colored`, `polygon_colored` and `triangles_colored` (#33).
 - Blend modes for filled shapes: `Painter::quad_ex`, `polygon_ex` and `triangles_ex` take a
   `BlendMode`, like `sprite_ex` (#32).
 - Textured filled shapes: `Painter::quad_textured` maps a texture onto a convex quad
   perspective-correctly (as a flat rectangle seen in perspective, e.g. a road segment), and
-  `Painter::triangles_textured` maps per-vertex UVs affinely (#34). Within a layer, filled
-  shapes are now grouped by blend mode and then texture, like sprites; call order holds within
-  a group, so plain alpha-blended shapes keep their order.
+  `Painter::triangles_textured` maps per-vertex UVs affinely. UVs outside `0..1` clamp to the
+  edge texels; textures don't tile yet (#37) (#34).
+- `Painter::rect_ex`, `Painter::rect_outline_ex` and `Painter::line_ex`, which take a layer and
+  `BlendMode` like `sprite_ex`, so untextured shapes can draw above a sprite scene (#27).
+- `Graphics::texture_size` / `Painter::texture_size`, the pixel size of a loaded texture
+  (follows hot-reloads) (#26).
+- `SpriteInstance::with_region(min, size, tex_size)` for drawing a pixel rectangle of an atlas,
+  `SpriteInstance::flip_x` / `flip_y` for mirroring any UV range, and
+  `Painter::sprite_region(tex, src_pos, src_size, pos, size)` as the layer-0 shorthand (#26).
+- `examples/03_primitives` demonstrates layered, gradient, additive and textured filled shapes,
+  including the same road segment textured perspective-correctly and affinely side by side.
+
+### Changed
+
+- The `Painter` docs and the jam agent guide describe the 2D draw order: layers first; within
+  a layer sprites and rects, then filled shapes, then circles, each grouped by blend mode and
+  texture with call order kept only within a group; text last. Untextured shapes use the white
+  texture, which sorts under every loaded texture on the same layer, so a `rect` drawn after a
+  sprite on the same layer still lands under it (#27).
 
 ## [0.3.1] - 2026-10-25
 
@@ -154,7 +164,8 @@ the `game-toolkit` umbrella; add one dependency and `use game_toolkit::prelude::
 - Top-level and per-crate `README.md`s, crates.io metadata, and `#![forbid(unsafe_code)]`
   across every crate.
 
-[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/sunsided/game-toolkit/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/sunsided/game-toolkit/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/sunsided/game-toolkit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sunsided/game-toolkit/compare/v0.1.0...v0.2.0
