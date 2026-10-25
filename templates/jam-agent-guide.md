@@ -29,7 +29,12 @@ impl Game for MyGame {
 ```
 
 There is no `fixed_update`: set `AppConfig::fixed_timestep` instead and `update` is called with a
-fixed `dt` (possibly several times per frame); leave it `None` for variable `dt`.
+fixed `dt` (zero, one or several times per frame); leave it `None` for variable `dt`. `render`
+runs once per frame either way; with a fixed step, `ctx.time.alpha` (`0.0..1.0`) is how far the
+frame is into the next step, for interpolating positions. `dt` is capped at
+`AppConfig::max_frame_time` (250 ms), so a long frame or time in the background slows the game
+down for one frame instead of fast-forwarding it. With a sillyecs world, leave `fixed_timestep`
+at `None`: the world runs its own fixed phases (see the `game-toolkit-ecs` docs).
 
 ## Context
 
@@ -41,7 +46,7 @@ fixed `dt` (possibly several times per frame); leave it `None` for variable `dt`
 | `ctx.input` | `Input` | keyboard / mouse / gamepad |
 | `ctx.audio` | `Option<Audio>` | sound - `None` when no device (runs muted); guard with `if let Some(a) = &mut ctx.audio` |
 | `ctx.assets` | `Assets` | asset bytes (`read`), path resolution, hot-reload watcher |
-| `ctx.time` | `Time` | `elapsed`, `delta` (`Duration`), `frame: u64`, `fps: f32` |
+| `ctx.time` | `Time` | `elapsed`, `delta` (`Duration`), `frame: u64`, `fps: f32`, `alpha: f32` (fixed-step interpolation) |
 | `ctx.rng` | `Rng` | deterministic xorshift64* RNG: `next_f32()`, `range_u32(a..b)`, `range_usize(a..b)`, `reseed(seed)` |
 | `ctx.window` | `Arc<Window>` | the winit window |
 | `ctx.quit()` | | request shutdown |
@@ -176,7 +181,7 @@ fn main() -> Result<()> {
 ```
 
 All fields: `title`, `width`, `height`, `vsync` (default `true`), `fixed_timestep: Option<Duration>`
-(default `None`), `asset_root` (default `./assets`), `web_preload: Option<Vec<String>>` (web: files to
+(default `None`), `max_frame_time: Duration` (default 250 ms; caps `dt`), `asset_root` (default `./assets`), `web_preload: Option<Vec<String>>` (web: files to
 fetch instead of `assets/manifest.txt`), `canvas_id: Option<String>` (web: existing canvas; `None`
 appends one), `random_seed: u64` (seeds `ctx.rng`; default is
 a fixed nonzero constant, so runs are reproducible until you change it), `depth_format:
@@ -191,7 +196,7 @@ This template enables `ui`. All optional features and what they add to the prelu
 |---------|------|-----|
 | `ui` | `Ui`, `egui` | egui debug overlays |
 | `aseprite` | `SpriteSheet`, `AnimationPlayer`, `Animation`, `Direction`, `FrameRect`, `LoadAseprite` (`ctx.load_aseprite(p)`) | load `.aseprite` / exported sheets + play tagged animations |
-| `ecs` | `ChannelQueue`, `Vec2` (sillyecs glue) | archetype ECS |
+| `ecs` | `ChannelQueue`, `channel_queue_impls!`, `Vec2` (sillyecs glue) | archetype ECS |
 | `synth` | `Synth`, `synthie` | chiptune / procedural audio |
 | `vector` | `vello` | high-quality 2D vector graphics (WebGPU only: skipped on WebGL2) |
 
