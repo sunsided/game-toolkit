@@ -8,6 +8,16 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- `SoundHandle`, a toolkit-owned handle to a playing sound: `set_volume` (linear) /
+  `set_volume_db`, `fade_volume` / `fade_volume_db`, `pause`, `resume`, `stop`, `is_playing`,
+  `is_paused`, `is_finished`, and `with_kira` for the underlying kira handle (#38).
+- `Audio::play_with` / `play_samples_with` and `PlayOptions` (`looped`, `volume`, `deferred`),
+  so looping music at a set volume is one call (#38).
+- `PlayOptions::deferred` queues a sound while audio hasn't started (web, before the first user
+  gesture) and starts it once it has; its handle is pending until then (#39).
+- `kira`, `SoundHandle`, `PlayOptions` and `AudioError` are re-exported from the prelude, so
+  games don't need their own `kira` dependency (#51).
+- `examples/07_audio` plays a looping track (M pauses, Up/Down change its volume).
 - The jam agent guide is published as the umbrella crate's `game_toolkit::guide` module on
   docs.rs, generated from the same source as the templates' `CLAUDE.md` (agent-only sections
   are left out). The README links it and gains a Drawing section with the `Painter` calls and
@@ -17,6 +27,10 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 
+- **Breaking:** `Audio::play` and `Audio::play_samples` return `Result<SoundHandle, AudioError>`
+  instead of `anyhow::Result<StaticSoundHandle>`. `AudioError::NotStarted` tells "audio not
+  started yet" apart from real failures (`UnknownSound`, `Backend`) (#39). `play` and
+  `play_samples` are documented, including the web caveat (#51).
 - `task sync:templates` / `task check:templates` and CI's sync check run
   `tools/sync-guide.sh`, which also writes `crates/prelude/src/guide.md`.
 
