@@ -64,9 +64,15 @@ p.sprite(tex, pos, size);                 // tex: TextureId from ctx.load_textur
 p.mesh(mesh, model, color);               // 3D, depth-tested under all 2D content
 ```
 
-Lower-level variants exist: `sprite_ex(tex, SpriteInstance, layer, BlendMode)`,
-`circle_ex(center, radius, thickness, color, layer)`, `visible_rect()`. With the `vector`
+Lower-level variants take an explicit layer: `sprite_ex(tex, SpriteInstance, layer, BlendMode)`,
+`rect_ex(pos, size, color, layer, BlendMode)` (also `rect_outline_ex`, `line_ex`),
+`circle_ex(center, radius, thickness, color, layer)`. Also `visible_rect()`. With the `vector`
 feature: `p.vector(|scene| { /* vello::Scene */ })`.
+
+Draw order: lower layers draw under higher ones. Within one layer, call order holds only for
+draws with the same blend mode and texture, and untextured shapes (`rect`, `line`) sort under
+textured sprites. To draw a HUD rect over a sprite scene, give it a higher layer with `rect_ex`
+instead of relying on call order.
 
 ## Input
 

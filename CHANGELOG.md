@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `Painter::rect_ex`, `Painter::rect_outline_ex` and `Painter::line_ex`, which take a layer and
+  `BlendMode` like `sprite_ex`, so untextured shapes can draw above a sprite scene (#27).
+- `Painter` docs describe the 2D draw order: layers first, then blend mode and texture, with
+  call order kept only within one of those groups. Untextured shapes use the white texture,
+  which sorts under every loaded texture on the same layer.
+
 ## [0.3.1] - 2026-10-25
 
 ### Fixed
