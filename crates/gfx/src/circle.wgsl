@@ -27,7 +27,7 @@ fn vs_main(in: VsIn) -> VsOut {
     out.local = local;
     out.radius = in.i_radius;
     out.thickness = in.i_thickness;
-    out.color = in.i_color;
+    out.color = vec4<f32>(srgb_to_linear(in.i_color.rgb), in.i_color.a);
     return out;
 }
 
@@ -47,4 +47,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
     if (alpha <= 0.0) { discard; }
     return vec4<f32>(in.color.rgb, in.color.a * alpha);
+}
+
+// Painter colors are sRGB (what a color picker shows); the frame is an sRGB target that
+// expects linear output, so decode them before use.
+fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
+    let lo = c / 12.92;
+    let hi = pow((c + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, c <= vec3<f32>(0.04045));
 }

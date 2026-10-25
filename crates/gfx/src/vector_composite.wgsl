@@ -1,6 +1,7 @@
 // Composites the vello-rendered offscreen texture onto the surface with a fullscreen
-// triangle. The vello target holds premultiplied-alpha color, so the pipeline blends with
-// PREMULTIPLIED_ALPHA_BLENDING.
+// triangle. The vello target holds premultiplied-alpha, sRGB-encoded color, so the pipeline
+// blends with PREMULTIPLIED_ALPHA_BLENDING and the shader decodes to linear for the sRGB
+// frame target (which encodes it again on write).
 
 @group(0) @binding(0) var tex: texture_2d<f32>;
 @group(0) @binding(1) var samp: sampler;
@@ -23,5 +24,17 @@ fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut {
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    return textureSample(tex, samp, in.uv);
+    let c = textureSample(tex, samp, in.uv);
+    if (c.a <= 0.0) {
+        return vec4<f32>(0.0);
+    }
+    return vec4<f32>(srgb_to_linear(c.rgb / c.a) * c.a, c.a);
+}
+
+// Painter colors are sRGB (what a color picker shows); the frame is an sRGB target that
+// expects linear output, so decode them before use.
+fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
+    let lo = c / 12.92;
+    let hi = pow((c + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, c <= vec3<f32>(0.04045));
 }

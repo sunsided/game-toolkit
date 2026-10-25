@@ -28,5 +28,15 @@ fn vs_main(in: VsIn) -> VsOut {
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // Dividing after interpolation makes UVs perspective-correct for quads (see quad_uvq).
-    return textureSample(t_tex, s_tex, in.uvq.xy / in.uvq.z) * in.color;
+    // Decoding after interpolation blends gradients in sRGB, as CSS gradients do.
+    let color = vec4<f32>(srgb_to_linear(in.color.rgb), in.color.a);
+    return textureSample(t_tex, s_tex, in.uvq.xy / in.uvq.z) * color;
+}
+
+// Painter colors are sRGB (what a color picker shows); the frame is an sRGB target that
+// expects linear output, so decode them before use.
+fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
+    let lo = c / 12.92;
+    let hi = pow((c + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, c <= vec3<f32>(0.04045));
 }
