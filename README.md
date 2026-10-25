@@ -118,6 +118,27 @@ Run any example with `cargo run -p <package>`.
 | `13_web` | `ex_13_web` | Same code natively and in the browser: sprite, text, sound on click, gamepad. `task web`. |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
 
+## Audio
+
+`ctx.audio` is an `Option<Audio>` (`None` when there is no output device; the game runs muted).
+Every play call returns a `SoundHandle` that controls that instance, so volume, pausing and
+looping need no direct `kira` dependency (`kira` is re-exported from the prelude for anything
+beyond that, at the toolkit's version):
+
+```rust
+let music = ctx.load_sound("music.ogg")?;           // Option<SoundId>; load in init
+if let (Some(audio), Some(id)) = (&mut ctx.audio, music) {
+    // Loop at 30% volume; `deferred` queues it until the browser allows audio.
+    let handle = audio.play_with(id, PlayOptions::looped().volume(0.3).deferred())?;
+    handle.set_volume(0.5);                          // or set_volume_db / fade_volume
+    handle.pause();                                  // resume, stop, is_playing, is_finished
+}
+```
+
+Plain `audio.play(id)` plays once. On the web it fails with `AudioError::NotStarted` until the
+player's first key press, click or touch, so log or ignore its error rather than `?`-ing it in
+`update`. `examples/07_audio` shows one-shots, synthesized effects and a looping track.
+
 ## Aseprite
 
 `game-toolkit-aseprite` reads both Aseprite formats into the same `SpriteSheet`:
@@ -216,7 +237,8 @@ one. Differences from native:
   `Graphics::load_texture` / `Audio::load_sound` are native-only; use the `*_bytes` variants or
   the `ctx.load_*` helpers.
 - **Audio starts on the first key press, click or touch** (browsers block audio before a user
-  gesture). Sounds can be loaded right away; `Audio::play` errors until then.
+  gesture). Sounds can be loaded right away; `Audio::play` fails with `AudioError::NotStarted`
+  until then, and `PlayOptions::deferred` plays queue until it happens.
 - **Not available:** hot-reload (`Assets::watch` is a no-op), `Graphics::request_screenshot`,
   and vello on WebGL2. `ctx.quit()` stops the loop but leaves the page.
 - **Text** uses an embedded DejaVu Sans, since there are no system fonts
