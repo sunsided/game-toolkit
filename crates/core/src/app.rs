@@ -38,6 +38,7 @@ pub struct AppConfig {
     /// game slows down for that frame instead of fast-forwarding through the gap: `dt` is
     /// capped at this, and with a fixed timestep at most `max_frame_time / step` updates run.
     /// [`Time::delta`](crate::Time::delta) still reports the real frame time.
+    /// `Duration::ZERO` disables the cap.
     pub max_frame_time: Duration,
     /// Asset root directory. Defaults to `./assets`. On the web it is a URL path relative to
     /// the page, and the files listed in its `manifest.txt` are fetched before `Game::init`.
@@ -296,7 +297,10 @@ impl<G: Game> AppRunner<G> {
         state.ctx.time.tick();
         state.ctx.input.poll_gamepads();
 
-        let delta = state.ctx.time.delta.min(self.config.max_frame_time);
+        let delta = match self.config.max_frame_time {
+            Duration::ZERO => state.ctx.time.delta,
+            cap => state.ctx.time.delta.min(cap),
+        };
         match self.config.fixed_timestep {
             Some(step) => {
                 self.accumulator += delta;
