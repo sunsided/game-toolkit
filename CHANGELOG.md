@@ -25,6 +25,12 @@ All notable changes to this project are documented here. The format is based on
 - `channel_queue_impls!` implements sillyecs' generated `WorldUserCommand` /
   `WorldCommandSender` / `WorldCommandReceiver` traits on `ChannelQueue` in one line; in the
   prelude with the `ecs` feature (#43).
+- The jam agent guide is published as the umbrella crate's `game_toolkit::guide` module on
+  docs.rs, generated from the same source as the templates' `CLAUDE.md` (agent-only sections
+  are left out). The README links it and gains a Drawing section with the `Painter` calls and
+  draw-order rules (#49).
+- The jam templates optimize dependencies in dev builds (`[profile.dev.package."*"]
+  opt-level = 3`); the README and guide recommend it for other projects (#48).
 - Per-texture wrap modes: `Graphics::set_texture_wrap(id, TextureWrap::Repeat)` (or
   `MirrorRepeat`) makes UVs outside `0..1` tile, so a scrolling road or a repeating floor is one
   `quad_textured` instead of a quad per tile. `TextureWrap::Clamp` stays the default, so sprites
@@ -47,6 +53,8 @@ All notable changes to this project are documented here. The format is based on
   `channel_queue_impls!`.
 - `AppConfig::fixed_timestep` documents that `update` may run zero or several times per frame
   and that `render` runs once (#50).
+- `task sync:templates` / `task check:templates` and CI's sync check run
+  `tools/sync-guide.sh`, which also writes `crates/prelude/src/guide.md`.
 
 ### Fixed
 

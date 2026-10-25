@@ -1,9 +1,16 @@
+<!-- source note
+Source of truth for the game-toolkit guide. `task sync:templates` (tools/sync-guide.sh) stamps
+it into templates/*/CLAUDE.md whole, and into crates/prelude/src/guide.md (docs.rs) without the
+agent-only blocks. Edit here, never the copies. No literal double braces (cargo-generate).
+-->
+<!-- agent-only -->
 # Agent guide
 
 This is a [game-toolkit](https://github.com/sunsided/game-toolkit) jam project. The whole
 runtime API is re-exported from one prelude, so you don't need to read the toolkit's source to
 write a game - this file is the cheatsheet. For depth: [docs.rs/game-toolkit](https://docs.rs/game-toolkit),
 and the runnable upstream examples (see the bottom of this file).
+<!-- /agent-only -->
 
 ```rust
 use game_toolkit::prelude::*;
@@ -190,7 +197,10 @@ Option<wgpu::TextureFormat>` (default `None`; set `Some(wgpu::TextureFormat::Dep
 
 ## Features
 
-This template enables `ui`. All optional features and what they add to the prelude:
+<!-- agent-only -->
+This template enables `ui`.
+<!-- /agent-only -->
+All optional features and what they add to the prelude:
 
 | Feature | Adds | For |
 |---------|------|-----|
@@ -201,6 +211,17 @@ This template enables `ui`. All optional features and what they add to the prelu
 | `vector` | `vello` | high-quality 2D vector graphics (WebGPU only: skipped on WebGL2) |
 
 Enable in `Cargo.toml`: `game-toolkit = { ..., features = ["ui", "aseprite"] }`.
+
+## Fast dev builds
+
+Unoptimized dependencies make debug builds of a game slow enough to be unplayable (audio
+decoding, image decoding, thousands of sprites per frame). Optimize just the dependencies, so
+your own code still compiles fast and debugs well. The jam templates ship this in `Cargo.toml`:
+
+```toml
+[profile.dev.package."*"]
+opt-level = 3
+```
 
 ## Assets
 
@@ -214,7 +235,8 @@ Natively, `ctx.assets.watch()` + `ctx.assets.drain_changes()` hot-reload changed
 The same code builds for the web (wasm32, WebGPU with a WebGL2 fallback) via
 [trunk](https://trunkrs.dev): `rustup target add wasm32-unknown-unknown`,
 `cargo install trunk --locked`, then `task web` (dev server) or `PROFILE=release task web:build`
-(zip `dist/` and upload it to itch.io as an HTML game).
+in a jam-template project, or `trunk serve` / `trunk build --release` directly (zip `dist/`
+and upload it to itch.io as an HTML game).
 
 What's different on the web:
 
@@ -231,6 +253,7 @@ What's different on the web:
   stops the loop. `std::time::Instant::now()` panics in wasm - use `ctx.time`.
 - Logs and panics go to the browser console.
 
+<!-- agent-only -->
 ## Commands
 
 This project ships its own `Taskfile.yaml` (needs [go-task](https://taskfile.dev)):
@@ -256,6 +279,7 @@ Plain `cargo run` works too. `task check` here enforces `rustfmt` - keep code fo
 - 2D-first. The 3D mesh path needs `AppConfig::depth_format = Some(..)` (the jam-3d template's
   `src/main.rs` shows a full cube + 2D HUD).
 - Keep the `Game` struct small; push reusable systems into modules.
+<!-- /agent-only -->
 
 ## Upstream examples
 

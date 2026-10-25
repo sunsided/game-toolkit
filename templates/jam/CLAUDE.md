@@ -190,7 +190,8 @@ Option<wgpu::TextureFormat>` (default `None`; set `Some(wgpu::TextureFormat::Dep
 
 ## Features
 
-This template enables `ui`. All optional features and what they add to the prelude:
+This template enables `ui`.
+All optional features and what they add to the prelude:
 
 | Feature | Adds | For |
 |---------|------|-----|
@@ -201,6 +202,17 @@ This template enables `ui`. All optional features and what they add to the prelu
 | `vector` | `vello` | high-quality 2D vector graphics (WebGPU only: skipped on WebGL2) |
 
 Enable in `Cargo.toml`: `game-toolkit = { ..., features = ["ui", "aseprite"] }`.
+
+## Fast dev builds
+
+Unoptimized dependencies make debug builds of a game slow enough to be unplayable (audio
+decoding, image decoding, thousands of sprites per frame). Optimize just the dependencies, so
+your own code still compiles fast and debugs well. The jam templates ship this in `Cargo.toml`:
+
+```toml
+[profile.dev.package."*"]
+opt-level = 3
+```
 
 ## Assets
 
@@ -214,7 +226,8 @@ Natively, `ctx.assets.watch()` + `ctx.assets.drain_changes()` hot-reload changed
 The same code builds for the web (wasm32, WebGPU with a WebGL2 fallback) via
 [trunk](https://trunkrs.dev): `rustup target add wasm32-unknown-unknown`,
 `cargo install trunk --locked`, then `task web` (dev server) or `PROFILE=release task web:build`
-(zip `dist/` and upload it to itch.io as an HTML game).
+in a jam-template project, or `trunk serve` / `trunk build --release` directly (zip `dist/`
+and upload it to itch.io as an HTML game).
 
 What's different on the web:
 
