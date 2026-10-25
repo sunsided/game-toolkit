@@ -5,9 +5,11 @@
 [![license](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](#license)
 [![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
 
-A Rust workspace of small, focused crates for 2D-first game jams. Drop in, implement
-`Game::init` / `update` / `render`, and ship. Each subsystem is its own crate, so a jam
-pulls only what it uses.
+A Rust workspace of small, focused crates for 2D and 3D game jams. Drop in, implement
+`Game::init` / `update` / `render`, and ship. Draw 2D with a batched painter (sprites, shapes,
+text, tilemaps, optional vello vector graphics) and 3D with instanced, depth-tested meshes.
+Both go into the same frame, so a 3D scene gets a 2D HUD on top for free. Each subsystem is
+its own crate, so a jam pulls only what it uses, and there are starter templates for both.
 
 Built on `wgpu`, `winit` 0.30, `kira`, `glyphon` (cosmic-text), `image`, and `bytemuck`,
 with optional `egui` tooling overlays and Aseprite asset loading.
@@ -224,8 +226,9 @@ from the surface with [miniscreenshot-wgpu](https://github.com/sunsided/miniscre
 
 ## 3D
 
-A small instanced static-mesh path renders under the 2D layers (which composite on top).
-It needs a depth buffer (`AppConfig::depth_format`).
+Static meshes are drawn instanced and depth-tested through a perspective `Camera3D`, under
+the 2D layers, which composite on top (HUD, menus, text). It needs a depth buffer
+(`AppConfig::depth_format`); `templates/jam-3d` starts from a spinning cube with a 2D HUD.
 
 ```rust
 let cube = ctx.gfx.create_mesh(&vertices, &indices); // [MeshVertex] + [u16]
@@ -236,8 +239,9 @@ let model = transform::mul(&transform::translation([x, 0.0, 0.0]), &transform::r
 p.mesh(cube, model, [0.4, 0.8, 0.45, 1.0]);
 ```
 
-Lighting is forward-unlit (Lambert from the vertex normal). glTF loading and a perspective
-follow-camera are future work.
+Meshes are positions + normals with `u16` indices, tinted per instance and lit by one fixed
+directional light (Lambert diffuse plus ambient). Mesh textures, glTF loading and a follow
+camera are future work.
 
 ## Vector graphics
 
@@ -325,9 +329,9 @@ The generated jam templates ship their own `Taskfile.yaml` too.
 
 ## Status
 
-First crates.io release: `0.1.0`. The 2D runtime, input (keyboard / mouse / gamepad),
-audio, assets, text, tilemap, egui overlay, Aseprite loading, optional depth/MSAA, a
-first-cut 3D mesh path, a deterministic seedable RNG, browser (wasm32) builds, ECS glue, the atlas-packer CLI, and
+Published on [crates.io](https://crates.io/crates/game-toolkit). The 2D runtime, input
+(keyboard / mouse / gamepad), audio, assets, text, tilemap, egui overlay, Aseprite loading,
+optional depth/MSAA, the 3D mesh path, a deterministic seedable RNG, browser (wasm32) builds, ECS glue, the atlas-packer CLI, and
 `cargo-generate` jam templates are all in place. Still pre-1.0, so the API may shift between minor versions; roadmap and
 open workstreams live in the [toolkit epic](https://github.com/sunsided/game-toolkit/issues/15).
 

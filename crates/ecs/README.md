@@ -14,7 +14,7 @@ systems in an `ecs.yaml`, runs sillyecs from its own `build.rs`, and includes th
 code with `sillyecs::include_ecs!()`. Because those types are generated per game, this crate provides only the
 small reusable pieces; see the workspace's `11_ecs` example for the full pattern.
 
-Part of game-toolkit, a Rust workspace of small crates for 2D-first game jams. See the
+Part of game-toolkit, a Rust workspace of small crates for 2D and 3D game jams. See the
 [workspace README](https://github.com/sunsided/game-toolkit#readme) for the full toolkit,
 examples, and quick-start.
 

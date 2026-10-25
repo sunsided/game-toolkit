@@ -11,7 +11,7 @@ exported PNG + JSON sprite sheets into a GPU-ready `SpriteSheet`, with a tag-dri
 `AnimationPlayer`. The dependency runs one way (aseprite -> gfx), so the renderer stays
 unaware of asset formats.
 
-Part of game-toolkit, a Rust workspace of small crates for 2D-first game jams. See the
+Part of game-toolkit, a Rust workspace of small crates for 2D and 3D game jams. See the
 [workspace README](https://github.com/sunsided/game-toolkit#readme) for the full toolkit,
 examples, and quick-start.
 

@@ -6,7 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Game loop, the Game trait, Context and time for the game-toolkit game-jam kit."
-keywords = ["gamedev", "game-loop", "gamejam", "2d"]
+keywords = ["gamedev", "game-loop", "gamejam", "2d", "3d"]
 categories = ["game-development"]
 
 [dependencies]

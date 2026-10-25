@@ -5,7 +5,7 @@ consumer-facing `CLAUDE.md`, synced from `templates/jam-agent-guide.md` - see Te
 
 ## What this is
 
-A Cargo workspace of small, focused crates for 2D-first game jams. `game-toolkit` is the umbrella
+A Cargo workspace of small, focused crates for 2D and 3D game jams. `game-toolkit` is the umbrella
 crate; consumers depend on it and write `use game_toolkit::prelude::*;` (the prelude lives in
 `crates/prelude/src/lib.rs` and re-exports the public surface of every subsystem crate).
 

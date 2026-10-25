@@ -11,5 +11,5 @@ atlas-packer --input sprites/ --output atlas.png --metadata atlas.json [--max-si
 It bin-packs with [etagere](https://crates.io/crates/etagere) (largest area first), blits each
 sprite into a tightly-sized atlas, and writes the atlas PNG plus the JSON map of sub-rects.
 
-Part of game-toolkit, a Rust workspace of small crates for 2D-first game jams. See the
+Part of game-toolkit, a Rust workspace of small crates for 2D and 3D game jams. See the
 [workspace README](https://github.com/sunsided/game-toolkit#readme) for the full toolkit.

@@ -1,4 +1,4 @@
-//! game-toolkit: a 2D-first game-jam toolkit.
+//! game-toolkit: a game-jam toolkit for 2D and 3D.
 //!
 //! This is the umbrella entry-point crate. Depend on `game-toolkit` and write
 //! `use game_toolkit::prelude::*;` to pull in the runtime types from the `game-toolkit-*`
