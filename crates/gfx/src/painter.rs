@@ -301,8 +301,8 @@ impl<'a> Painter<'a> {
     pub fn triangles_colored(
         &mut self,
         vertices: &[[f32; 2]],
-        colors: &[[f32; 4]],
         indices: &[u32],
+        colors: &[[f32; 4]],
         layer: i16,
     ) {
         let key = self.plain(layer, BlendMode::Alpha);
