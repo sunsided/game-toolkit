@@ -327,6 +327,14 @@ impl Graphics {
         Ok(id)
     }
 
+    /// Size `[width, height]` in pixels that `s` takes up drawn at `size_px` (the widest line,
+    /// and the height of all lines), for aligning text or sizing a box to fit. Uses the same
+    /// layout as drawing, so the result matches `Painter::text` exactly; measuring and then
+    /// drawing the same string shapes it once.
+    pub fn measure_text(&mut self, s: &str, size_px: f32) -> [f32; 2] {
+        self.text.measure(s, size_px)
+    }
+
     /// Register an extra font face (TTF/OTF bytes) as a glyph fallback for text rendering.
     pub fn load_font_bytes(&mut self, bytes: Vec<u8>) {
         self.text.load_font_bytes(bytes);
@@ -501,14 +509,14 @@ impl Graphics {
         let Some(encoder) = frame.encoder.as_mut() else {
             return;
         };
-        // Interleave sprites, filled shapes and circles by layer so a circle on layer -1
-        // draws under a sprite on layer 0; within a layer, sprites draw first, then shapes,
-        // then circles. Text renders once on top (glyphon prepares a single vertex buffer per
-        // call, so it is not layered).
+        // Interleave sprites, filled shapes, circles and layered text by layer so a circle on
+        // layer -1 draws under a sprite on layer 0; within a layer, sprites draw first, then
+        // shapes, then circles, then text. Unlayered text (`Painter::text`) draws on top.
         let mut layers = std::collections::BTreeSet::new();
         self.sprites.collect_layers(&mut layers);
         self.shapes.collect_layers(&mut layers);
         self.primitives.collect_layers(&mut layers);
+        self.text.collect_layers(&mut layers);
 
         // Upload each batcher's instances exactly once before drawing: `queue.write_buffer`
         // is not part of the encoder command stream, so writing per layer pass would clobber
@@ -516,6 +524,7 @@ impl Graphics {
         self.sprites.upload(&self.device, &self.queue);
         self.shapes.upload(&self.device, &self.queue);
         self.primitives.upload(&self.device, &self.queue);
+        self.text.prepare(&self.device, &self.queue);
 
         // When multisampling, draws target the MSAA texture and resolve to the surface;
         // otherwise they target the surface directly.
@@ -564,10 +573,11 @@ impl Graphics {
                 .draw_layer(layer, encoder, &targets, &self.camera_bg, &self.textures);
             self.primitives
                 .draw_layer(layer, encoder, &targets, &self.camera_bg);
+            self.text.draw_layer(Some(layer), encoder, &targets);
         }
 
-        self.text
-            .flush(&self.device, &self.queue, encoder, &targets);
+        self.text.draw_layer(None, encoder, &targets);
+        self.text.finish();
 
         // Vector content composites on top of the 2D layers, directly onto the surface.
         #[cfg(feature = "vector")]

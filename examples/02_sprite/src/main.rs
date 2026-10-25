@@ -1,5 +1,6 @@
 //! Loads a PNG with `ctx.load_texture` and draws it three ways: plain, spinning,
-//! and tinted. Exercises the PNG decode -> upload -> render path end to end.
+//! and tinted, plus a pixel region of it, mirrored, through the `draw_sprite` builder.
+//! Exercises the PNG decode -> upload -> render path end to end.
 
 use game_toolkit::prelude::*;
 
@@ -52,9 +53,16 @@ impl Game for Sprite {
             BlendMode::Alpha,
         );
 
+        // Builder: the top-left quarter by pixel rectangle (no texture-size lookup needed),
+        // on a higher layer than the row above, flipping to face the other way every second.
+        p.draw_sprite(self.tex, [w * 0.5 - s[0] * 0.5, cy + s[1] * 1.2], s)
+            .region([0.0, 0.0], [64.0, 64.0])
+            .flip_x_if(t.fract() < 0.5)
+            .layer(1);
+
         p.text(
             [16.0, 16.0],
-            "02_sprite: plain / spinning / tinted (Esc to quit)",
+            "02_sprite: plain / spinning / tinted, and a mirrored region (Esc to quit)",
             20.0,
             [0.85, 0.85, 0.9, 1.0],
         );

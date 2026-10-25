@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
+use crate::color::Color;
 use crate::target::Targets;
 use crate::texture::{TextureId, TextureRegistry};
 
@@ -42,8 +43,13 @@ pub struct SpriteInstance {
     pub uv_max: [f32; 2],
     pub color: [f32; 4],
     pub rotation: f32,
+    /// Padding to a 16-byte multiple. `_pad[0]` doubles as the CPU-side marker for
+    /// [`SpriteInstance::with_pixel_region`]; leave it zeroed.
     pub _pad: [f32; 3],
 }
+
+/// `_pad[0]` value marking `uv_min` / `uv_max` as pixels still to be divided by the texture size.
+const PIXEL_REGION: f32 = 1.0;
 
 impl SpriteInstance {
     pub fn at(pos: [f32; 2], size: [f32; 2]) -> Self {
@@ -57,8 +63,8 @@ impl SpriteInstance {
             _pad: [0.0; 3],
         }
     }
-    pub fn with_color(mut self, c: [f32; 4]) -> Self {
-        self.color = c;
+    pub fn with_color(mut self, c: impl Into<Color>) -> Self {
+        self.color = c.into().to_array();
         self
     }
     pub fn with_rotation(mut self, r: f32) -> Self {
@@ -85,6 +91,32 @@ impl SpriteInstance {
             [(min[0] + size[0]) / tw, (min[1] + size[1]) / th],
         )
     }
+    /// Sample the `size` pixel rectangle at `min` (top-left, in pixels) of whatever texture
+    /// this is drawn with, like [`with_region`](Self::with_region) but without passing the
+    /// texture size: [`crate::Painter::sprite_ex`] looks it up when the sprite is drawn, and
+    /// draws nothing for an unknown texture. Combine freely with [`flip_x`](Self::flip_x) /
+    /// [`flip_y`](Self::flip_y), and draw the instance only through `sprite_ex`.
+    pub fn with_pixel_region(mut self, min: [f32; 2], size: [f32; 2]) -> Self {
+        self.uv_min = min;
+        self.uv_max = [min[0] + size[0], min[1] + size[1]];
+        self._pad[0] = PIXEL_REGION;
+        self
+    }
+
+    /// Whether the UVs are a [`with_pixel_region`](Self::with_pixel_region) still in pixels.
+    pub(crate) fn has_pixel_region(&self) -> bool {
+        self._pad[0] == PIXEL_REGION
+    }
+
+    /// Turn a pixel region into UVs for a texture of `tex_size` pixels.
+    pub(crate) fn resolve_pixel_region(mut self, tex_size: [u32; 2]) -> Self {
+        let [tw, th] = [tex_size[0].max(1) as f32, tex_size[1].max(1) as f32];
+        self.uv_min = [self.uv_min[0] / tw, self.uv_min[1] / th];
+        self.uv_max = [self.uv_max[0] / tw, self.uv_max[1] / th];
+        self._pad[0] = 0.0;
+        self
+    }
+
     /// Mirror horizontally by swapping the u bounds. Works with any UV range or region;
     /// apply it after [`with_uv`](Self::with_uv) / [`with_region`](Self::with_region).
     pub fn flip_x(mut self) -> Self {
@@ -354,6 +386,29 @@ impl SpriteBatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pixel_region_resolves_like_with_region() {
+        let tex = [64, 32];
+        let px = SpriteInstance::at([0.0; 2], [8.0; 2]).with_pixel_region([16.0, 8.0], [16.0, 8.0]);
+        assert!(px.has_pixel_region());
+        let resolved = px.resolve_pixel_region(tex);
+        let direct =
+            SpriteInstance::at([0.0; 2], [8.0; 2]).with_region([16.0, 8.0], [16.0, 8.0], tex);
+        assert!(!resolved.has_pixel_region());
+        assert_eq!(resolved.uv_min, direct.uv_min);
+        assert_eq!(resolved.uv_max, direct.uv_max);
+    }
+
+    #[test]
+    fn flip_before_resolving_a_pixel_region() {
+        let inst = SpriteInstance::at([0.0; 2], [8.0; 2])
+            .with_pixel_region([0.0, 0.0], [16.0, 16.0])
+            .flip_x()
+            .resolve_pixel_region([32, 32]);
+        assert_eq!(inst.uv_min, [0.5, 0.0]);
+        assert_eq!(inst.uv_max, [0.0, 0.5]);
+    }
 
     #[test]
     fn with_region_maps_pixels_to_uvs() {
