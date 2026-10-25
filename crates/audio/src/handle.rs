@@ -25,9 +25,10 @@ pub struct SoundHandle {
 
 #[derive(Debug)]
 pub(crate) enum Slot {
-    /// Queued until audio starts, with the state to apply once it does.
+    /// Queued until audio starts, with the state to apply once it does: the last volume
+    /// change (target and fade duration) and whether it was paused.
     Pending {
-        volume: Option<Decibels>,
+        volume: Option<(Decibels, Duration)>,
         paused: bool,
     },
     Playing(StaticSoundHandle),
@@ -55,7 +56,9 @@ impl SoundHandle {
 
     pub(crate) fn lock(&self) -> MutexGuard<'_, Slot> {
         // A panic while holding the lock can't leave the slot half-updated, so ignore poison.
-        self.slot.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.slot
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// Set the volume as a linear amplitude (`1.0` is the sound's own level, `0.0` silence).
@@ -76,7 +79,8 @@ impl SoundHandle {
     /// Fade the volume to `db` decibels over `duration`.
     pub fn fade_volume_db(&self, db: f32, duration: Duration) {
         match &mut *self.lock() {
-            Slot::Pending { volume, .. } => *volume = Some(Decibels(db)),
+            // Replayed when the sound starts, so a fade-in requested early still fades.
+            Slot::Pending { volume, .. } => *volume = Some((Decibels(db), duration)),
             Slot::Playing(h) => h.set_volume(Decibels(db), tween(duration)),
             Slot::Cancelled => {}
         }
@@ -152,7 +156,7 @@ impl SoundHandle {
     }
 }
 
-fn tween(duration: Duration) -> Tween {
+pub(crate) fn tween(duration: Duration) -> Tween {
     if duration.is_zero() {
         Tween::default()
     } else {
@@ -176,13 +180,19 @@ mod tests {
         assert!(h.is_paused());
         match &*h.lock() {
             Slot::Pending { volume, paused } => {
-                assert_eq!(*volume, Some(Decibels(-12.0)));
+                assert_eq!(*volume, Some((Decibels(-12.0), Duration::ZERO)));
                 assert!(*paused);
             }
             other => panic!("expected pending, got {other:?}"),
         }
         h.resume();
         assert!(!h.is_paused());
+        h.fade_volume_db(-3.0, Duration::from_secs(2));
+        assert!(matches!(
+            &*h.lock(),
+            Slot::Pending { volume: Some((Decibels(db), d)), .. }
+                if *db == -3.0 && *d == Duration::from_secs(2)
+        ));
     }
 
     #[test]

@@ -175,13 +175,19 @@ impl Audio {
         let Slot::Pending { volume, paused } = &*slot else {
             return; // stopped while queued
         };
-        let data = match volume {
-            Some(volume) => data.volume(*volume),
-            None => data,
+        let (volume, paused) = (*volume, *paused);
+        // An instant volume change replaces the start volume; a fade starts from it once
+        // the sound plays, over the duration that was asked for.
+        let (data, fade) = match volume {
+            Some((db, duration)) if duration.is_zero() => (data.volume(db), None),
+            Some((db, duration)) => (data, Some((db, duration))),
+            None => (data, None),
         };
-        let paused = *paused;
         match self.play_now(data) {
             Ok(mut kira) => {
+                if let Some((db, duration)) = fade {
+                    kira.set_volume(db, handle::tween(duration));
+                }
                 if paused {
                     kira.pause(Tween::default());
                 }
