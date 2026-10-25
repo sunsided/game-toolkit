@@ -39,9 +39,9 @@ All notable changes to this project are documented here. The format is based on
   `Duration::ZERO` disables the cap (#45).
 - `Time::alpha`: with a fixed timestep, how far the frame is into the next step, for
   interpolating motion in `render` (#45).
-- `channel_queue_impls!` implements sillyecs' generated `WorldUserCommand` /
-  `WorldCommandSender` / `WorldCommandReceiver` traits on `ChannelQueue` in one line; in the
-  prelude with the `ecs` feature (#43).
+- `ChannelQueue` implements sillyecs' `CommandSender` / `CommandReceiver` for any command type,
+  so `ChannelQueue<WorldCommand<U>>` is a world command queue without any impls in the game
+  (#43).
 - The jam agent guide is published as the umbrella crate's `game_toolkit::guide` module on
   docs.rs, generated from the same source as the templates' `CLAUDE.md` (agent-only sections
   are left out). The README links it and gains a Drawing section with the `Painter` calls and
@@ -82,10 +82,12 @@ All notable changes to this project are documented here. The format is based on
   instead of `anyhow::Result<StaticSoundHandle>`. `AudioError::NotStarted` tells "audio not
   started yet" apart from real failures (`UnknownSound`, `Backend`) (#39). `play` and
   `play_samples` are documented, including the web caveat (#51).
-- sillyecs 0.1. The `game-toolkit-ecs` docs ask for `sillyecs = "0.1"` and its `wasm` feature
-  on the web (#44), and explain how sillyecs' fixed phases relate to `fixed_timestep`, and
-  resetting the world's clock after a gap (#50). `examples/11_ecs` does that reset, and uses
-  `channel_queue_impls!`.
+- **Breaking:** sillyecs 0.2, and `game-toolkit-ecs` depends on it. Games need `sillyecs = "0.2"`
+  and `sillyecs-build = "0.2"`, and drop their own command-queue impls for `ChannelQueue`, which
+  now conflict with sillyecs' blanket impls. The `game-toolkit-ecs` docs ask for sillyecs' `wasm`
+  feature on the web (#44), and explain how sillyecs' fixed phases relate to `fixed_timestep`,
+  and resetting the world's clock after a gap (#50). `examples/11_ecs` does that reset, includes
+  the generated code with `sillyecs::include_ecs!`, and needs no lint allows for it.
 - `AppConfig::fixed_timestep` documents that `update` may run zero or several times per frame
   and that `render` runs once (#50).
 - `task sync:templates` / `task check:templates` and CI's sync check run

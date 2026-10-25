@@ -10,6 +10,7 @@ keywords = ["ecs", "gamedev", "sillyecs", "entity"]
 categories = ["game-development"]
 
 [dependencies]
+sillyecs = { workspace = true }
 
 [lints]
 workspace = true

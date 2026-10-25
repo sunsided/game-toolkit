@@ -13,8 +13,6 @@ path = "src/main.rs"
 [dependencies]
 game-toolkit = { workspace = true, features = ["ecs"] }
 env_logger = { workspace = true }
-# The generated ECS code logs via tracing.
-tracing = { workspace = true }
 # Runtime support types (EntityId, FrameContext, ...) the generated code refers to.
 sillyecs = { workspace = true }
 
