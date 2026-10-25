@@ -18,6 +18,11 @@ tracing = { workspace = true }
 # Runtime support types (EntityId, FrameContext, ...) the generated code refers to.
 sillyecs = { workspace = true }
 
+# sillyecs times phases with `Instant`; its `wasm` feature swaps in one that works in the
+# browser (`std::time::Instant` panics there).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+sillyecs = { workspace = true, features = ["wasm"] }
+
 [build-dependencies]
 sillyecs-build = { workspace = true }
 
