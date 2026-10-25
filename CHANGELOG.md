@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-25
+
 ### Added
 
 - `SoundHandle`, a toolkit-owned handle to a playing sound: `set_volume` (linear) /
@@ -61,15 +63,6 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 
-- **Colors are sRGB everywhere.** Sprite tints, rects, lines, filled shapes, circles, mesh
-  tints and the clear color used to reach the sRGB surface as linear values, so they showed
-  lighter than written (and lighter than text in the same color). They are now decoded from
-  sRGB in the shaders, so `[0.5, 0.5, 0.5, 1.0]` or `Color::hex(0x808080)` shows as `#808080`
-  everywhere. Existing games get darker, more saturated mid-tones; adjust colors tuned by eye
-  to the old look (#58).
-- Frames always render through an sRGB view: on surfaces without an sRGB format (WebGPU
-  canvases) the sRGB variant is used as a view format, so textures, text and colors look the
-  same as natively. `Graphics::surface_format` returns that render format.
 - **Breaking:** `Audio::play` and `Audio::play_samples` return `Result<SoundHandle, AudioError>`
   instead of `anyhow::Result<StaticSoundHandle>`. `AudioError::NotStarted` tells "audio not
   started yet" apart from real failures (`UnknownSound`, `Backend`) (#39). `play` and
@@ -80,12 +73,24 @@ All notable changes to this project are documented here. The format is based on
   feature on the web (#44), and explain how sillyecs' fixed phases relate to `fixed_timestep`,
   and resetting the world's clock after a gap (#50). `examples/11_ecs` does that reset, includes
   the generated code with `sillyecs::include_ecs!`, and needs no lint allows for it.
+- **Colors are sRGB everywhere.** Sprite tints, rects, lines, filled shapes, circles, mesh
+  tints and the clear color used to reach the sRGB surface as linear values, so they showed
+  lighter than written (and lighter than text in the same color). They are now decoded from
+  sRGB in the shaders, so `[0.5, 0.5, 0.5, 1.0]` or `Color::hex(0x808080)` shows as `#808080`
+  everywhere. Existing games get darker, more saturated mid-tones; adjust colors tuned by eye
+  to the old look (#58).
+- Frames always render through an sRGB view: on surfaces without an sRGB format (WebGPU
+  canvases) the sRGB variant is used as a view format, so textures, text and colors look the
+  same as natively. `Graphics::surface_format` returns that render format.
 - `AppConfig::fixed_timestep` documents that `update` may run zero or several times per frame
   and that `render` runs once (#50).
 - `task sync:templates` / `task check:templates` and CI's sync check run
   `tools/sync-guide.sh`, which also writes `crates/prelude/src/guide.md`.
 - `SpriteInstance::with_color` and `Painter::mesh` / `clear` take `impl Into<Color>`.
 - The text atlas is trimmed after each frame, so glyphs no longer drawn free their space.
+- The README, crate READMEs, crate metadata and the jam guide describe the toolkit as being for
+  2D and 3D game jams instead of "2D-first", and the README's 3D section states what the mesh
+  path covers (#62).
 
 ### Fixed
 
@@ -257,7 +262,8 @@ the `game-toolkit` umbrella; add one dependency and `use game_toolkit::prelude::
 - Top-level and per-crate `README.md`s, crates.io metadata, and `#![forbid(unsafe_code)]`
   across every crate.
 
-[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/sunsided/game-toolkit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/sunsided/game-toolkit/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/sunsided/game-toolkit/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/sunsided/game-toolkit/compare/v0.2.0...v0.3.0
