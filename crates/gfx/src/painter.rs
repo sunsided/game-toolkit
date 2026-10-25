@@ -2,7 +2,7 @@ use crate::frame::Frame;
 use crate::graphics::Graphics;
 use crate::mesh::{MeshId, MeshInstance};
 use crate::primitives::CircleInstance;
-use crate::shapes::Colors;
+use crate::shapes::{Colors, ShapeKey, Uvs, quad_uvq};
 use crate::sprite::{BlendMode, SpriteInstance};
 use crate::texture::TextureId;
 use crate::transform::Mat4;
@@ -14,8 +14,9 @@ use crate::transform::Mat4;
 /// 2D content is sorted by layer: lower layers draw under higher ones, across sprites,
 /// shapes and circles. Within a layer, sprites and sprite-based shapes (`sprite*`, `rect*`,
 /// `line*`) draw first, grouped by [`BlendMode`] and then by texture; call order is kept only
-/// between those draws that share layer, blend mode and texture. Filled shapes (`quad`,
-/// `polygon`, `triangles`) draw next, in call order; circles draw on top.
+/// between those draws that share layer, blend mode and texture. Filled shapes (`quad*`,
+/// `polygon*`, `triangles*`) draw next, grouped the same way, in call order within a group
+/// (so plain alpha-blended shapes on one layer always keep call order); circles draw on top.
 ///
 /// Untextured shapes (`rect*`, `line*`) use the internal white texture, which sorts before
 /// every loaded texture. So on the same layer and blend mode, a `rect` lands *under* a
@@ -170,37 +171,101 @@ impl<'a> Painter<'a> {
         self.gfx.sprites.draw(tex, layer, blend, inst);
     }
 
+    /// Group key for an untextured shape: it samples the white texture, like `rect`.
+    fn plain(&self, layer: i16, blend: BlendMode) -> ShapeKey {
+        ShapeKey {
+            layer,
+            blend,
+            texture: self.gfx.white_texture(),
+        }
+    }
+
     /// Filled convex quad through `points` (in order, either winding), alpha-blended. Lands
     /// above this layer's sprites and rects and below its circles; see [`Painter`].
     pub fn quad(&mut self, points: [[f32; 2]; 4], color: [f32; 4], layer: i16) {
+        self.quad_ex(points, color, layer, BlendMode::Alpha);
+    }
+
+    /// [`Painter::quad`] with an explicit blend mode.
+    pub fn quad_ex(
+        &mut self,
+        points: [[f32; 2]; 4],
+        color: [f32; 4],
+        layer: i16,
+        blend: BlendMode,
+    ) {
+        let key = self.plain(layer, blend);
         self.gfx
             .shapes
-            .polygon(layer, &points, Colors::Uniform(color));
+            .polygon(key, &points, Colors::Uniform(color), Uvs::None);
     }
 
     /// [`Painter::quad`] with one colour per corner, interpolated across the quad (e.g. a
     /// vertical gradient: the same colour on both top corners, another on both bottom ones).
     pub fn quad_colored(&mut self, points: [[f32; 2]; 4], colors: [[f32; 4]; 4], layer: i16) {
+        let key = self.plain(layer, BlendMode::Alpha);
         self.gfx
             .shapes
-            .polygon(layer, &points, Colors::PerVertex(&colors));
+            .polygon(key, &points, Colors::PerVertex(&colors), Uvs::None);
+    }
+
+    /// Convex quad through `points` showing `tex`, with `uvs` the texture coordinates of the
+    /// four corners (`[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]` for the whole
+    /// texture), tinted by `color`. UVs outside `0..1` clamp to the edge texels (textures
+    /// do not tile), so draw a tiling surface as one quad per tile.
+    ///
+    /// Texturing is perspective-correct: the quad is treated as a flat rectangle seen in
+    /// perspective (a road segment, a mode-7 floor), so a trapezoid shows the texture
+    /// foreshortened rather than sheared along its diagonal. Concave or self-intersecting
+    /// quads fall back to plain affine texturing.
+    pub fn quad_textured(
+        &mut self,
+        tex: TextureId,
+        points: [[f32; 2]; 4],
+        uvs: [[f32; 2]; 4],
+        color: [f32; 4],
+        layer: i16,
+        blend: BlendMode,
+    ) {
+        let key = ShapeKey {
+            layer,
+            blend,
+            texture: tex,
+        };
+        let uvq = quad_uvq(points, uvs);
+        self.gfx
+            .shapes
+            .polygon(key, &points, Colors::Uniform(color), Uvs::Projective(&uvq));
     }
 
     /// Filled convex polygon through `points` (in order, either winding), fan-triangulated
     /// from the first point and alpha-blended. Fewer than three points draw nothing. A
     /// concave polygon would draw wrong; split it or use [`Painter::triangles`].
     pub fn polygon(&mut self, points: &[[f32; 2]], color: [f32; 4], layer: i16) {
+        self.polygon_ex(points, color, layer, BlendMode::Alpha);
+    }
+
+    /// [`Painter::polygon`] with an explicit blend mode.
+    pub fn polygon_ex(
+        &mut self,
+        points: &[[f32; 2]],
+        color: [f32; 4],
+        layer: i16,
+        blend: BlendMode,
+    ) {
+        let key = self.plain(layer, blend);
         self.gfx
             .shapes
-            .polygon(layer, points, Colors::Uniform(color));
+            .polygon(key, points, Colors::Uniform(color), Uvs::None);
     }
 
     /// [`Painter::polygon`] with one colour per point, interpolated across the polygon.
     /// Draws nothing unless `colors.len() == points.len()` (a debug-build panic).
     pub fn polygon_colored(&mut self, points: &[[f32; 2]], colors: &[[f32; 4]], layer: i16) {
+        let key = self.plain(layer, BlendMode::Alpha);
         self.gfx
             .shapes
-            .polygon(layer, points, Colors::PerVertex(colors));
+            .polygon(key, points, Colors::PerVertex(colors), Uvs::None);
     }
 
     /// Filled triangle list: every three `indices` into `vertices` make one triangle,
@@ -213,9 +278,22 @@ impl<'a> Painter<'a> {
         color: [f32; 4],
         layer: i16,
     ) {
+        self.triangles_ex(vertices, indices, color, layer, BlendMode::Alpha);
+    }
+
+    /// [`Painter::triangles`] with an explicit blend mode.
+    pub fn triangles_ex(
+        &mut self,
+        vertices: &[[f32; 2]],
+        indices: &[u32],
+        color: [f32; 4],
+        layer: i16,
+        blend: BlendMode,
+    ) {
+        let key = self.plain(layer, blend);
         self.gfx
             .shapes
-            .triangles(layer, vertices, Colors::Uniform(color), indices);
+            .triangles(key, vertices, Colors::Uniform(color), Uvs::None, indices);
     }
 
     /// [`Painter::triangles`] with one colour per vertex, interpolated across each triangle.
@@ -227,9 +305,41 @@ impl<'a> Painter<'a> {
         indices: &[u32],
         layer: i16,
     ) {
+        let key = self.plain(layer, BlendMode::Alpha);
         self.gfx
             .shapes
-            .triangles(layer, vertices, Colors::PerVertex(colors), indices);
+            .triangles(key, vertices, Colors::PerVertex(colors), Uvs::None, indices);
+    }
+
+    /// Triangle list showing `tex`, with `uvs` one texture coordinate per vertex, tinted by
+    /// `color`. UVs outside `0..1` clamp to the edge texels, as for
+    /// [`Painter::quad_textured`]. UVs are interpolated affinely (a triangle list carries no perspective); for
+    /// a perspective-correct quad use [`Painter::quad_textured`]. Draws nothing unless
+    /// `uvs.len() == vertices.len()` and the indices are valid, as for
+    /// [`Painter::triangles`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn triangles_textured(
+        &mut self,
+        tex: TextureId,
+        vertices: &[[f32; 2]],
+        uvs: &[[f32; 2]],
+        indices: &[u32],
+        color: [f32; 4],
+        layer: i16,
+        blend: BlendMode,
+    ) {
+        let key = ShapeKey {
+            layer,
+            blend,
+            texture: tex,
+        };
+        self.gfx.shapes.triangles(
+            key,
+            vertices,
+            Colors::Uniform(color),
+            Uvs::Affine(uvs),
+            indices,
+        );
     }
 
     /// Filled disk (layer 0).
