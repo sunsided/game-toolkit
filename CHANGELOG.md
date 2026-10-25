@@ -6,17 +6,28 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-25
+
+### Fixed
+
+- Generated jam projects (`templates/jam`, `templates/jam-3d`) have a `Cargo.toml` again; the
+  manifest was left behind as `Cargo.toml.template`, so `cargo run` failed until it was renamed
+  by hand.
+- Generated jam projects pass their own `cargo fmt --check` for any project name length.
+- Tagged releases create a GitHub release with that version's changelog section after
+  publishing to crates.io.
+
 ### Changed
 
-- **Breaking:** moved to sillyecs 0.0.7, which splits the code generator out into the
-  `sillyecs-build` crate. Games using `game-toolkit-ecs` now need `sillyecs-build` under
-  `[build-dependencies]` (with `use sillyecs_build::EcsCode;` in `build.rs`) and `sillyecs` under
-  `[dependencies]`, since the generated code refers to its runtime types (`sillyecs::EntityId`,
-  ...). Generated `WorldCommand` is now generic over a user-command type, so the command queue
-  must implement `WorldUserCommand` and the world `WorldUserCommandHandler`;
-  `std::convert::Infallible` works when a game has no custom commands. Per-entity lookups are
-  now `get_<archetype>_entity` from the generated `EntityAccess` trait. `examples/11_ecs` shows
-  the updated pattern.
+- `game-toolkit-ecs` docs and `examples/11_ecs` target sillyecs 0.0.7. The toolkit's API is
+  unchanged, but games that move to sillyecs 0.0.7 must adapt: the code generator now lives
+  in `sillyecs-build` (`[build-dependencies]`, `use sillyecs_build::EcsCode;` in `build.rs`),
+  and `sillyecs` becomes a regular dependency because the generated code refers to its runtime
+  types (`sillyecs::EntityId`, ...). Generated `WorldCommand` is generic over a user-command
+  type, so the command queue must implement `WorldUserCommand` and the world
+  `WorldUserCommandHandler` (`std::convert::Infallible` works when a game has no custom
+  commands), and per-entity lookups are now `get_<archetype>_entity` from the generated
+  `EntityAccess` trait. `examples/11_ecs` shows the updated pattern.
 
 ## [0.3.0] - 2026-10-15
 
@@ -117,7 +128,8 @@ the `game-toolkit` umbrella; add one dependency and `use game_toolkit::prelude::
 - Top-level and per-crate `README.md`s, crates.io metadata, and `#![forbid(unsafe_code)]`
   across every crate.
 
-[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/sunsided/game-toolkit/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/sunsided/game-toolkit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sunsided/game-toolkit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sunsided/game-toolkit/releases/tag/v0.1.0
