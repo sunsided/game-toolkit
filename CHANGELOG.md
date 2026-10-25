@@ -40,6 +40,24 @@ All notable changes to this project are documented here. The format is based on
   the asset root, or `AppConfig::web_preload`) and log a warning, once per file, for files
   the web build wouldn't preload. `Assets::check_web_listed` runs the check for files read by
   path; `Assets::set_web_preload` replaces the list; `parse_manifest` is public (#46).
+- `Color` (`rgb` / `rgba` / `rgb8` / `rgba8` / `hex` / `hex_rgba`, named constants,
+  `with_alpha`, `lerp`) and `Layer(i16)` (`DEFAULT`, `BOTTOM`, `TOP`). Painter calls take
+  `impl Into<Color>` and `impl Into<Layer>`, so existing `[f32; 4]` and integer arguments keep
+  compiling (#42).
+- Draw builders that queue on drop: `Painter::draw_sprite` (`region`, `uv`, `color`,
+  `rotation`, `flip_x` / `flip_y` / `flip_x_if`, `layer`, `blend`), `Painter::draw_rect`
+  (`color`, `outline`, `layer`, `blend`) and `Painter::draw_text` (`size`, `color`, `align`,
+  `layer`) (#42).
+- `SpriteInstance::with_pixel_region(src_pos, src_size)`: an atlas region in pixels, resolved
+  against the texture's size when `sprite_ex` draws it, so a layered or mirrored atlas sprite
+  needs no `texture_size` lookup (#41).
+- Layered text: `Painter::text_ex(pos, s, size_px, color, layer)` sorts with sprites and
+  shapes, drawing last within its layer. `Painter::text` still draws above every layer (#40).
+- `Graphics::measure_text` / `Painter::measure_text` return a string's `[width, height]` with
+  the same layout as drawing, and `Align` (`Left` / `Center` / `Right`) aligns builder text
+  around its position (#47).
+- `examples/04_text` right-aligns, sizes a box to its label and fades a pause overlay over
+  layered text; `examples/02_sprite` draws a mirrored pixel region with the builder.
 
 ### Changed
 
@@ -55,6 +73,8 @@ All notable changes to this project are documented here. The format is based on
   and that `render` runs once (#50).
 - `task sync:templates` / `task check:templates` and CI's sync check run
   `tools/sync-guide.sh`, which also writes `crates/prelude/src/guide.md`.
+- `SpriteInstance::with_color` and `Painter::mesh` / `clear` take `impl Into<Color>`.
+- The text atlas is trimmed after each frame, so glyphs no longer drawn free their space.
 
 ### Fixed
 

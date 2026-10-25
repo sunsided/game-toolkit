@@ -4,6 +4,8 @@
 
 mod camera;
 mod camera3d;
+mod color;
+mod draw;
 mod frame;
 mod graphics;
 mod mesh;
@@ -30,12 +32,15 @@ pub use vello;
 
 pub use camera::Camera2D;
 pub use camera3d::{Camera, Camera3D};
+pub use color::{Color, Layer};
+pub use draw::{RectDraw, SpriteDraw, TextDraw};
 pub use frame::Frame;
 pub use graphics::Graphics;
 pub use mesh::{MeshId, MeshInstance, MeshVertex};
 pub use painter::Painter;
 pub use primitives::CircleInstance;
 pub use sprite::{BlendMode, SpriteInstance};
+pub use text::Align;
 pub use texture::{Texture, TextureId, TextureWrap};
 pub use tilemap::Tilemap;
 pub use transform::Mat4;

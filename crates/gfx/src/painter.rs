@@ -1,3 +1,5 @@
+use crate::color::{Color, Layer};
+use crate::draw::{RectDraw, SpriteDraw, TextDraw};
 use crate::frame::Frame;
 use crate::graphics::Graphics;
 use crate::mesh::{MeshId, MeshInstance};
@@ -21,7 +23,15 @@ use crate::transform::Mat4;
 /// Untextured shapes (`rect*`, `line*`) use the internal white texture, which sorts before
 /// every loaded texture. So on the same layer and blend mode, a `rect` lands *under* a
 /// textured sprite even when it is drawn after it; put it on a higher layer with
-/// [`Painter::rect_ex`] to draw it on top. Text is not layered and always draws last.
+/// [`Painter::rect_ex`] to draw it on top. Text from [`Painter::text_ex`] draws last within its
+/// layer; text from [`Painter::text`] draws on top of every layer.
+///
+/// # Arguments
+///
+/// Colours are `impl Into<Color>` and layers `impl Into<Layer>`, so `[r, g, b, a]` arrays and
+/// plain integers work as well as [`Color`] and [`Layer`]. For draws with several optional
+/// settings, [`Painter::draw_sprite`], [`Painter::draw_rect`] and [`Painter::draw_text`]
+/// return builders instead of taking long positional argument lists.
 pub struct Painter<'a> {
     frame: &'a mut Frame,
     gfx: &'a mut Graphics,
@@ -32,8 +42,8 @@ impl<'a> Painter<'a> {
         Self { frame, gfx }
     }
 
-    pub fn clear(&mut self, color: [f32; 4]) {
-        self.frame.clear_color = color;
+    pub fn clear(&mut self, color: impl Into<Color>) {
+        self.frame.clear_color = color.into().to_array();
     }
 
     /// World-space rectangle currently visible through the 2D camera, as `(min, max)`.
@@ -50,8 +60,9 @@ impl<'a> Painter<'a> {
 
     /// Draw the `src_size` pixel rectangle at `src_pos` (top-left, in pixels) of `tex`, e.g. one
     /// sprite of an atlas, into `pos`/`size` (layer 0, alpha blending). Does nothing for an
-    /// unknown texture. For flipping or an explicit layer, build the instance with
-    /// [`SpriteInstance::with_region`] and draw it with [`Painter::sprite_ex`].
+    /// unknown texture. For flipping or an explicit layer, use [`Painter::draw_sprite`] with
+    /// `.region(..)`, or build the instance with [`SpriteInstance::with_pixel_region`] and draw
+    /// it with [`Painter::sprite_ex`].
     pub fn sprite_region(
         &mut self,
         tex: TextureId,
@@ -66,25 +77,69 @@ impl<'a> Painter<'a> {
         }
     }
 
+    /// Start a sprite draw with optional settings: an atlas region in pixels, tint,
+    /// rotation, flips, layer and blend mode. It is queued when the returned builder drops,
+    /// usually at the end of the statement:
+    ///
+    /// ```ignore
+    /// p.draw_sprite(atlas, pos, [32.0, 32.0])
+    ///     .region([64.0, 0.0], [16.0, 16.0])
+    ///     .layer(CARS)
+    ///     .flip_x_if(facing_left);
+    /// ```
+    pub fn draw_sprite(
+        &mut self,
+        tex: TextureId,
+        pos: [f32; 2],
+        size: [f32; 2],
+    ) -> SpriteDraw<'_, 'a> {
+        SpriteDraw::new(self, tex, pos, size)
+    }
+
+    /// Start a rectangle draw with optional settings: colour, outline, layer and blend mode.
+    /// Queued when the returned builder drops: `p.draw_rect(pos, size).color(c).layer(HUD);`.
+    pub fn draw_rect(&mut self, pos: [f32; 2], size: [f32; 2]) -> RectDraw<'_, 'a> {
+        RectDraw::new(self, pos, size)
+    }
+
+    /// Start a text draw with optional settings: size, colour, alignment and layer. Queued
+    /// when the returned builder drops:
+    /// `p.draw_text([w / 2.0, 20.0], "GAME OVER").size(48.0).align(Align::Center);`.
+    pub fn draw_text<'s>(&mut self, pos: [f32; 2], s: &'s str) -> TextDraw<'_, 'a, 's> {
+        TextDraw::new(self, pos, s)
+    }
+
     /// Pixel size of a loaded texture; see [`Graphics::texture_size`].
     pub fn texture_size(&self, tex: TextureId) -> Option<[u32; 2]> {
         self.gfx.texture_size(tex)
     }
 
     /// Sprite on an explicit layer with an explicit blend mode. See the draw-order notes on
-    /// [`Painter`].
+    /// [`Painter`]. An instance built with [`SpriteInstance::with_pixel_region`] gets its UVs
+    /// from the texture's size here, and draws nothing for an unknown texture.
     pub fn sprite_ex(
         &mut self,
         tex: TextureId,
         inst: SpriteInstance,
-        layer: i16,
+        layer: impl Into<Layer>,
         blend: BlendMode,
     ) {
+        let layer = layer.into().0;
+        // A `with_pixel_region` instance holds its region in pixels until the texture's size
+        // is known; resolve it to UVs here, or draw nothing for an unknown texture.
+        let inst = if inst.has_pixel_region() {
+            let Some(tex_size) = self.gfx.texture_size(tex) else {
+                return;
+            };
+            inst.resolve_pixel_region(tex_size)
+        } else {
+            inst
+        };
         self.gfx.sprites.draw(tex, layer, blend, inst);
     }
 
     /// Filled rectangle (layer 0, alpha blending; uses the internal 1×1 white texture).
-    pub fn rect(&mut self, pos: [f32; 2], size: [f32; 2], color: [f32; 4]) {
+    pub fn rect(&mut self, pos: [f32; 2], size: [f32; 2], color: impl Into<Color>) {
         self.rect_ex(pos, size, color, 0, BlendMode::Alpha);
     }
 
@@ -93,21 +148,27 @@ impl<'a> Painter<'a> {
         &mut self,
         pos: [f32; 2],
         size: [f32; 2],
-        color: [f32; 4],
-        layer: i16,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
         blend: BlendMode,
     ) {
         let tex = self.gfx.white_texture();
         self.gfx.sprites.draw(
             tex,
-            layer,
+            layer.into().0,
             blend,
             SpriteInstance::at(pos, size).with_color(color),
         );
     }
 
     /// 4 thin lines around the rectangle (layer 0, alpha blending).
-    pub fn rect_outline(&mut self, pos: [f32; 2], size: [f32; 2], thickness: f32, color: [f32; 4]) {
+    pub fn rect_outline(
+        &mut self,
+        pos: [f32; 2],
+        size: [f32; 2],
+        thickness: f32,
+        color: impl Into<Color>,
+    ) {
         self.rect_outline_ex(pos, size, thickness, color, 0, BlendMode::Alpha);
     }
 
@@ -117,10 +178,11 @@ impl<'a> Painter<'a> {
         pos: [f32; 2],
         size: [f32; 2],
         thickness: f32,
-        color: [f32; 4],
-        layer: i16,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
         blend: BlendMode,
     ) {
+        let (color, layer) = (color.into(), layer.into());
         let [x, y] = pos;
         let [w, h] = size;
         self.line_ex([x, y], [x + w, y], thickness, color, layer, blend);
@@ -131,7 +193,7 @@ impl<'a> Painter<'a> {
 
     /// Line segment, drawn as a rotated thin quad through the sprite batcher (layer 0, alpha
     /// blending).
-    pub fn line(&mut self, a: [f32; 2], b: [f32; 2], thickness: f32, color: [f32; 4]) {
+    pub fn line(&mut self, a: [f32; 2], b: [f32; 2], thickness: f32, color: impl Into<Color>) {
         self.line_ex(a, b, thickness, color, 0, BlendMode::Alpha);
     }
 
@@ -141,8 +203,8 @@ impl<'a> Painter<'a> {
         a: [f32; 2],
         b: [f32; 2],
         thickness: f32,
-        color: [f32; 4],
-        layer: i16,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
         blend: BlendMode,
     ) {
         let dx = b[0] - a[0];
@@ -164,17 +226,17 @@ impl<'a> Painter<'a> {
             size: [len, thickness],
             uv_min: [0.0, 0.0],
             uv_max: [1.0, 1.0],
-            color,
+            color: color.into().to_array(),
             rotation: angle,
             _pad: [0.0; 3],
         };
-        self.gfx.sprites.draw(tex, layer, blend, inst);
+        self.gfx.sprites.draw(tex, layer.into().0, blend, inst);
     }
 
     /// Group key for an untextured shape: it samples the white texture, like `rect`.
-    fn plain(&self, layer: i16, blend: BlendMode) -> ShapeKey {
+    fn plain(&self, layer: impl Into<Layer>, blend: BlendMode) -> ShapeKey {
         ShapeKey {
-            layer,
+            layer: layer.into().0,
             blend,
             texture: self.gfx.white_texture(),
         }
@@ -182,7 +244,12 @@ impl<'a> Painter<'a> {
 
     /// Filled convex quad through `points` (in order, either winding), alpha-blended. Lands
     /// above this layer's sprites and rects and below its circles; see [`Painter`].
-    pub fn quad(&mut self, points: [[f32; 2]; 4], color: [f32; 4], layer: i16) {
+    pub fn quad(
+        &mut self,
+        points: [[f32; 2]; 4],
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
+    ) {
         self.quad_ex(points, color, layer, BlendMode::Alpha);
     }
 
@@ -190,19 +257,28 @@ impl<'a> Painter<'a> {
     pub fn quad_ex(
         &mut self,
         points: [[f32; 2]; 4],
-        color: [f32; 4],
-        layer: i16,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
         blend: BlendMode,
     ) {
         let key = self.plain(layer, blend);
-        self.gfx
-            .shapes
-            .polygon(key, &points, Colors::Uniform(color), Uvs::None);
+        self.gfx.shapes.polygon(
+            key,
+            &points,
+            Colors::Uniform(color.into().to_array()),
+            Uvs::None,
+        );
     }
 
     /// [`Painter::quad`] with one colour per corner, interpolated across the quad (e.g. a
     /// vertical gradient: the same colour on both top corners, another on both bottom ones).
-    pub fn quad_colored(&mut self, points: [[f32; 2]; 4], colors: [[f32; 4]; 4], layer: i16) {
+    pub fn quad_colored(
+        &mut self,
+        points: [[f32; 2]; 4],
+        colors: [impl Into<Color>; 4],
+        layer: impl Into<Layer>,
+    ) {
+        let colors = colors.map(|c| c.into().to_array());
         let key = self.plain(layer, BlendMode::Alpha);
         self.gfx
             .shapes
@@ -225,25 +301,33 @@ impl<'a> Painter<'a> {
         tex: TextureId,
         points: [[f32; 2]; 4],
         uvs: [[f32; 2]; 4],
-        color: [f32; 4],
-        layer: i16,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
         blend: BlendMode,
     ) {
         let key = ShapeKey {
-            layer,
+            layer: layer.into().0,
             blend,
             texture: tex,
         };
         let uvq = quad_uvq(points, uvs);
-        self.gfx
-            .shapes
-            .polygon(key, &points, Colors::Uniform(color), Uvs::Projective(&uvq));
+        self.gfx.shapes.polygon(
+            key,
+            &points,
+            Colors::Uniform(color.into().to_array()),
+            Uvs::Projective(&uvq),
+        );
     }
 
     /// Filled convex polygon through `points` (in order, either winding), fan-triangulated
     /// from the first point and alpha-blended. Fewer than three points draw nothing. A
     /// concave polygon would draw wrong; split it or use [`Painter::triangles`].
-    pub fn polygon(&mut self, points: &[[f32; 2]], color: [f32; 4], layer: i16) {
+    pub fn polygon(
+        &mut self,
+        points: &[[f32; 2]],
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
+    ) {
         self.polygon_ex(points, color, layer, BlendMode::Alpha);
     }
 
@@ -251,19 +335,27 @@ impl<'a> Painter<'a> {
     pub fn polygon_ex(
         &mut self,
         points: &[[f32; 2]],
-        color: [f32; 4],
-        layer: i16,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
         blend: BlendMode,
     ) {
         let key = self.plain(layer, blend);
-        self.gfx
-            .shapes
-            .polygon(key, points, Colors::Uniform(color), Uvs::None);
+        self.gfx.shapes.polygon(
+            key,
+            points,
+            Colors::Uniform(color.into().to_array()),
+            Uvs::None,
+        );
     }
 
     /// [`Painter::polygon`] with one colour per point, interpolated across the polygon.
     /// Draws nothing unless `colors.len() == points.len()` (a debug-build panic).
-    pub fn polygon_colored(&mut self, points: &[[f32; 2]], colors: &[[f32; 4]], layer: i16) {
+    pub fn polygon_colored(
+        &mut self,
+        points: &[[f32; 2]],
+        colors: &[[f32; 4]],
+        layer: impl Into<Layer>,
+    ) {
         let key = self.plain(layer, BlendMode::Alpha);
         self.gfx
             .shapes
@@ -277,8 +369,8 @@ impl<'a> Painter<'a> {
         &mut self,
         vertices: &[[f32; 2]],
         indices: &[u32],
-        color: [f32; 4],
-        layer: i16,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
     ) {
         self.triangles_ex(vertices, indices, color, layer, BlendMode::Alpha);
     }
@@ -288,14 +380,18 @@ impl<'a> Painter<'a> {
         &mut self,
         vertices: &[[f32; 2]],
         indices: &[u32],
-        color: [f32; 4],
-        layer: i16,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
         blend: BlendMode,
     ) {
         let key = self.plain(layer, blend);
-        self.gfx
-            .shapes
-            .triangles(key, vertices, Colors::Uniform(color), Uvs::None, indices);
+        self.gfx.shapes.triangles(
+            key,
+            vertices,
+            Colors::Uniform(color.into().to_array()),
+            Uvs::None,
+            indices,
+        );
     }
 
     /// [`Painter::triangles`] with one colour per vertex, interpolated across each triangle.
@@ -305,7 +401,7 @@ impl<'a> Painter<'a> {
         vertices: &[[f32; 2]],
         indices: &[u32],
         colors: &[[f32; 4]],
-        layer: i16,
+        layer: impl Into<Layer>,
     ) {
         let key = self.plain(layer, BlendMode::Alpha);
         self.gfx
@@ -326,26 +422,26 @@ impl<'a> Painter<'a> {
         vertices: &[[f32; 2]],
         uvs: &[[f32; 2]],
         indices: &[u32],
-        color: [f32; 4],
-        layer: i16,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
         blend: BlendMode,
     ) {
         let key = ShapeKey {
-            layer,
+            layer: layer.into().0,
             blend,
             texture: tex,
         };
         self.gfx.shapes.triangles(
             key,
             vertices,
-            Colors::Uniform(color),
+            Colors::Uniform(color.into().to_array()),
             Uvs::Affine(uvs),
             indices,
         );
     }
 
     /// Filled disk (layer 0).
-    pub fn circle(&mut self, center: [f32; 2], radius: f32, color: [f32; 4]) {
+    pub fn circle(&mut self, center: [f32; 2], radius: f32, color: impl Into<Color>) {
         self.circle_ex(center, radius, 0.0, color, 0);
     }
 
@@ -355,7 +451,7 @@ impl<'a> Painter<'a> {
         center: [f32; 2],
         radius: f32,
         thickness: f32,
-        color: [f32; 4],
+        color: impl Into<Color>,
     ) {
         self.circle_ex(center, radius, thickness.max(1.0), color, 0);
     }
@@ -367,30 +463,63 @@ impl<'a> Painter<'a> {
         center: [f32; 2],
         radius: f32,
         thickness: f32,
-        color: [f32; 4],
-        layer: i16,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
     ) {
         self.gfx.primitives.push(
-            layer,
+            layer.into().0,
             CircleInstance {
                 center,
                 radius,
                 thickness,
-                color,
+                color: color.into().to_array(),
             },
         );
     }
 
-    /// Draw text. Text always renders on top of sprites and circles (it is not layered).
-    pub fn text(&mut self, pos: [f32; 2], s: &str, size_px: f32, color: [f32; 4]) {
-        self.gfx.text.queue(s, pos, size_px, color);
+    /// Draw text with its top-left corner at `pos`, `size_px` pixels high. Text drawn this way
+    /// renders on top of every layer; use [`Painter::text_ex`] to put it on one. Positions
+    /// are screen pixels: text doesn't follow the 2D camera.
+    pub fn text(&mut self, pos: [f32; 2], s: &str, size_px: f32, color: impl Into<Color>) {
+        self.gfx
+            .text
+            .queue(s, pos, size_px, color.into().to_array(), None);
+    }
+
+    /// [`Painter::text`] on an explicit layer, sorted with the other 2D content: it covers
+    /// lower layers and is covered by higher ones. Within its layer, text draws on top of the
+    /// layer's sprites, shapes and circles. Use it for a fade or pause overlay over the HUD,
+    /// or a dialog box over labels.
+    pub fn text_ex(
+        &mut self,
+        pos: [f32; 2],
+        s: &str,
+        size_px: f32,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
+    ) {
+        self.gfx.text.queue(
+            s,
+            pos,
+            size_px,
+            color.into().to_array(),
+            Some(layer.into().0),
+        );
+    }
+
+    /// Size `[width, height]` in pixels that `s` takes up when drawn with
+    /// [`Painter::text`] at `size_px`, for centering or right-aligning it, or sizing a box
+    /// to fit. Same as [`Graphics::measure_text`].
+    pub fn measure_text(&mut self, s: &str, size_px: f32) -> [f32; 2] {
+        self.gfx.measure_text(s, size_px)
     }
 
     /// Draw an instance of a 3D `mesh` with the given column-major `model` transform and
     /// tint. Meshes are depth-tested against [`crate::Graphics::camera3d`] and render under
     /// all 2D content.
-    pub fn mesh(&mut self, mesh: MeshId, model: Mat4, color: [f32; 4]) {
-        self.gfx.draw_mesh(mesh, MeshInstance::new(model, color));
+    pub fn mesh(&mut self, mesh: MeshId, model: Mat4, color: impl Into<Color>) {
+        self.gfx
+            .draw_mesh(mesh, MeshInstance::new(model, color.into().to_array()));
     }
 
     /// Draw vector graphics with vello (feature `vector`). The closure receives the frame's

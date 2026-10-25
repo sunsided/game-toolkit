@@ -80,8 +80,9 @@ per-`Context` RNG (`ctx.rng`); a fixed seed reproduces a run.
 ## Drawing
 
 In `render`, `frame.painter(&mut ctx.gfx)` returns a `Painter`; it queues draw calls and
-flushes them when it drops. Positions are pixels from the top-left, colors `[r, g, b, a]` in
-`0.0..=1.0`.
+flushes them when it drops. Positions are pixels from the top-left. Colors are a `Color`
+(`Color::hex(0xff8800)`, `Color::WHITE.with_alpha(0.5)`) or an `[r, g, b, a]` array in
+`0.0..=1.0`; layers are a `Layer` (`const HUD: Layer = Layer(3);`) or a plain integer.
 
 | Call | Draws |
 |------|-------|
@@ -91,14 +92,16 @@ flushes them when it drops. Positions are pixels from the top-left, colors `[r, 
 | `rect`, `rect_outline`, `line` (+ `_ex` with layer and blend) | untextured rectangles and lines |
 | `circle`, `circle_outline`, `circle_ex` | SDF circles and rings |
 | `quad`, `polygon`, `triangles` (+ `_colored`, `_ex`, `_textured`) | filled convex shapes, gradients, perspective-textured quads |
-| `text(pos, s, size_px, color)` | text, on top of everything |
+| `text(pos, s, size_px, color)`, `text_ex(.., layer)` | text on top of everything, or sorted with a layer |
+| `measure_text(s, size_px)` | a string's `[width, height]`, for aligning or sizing a box |
+| `draw_sprite(..)`, `draw_rect(..)`, `draw_text(..)` | builders for draws with options: `.region(..)`, `.flip_x()`, `.layer(..)`, `.blend(..)`, `.align(..)`, …; queued when dropped |
 | `mesh(mesh, model, color)` | a 3D mesh, depth-tested under all 2D content |
 
 **Draw order.** Lower layers draw under higher ones; the calls without a layer argument use
 layer 0. Within a layer: sprites and rects/lines first (grouped by blend mode, then texture;
-untextured shapes sort *under* textured sprites), then filled shapes, then circles. Call order
-only holds within one such group, so put a HUD rect over a sprite scene on a higher layer with
-`rect_ex` rather than relying on call order. The [`Painter`
+untextured shapes sort *under* textured sprites), then filled shapes, then circles, then
+layered text. Call order only holds within one such group, so put a HUD rect over a sprite
+scene on a higher layer with `rect_ex` rather than relying on call order. The [`Painter`
 docs](https://docs.rs/game-toolkit-gfx/latest/game_toolkit_gfx/struct.Painter.html) and the
 [guide](https://docs.rs/game-toolkit/latest/game_toolkit/guide/) have the details.
 

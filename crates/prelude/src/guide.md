@@ -50,7 +50,10 @@ at `None`: the world runs its own fixed phases (see the `game-toolkit-ecs` docs)
 ## Drawing: the Painter
 
 In `render`, get a `Painter` for the frame, then issue draw calls. The painter flushes on drop.
-All positions are pixels (top-left origin); colors are `[r, g, b, a]` in `0.0..=1.0`.
+All positions are pixels (top-left origin). Colors are `impl Into<Color>`: a `Color`
+(`Color::WHITE`, `Color::hex(0xff8800)`, `Color::rgb8(..)`, `.with_alpha(0.5)`, `.lerp(..)`) or
+an `[r, g, b, a]` array in `0.0..=1.0`. Layers are `impl Into<Layer>`: a bare integer or a named
+`const HUD: Layer = Layer(3);`.
 
 ```rust,ignore
 let mut p = frame.painter(&mut ctx.gfx);
@@ -62,13 +65,29 @@ p.quad([a, b, c, d], color, layer);       // filled convex quad; also polygon(&p
 p.triangles(&verts, &indices, color, layer); // raw filled triangle list
 // gradients: quad_colored(points, [c0, c1, c2, c3], layer), polygon_colored, triangles_colored
 // blend modes: quad_ex / polygon_ex / triangles_ex(..., layer, BlendMode::Additive)
-// textured, perspective-correct (road segments, mode-7 floors; UVs clamp to 0..1):
+// textured, perspective-correct (road segments, mode-7 floors). UVs past 0..1 clamp, or
+// tile after ctx.gfx.set_texture_wrap(tex, TextureWrap::Repeat) (keep atlases on Clamp):
 p.quad_textured(tex, [a, b, c, d], [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], color, layer, BlendMode::Alpha);
-p.text(pos, "hi", 24.0, color);           // text always draws on top
+p.text(pos, "hi", 24.0, color);           // unlayered: on top of everything
+p.text_ex(pos, "hi", 24.0, color, layer); // layered: covered by higher layers (pause overlay)
+let [w, h] = p.measure_text("hi", 24.0);  // also ctx.gfx.measure_text, outside render
 p.sprite(tex, pos, size);                 // tex: TextureId from ctx.load_texture(...)
 p.sprite_region(tex, src_pos, src_size, pos, size); // pixel rect of an atlas
 p.mesh(mesh, model, color);               // 3D, depth-tested under all 2D content
 ```
+
+Builders for draws with several options; each queues its draw when dropped, at the end
+of the statement:
+
+```rust,ignore
+p.draw_sprite(tex, pos, size).region(src_pos, src_size).layer(CARS).flip_x_if(facing_left);
+p.draw_rect(pos, size).color(Color::BLACK.with_alpha(0.6)).layer(Layer::TOP); // .outline(2.0)
+p.draw_text([w / 2.0, 20.0], "PAUSED").size(48.0).align(Align::Center).layer(HUD);
+```
+
+Sprite builder: `region` (pixels), `uv`, `color`, `rotation`, `flip_x` / `flip_y` /
+`flip_x_if(bool)`, `layer`, `blend`. Text builder: `size` (default 16), `color`, `align`
+(`Left` / `Center` / `Right`, around `pos.x`), `layer` (default: unlayered).
 
 Lower-level variants take an explicit layer: `sprite_ex(tex, SpriteInstance, layer, BlendMode)`,
 `rect_ex(pos, size, color, layer, BlendMode)` (also `rect_outline_ex`, `line_ex`),
@@ -79,13 +98,14 @@ Draw order: lower layers draw under higher ones. Within one layer, call order ho
 draws with the same blend mode and texture, and untextured shapes (`rect`, `line`) sort under
 textured sprites. Filled shapes (`quad*`, `polygon*`, `triangles*`) draw above a layer's
 sprites and rects and below its circles, grouped by blend mode and texture like sprites; plain
-alpha-blended shapes on one layer keep call order. To draw a HUD rect over a sprite scene, give it a higher layer with `rect_ex`
-instead of relying on call order.
+alpha-blended shapes on one layer keep call order. Layered text (`text_ex`, or `draw_text`
+with `.layer`) draws last within its layer; `p.text` draws above every layer. To draw a HUD
+rect over a sprite scene, give it a higher layer with `rect_ex` instead of relying on call
+order. Text positions are screen pixels: text doesn't follow the 2D camera.
 
-Atlas sprites with a layer or mirroring: `ctx.gfx.texture_size(tex)` (or `p.texture_size(tex)`)
-gives the pixel size, then
-`SpriteInstance::at(pos, size).with_region(src_pos, src_size, tex_size).flip_x()` into
-`sprite_ex`. `flip_x` / `flip_y` work on any UV range.
+Atlas sprites with a layer or mirroring: `p.draw_sprite(..).region(..)` above, or
+`SpriteInstance::at(pos, size).with_pixel_region(src_pos, src_size).flip_x()` into `sprite_ex`
+(the painter looks the texture size up). `flip_x` / `flip_y` work on any UV range.
 
 ## Input
 
@@ -225,7 +245,9 @@ What's different on the web:
 
 - **Assets are preloaded.** Before `init`, the toolkit fetches every file listed in
   `assets/manifest.txt`; `task web` / `task web:build` regenerate it (`task assets:manifest`).
-  A file missing from the manifest fails to load at runtime.
+  A file missing from the manifest fails to load at runtime. Native debug builds warn
+  (`asset ... is not listed in .../manifest.txt`) when the game loads a file the manifest
+  doesn't list, so watch the log after adding assets.
 - **No filesystem paths.** Load through `ctx.load_texture` / `ctx.load_sound` /
   `ctx.load_aseprite` / `ctx.assets.read`, not `std::fs` or the path-taking `ctx.gfx.load_texture`
   (native only).
