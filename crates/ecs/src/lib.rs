@@ -2,15 +2,15 @@
 //! generated archetype ECS - with game-toolkit.
 //!
 //! sillyecs is a **build-time code generator**: a game describes its components, archetypes,
-//! phases and systems in an `ecs.yaml`, runs sillyecs from its own `build.rs`, and
-//! `include!`s the generated `*_gen.rs` files. Because the `World`/component/system types are
+//! phases and systems in an `ecs.yaml`, runs sillyecs from its own `build.rs`, and includes
+//! the generated code with `sillyecs::include_ecs!()`. Because the `World`/component/system types are
 //! generated per game, this crate cannot wrap them generically - it only provides the small,
 //! reusable pieces that every sillyecs game needs anyway:
 //!
 //! - [`Vec2`] - a plain 2D vector to alias as component data (`type PositionData = Vec2;`).
-//! - [`ChannelQueue`] - an mpsc-backed command queue, and [`channel_queue_impls!`] to implement
-//!   the generated `WorldUserCommand` / `WorldCommandSender` / `WorldCommandReceiver` traits
-//!   on it in one line.
+//! - [`ChannelQueue`] - an mpsc-backed command queue. It implements sillyecs'
+//!   [`CommandSender`](sillyecs::CommandSender) / [`CommandReceiver`](sillyecs::CommandReceiver)
+//!   for any command type, so `ChannelQueue<WorldCommand<U>>` is a world command queue as is.
 //!
 //! Drive the generated world from the toolkit loop by calling `world.apply_system_phases()`
 //! in `Game::update` and reading components back in `Game::render`. See `examples/11_ecs` for
@@ -22,13 +22,13 @@
 //!
 //! ```toml
 //! [dependencies]
-//! sillyecs = "0.1"
+//! sillyecs = "0.2"
 //!
 //! [target.'cfg(target_arch = "wasm32")'.dependencies]
-//! sillyecs = { version = "0.1", features = ["wasm"] }
+//! sillyecs = { version = "0.2", features = ["wasm"] }
 //!
 //! [build-dependencies]
-//! sillyecs-build = "0.1"
+//! sillyecs-build = "0.2"
 //! ```
 //!
 //! # Timing
@@ -93,9 +93,15 @@ impl From<Vec2> for [f32; 2] {
 
 /// An mpsc-backed, single-threaded command queue for a sillyecs world.
 ///
-/// sillyecs generates `WorldUserCommand`, `WorldCommandSender` and `WorldCommandReceiver`
-/// traits (and a `WorldCommand<U>` type) per game, so this crate can't implement them itself.
-/// [`channel_queue_impls!`] writes the impls in the game crate.
+/// It implements [`CommandSender`](sillyecs::CommandSender) and
+/// [`CommandReceiver`](sillyecs::CommandReceiver) for any command type, and sillyecs implements
+/// its generated `WorldCommandSender` / `WorldCommandReceiver` for those, so a world takes it
+/// as is:
+///
+/// ```ignore
+/// type World = MainWorld<NoOpPhaseEvents, ChannelQueue<WorldCommand<MyUserCommand>>>;
+/// let world = World::new(&factory, ChannelQueue::new());
+/// ```
 pub struct ChannelQueue<C> {
     sender: Sender<C>,
     receiver: Receiver<C>,
@@ -128,101 +134,39 @@ impl<C> Default for ChannelQueue<C> {
     }
 }
 
-/// Implement sillyecs' generated command-queue traits on [`ChannelQueue`].
-///
-/// Invoke it in the game crate, after `include!`-ing the generated `world_gen.rs` (the traits
-/// must be in scope). Pass the game's user-command type, the `U` in `WorldCommand<U>`; the
-/// queue then carries `WorldCommand<U>`:
-///
-/// ```ignore
-/// include!(concat!(env!("OUT_DIR"), "/world_gen.rs"));
-///
-/// // No game-specific commands:
-/// channel_queue_impls!(user = std::convert::Infallible);
-/// let queue: ChannelQueue<WorldCommand<std::convert::Infallible>> = ChannelQueue::new();
-/// ```
-///
-/// If the command type goes by another name (an alias, or a different generated name), pass
-/// it first: `channel_queue_impls!(MyCommand, user = MyUserCommand);`.
-///
-/// This expands to:
-///
-/// ```ignore
-/// impl WorldUserCommand for ChannelQueue<WorldCommand<U>> {
-///     type UserCommand = U;
-/// }
-/// impl WorldCommandSender for ChannelQueue<WorldCommand<U>> {
-///     type Error = std::sync::mpsc::SendError<WorldCommand<U>>;
-///     fn send(&self, command: WorldCommand<U>) -> Result<(), Self::Error> {
-///         ChannelQueue::send(self, command)
-///     }
-/// }
-/// impl WorldCommandReceiver for ChannelQueue<WorldCommand<U>> {
-///     type Error = std::sync::mpsc::TryRecvError;
-///     fn recv(&self) -> Result<Option<WorldCommand<U>>, Self::Error> {
-///         ChannelQueue::try_recv(self)
-///     }
-/// }
-/// ```
-#[macro_export]
-macro_rules! channel_queue_impls {
-    (user = $user:ty $(,)?) => {
-        $crate::channel_queue_impls!(WorldCommand<$user>, user = $user);
-    };
-    ($command:ty, user = $user:ty $(,)?) => {
-        impl WorldUserCommand for $crate::ChannelQueue<$command> {
-            type UserCommand = $user;
-        }
-        impl WorldCommandSender for $crate::ChannelQueue<$command> {
-            type Error = ::std::sync::mpsc::SendError<$command>;
-            fn send(&self, command: $command) -> ::core::result::Result<(), Self::Error> {
-                $crate::ChannelQueue::send(self, command)
-            }
-        }
-        impl WorldCommandReceiver for $crate::ChannelQueue<$command> {
-            type Error = ::std::sync::mpsc::TryRecvError;
-            fn recv(
-                &self,
-            ) -> ::core::result::Result<::core::option::Option<$command>, Self::Error> {
-                $crate::ChannelQueue::try_recv(self)
-            }
-        }
-    };
+impl<C> sillyecs::CommandSender for ChannelQueue<C> {
+    type Command = C;
+    type Error = SendError<C>;
+
+    fn send(&self, command: C) -> Result<(), Self::Error> {
+        Self::send(self, command)
+    }
+}
+
+impl<C> sillyecs::CommandReceiver for ChannelQueue<C> {
+    type Command = C;
+    type Error = TryRecvError;
+
+    fn recv(&self) -> Result<Option<C>, Self::Error> {
+        self.try_recv()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // Stand-ins for the traits and command type sillyecs generates per game.
-    mod generated {
-        pub struct WorldCommand<U>(pub U);
-        pub trait WorldUserCommand {
-            type UserCommand;
-        }
-        pub trait WorldCommandSender {
-            type Error;
-            fn send(&self, command: WorldCommand<u8>) -> Result<(), Self::Error>;
-        }
-        pub trait WorldCommandReceiver {
-            type Error;
-            fn recv(&self) -> Result<Option<WorldCommand<u8>>, Self::Error>;
-        }
-
-        crate::channel_queue_impls!(user = u8);
-    }
-
     #[test]
-    fn channel_queue_impls_forward_to_the_queue() {
-        use generated::{WorldCommand, WorldCommandReceiver, WorldCommandSender, WorldUserCommand};
-        type User = <ChannelQueue<WorldCommand<u8>> as WorldUserCommand>::UserCommand;
-        let q: ChannelQueue<WorldCommand<User>> = ChannelQueue::new();
-        WorldCommandSender::send(&q, WorldCommand(3)).unwrap();
-        assert_eq!(
-            WorldCommandReceiver::recv(&q).unwrap().map(|c| c.0),
-            Some(3)
-        );
-        assert!(WorldCommandReceiver::recv(&q).unwrap().is_none());
+    fn channel_queue_implements_the_sillyecs_traits() {
+        fn roundtrip<Q>(q: &Q)
+        where
+            Q: sillyecs::CommandSender<Command = u32> + sillyecs::CommandReceiver<Command = u32>,
+        {
+            sillyecs::CommandSender::send(q, 3).unwrap();
+            assert_eq!(sillyecs::CommandReceiver::recv(q).unwrap(), Some(3));
+            assert_eq!(sillyecs::CommandReceiver::recv(q).unwrap(), None);
+        }
+        roundtrip(&ChannelQueue::new());
     }
 
     #[test]

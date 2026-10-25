@@ -225,7 +225,7 @@ All optional features and what they add to the prelude:
 |---------|------|-----|
 | `ui` | `Ui`, `egui` | egui debug overlays |
 | `aseprite` | `SpriteSheet`, `AnimationPlayer`, `Animation`, `Direction`, `FrameRect`, `LoadAseprite` (`ctx.load_aseprite(p)`) | load `.aseprite` / exported sheets + play tagged animations |
-| `ecs` | `ChannelQueue`, `channel_queue_impls!`, `Vec2` (sillyecs glue) | archetype ECS |
+| `ecs` | `ChannelQueue`, `Vec2` (sillyecs glue) | archetype ECS |
 | `synth` | `Synth`, `synthie` | chiptune / procedural audio |
 | `vector` | `vello` | high-quality 2D vector graphics (WebGPU only: skipped on WebGL2) |
 

@@ -44,7 +44,7 @@ pub mod prelude {
     pub use game_toolkit_audio::{Synth, synthie};
 
     #[cfg(feature = "ecs")]
-    pub use game_toolkit_ecs::{self, ChannelQueue, Vec2, channel_queue_impls};
+    pub use game_toolkit_ecs::{self, ChannelQueue, Vec2};
 
     #[cfg(feature = "vector")]
     pub use game_toolkit_gfx::vello;

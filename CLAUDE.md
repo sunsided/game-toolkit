@@ -51,7 +51,8 @@ finishes in `user_event`), and assets are preloaded from `assets/manifest.txt` b
   the workspace on the toolchain named by `rust-version` in the root `Cargo.toml`. Bump the two
   together (`dtolnay/rust-toolchain@<msrv>` in `.github/workflows/ci.yml`).
 - Workspace lints (`[workspace.lints]`) are `warn`-level but `-D warnings` makes them a hard
-  gate. sillyecs-generated code in `examples/11_ecs` opts out via a crate-level `allow`.
+  gate. sillyecs-generated code (`examples/11_ecs`) carries its own lint allows, so it needs
+  none from us.
 - Docs build under `RUSTDOCFLAGS=-D warnings` (`cargo doc --workspace --no-deps`) - broken
   intra-doc links fail CI before docs.rs sees them.
 - `Cargo.lock` is committed for reproducible CI; CI builds `--locked`.
