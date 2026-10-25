@@ -6,23 +6,6 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-### Changed
-
-- **Colors are sRGB everywhere.** Sprite tints, rects, lines, filled shapes, circles, mesh
-  tints and the clear color used to reach the sRGB surface as linear values, so they showed
-  lighter than written (and lighter than text in the same color). They are now decoded from
-  sRGB in the shaders, so `[0.5, 0.5, 0.5, 1.0]` or `Color::hex(0x808080)` shows as `#808080`
-  everywhere. Existing games get darker, more saturated mid-tones; adjust colors tuned by eye
-  to the old look (#58).
-- Frames always render through an sRGB view: on surfaces without an sRGB format (WebGPU
-  canvases) the sRGB variant is used as a view format, so textures, text and colors look the
-  same as natively. `Graphics::surface_format` returns that render format.
-
-### Fixed
-
-- vello content was encoded to sRGB twice when composited, so vector colors showed lighter
-  than given; the composite now decodes it first.
-
 ### Added
 
 - `SoundHandle`, a toolkit-owned handle to a playing sound: `set_volume` (linear) /
@@ -78,6 +61,15 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 
+- **Colors are sRGB everywhere.** Sprite tints, rects, lines, filled shapes, circles, mesh
+  tints and the clear color used to reach the sRGB surface as linear values, so they showed
+  lighter than written (and lighter than text in the same color). They are now decoded from
+  sRGB in the shaders, so `[0.5, 0.5, 0.5, 1.0]` or `Color::hex(0x808080)` shows as `#808080`
+  everywhere. Existing games get darker, more saturated mid-tones; adjust colors tuned by eye
+  to the old look (#58).
+- Frames always render through an sRGB view: on surfaces without an sRGB format (WebGPU
+  canvases) the sRGB variant is used as a view format, so textures, text and colors look the
+  same as natively. `Graphics::surface_format` returns that render format.
 - **Breaking:** `Audio::play` and `Audio::play_samples` return `Result<SoundHandle, AudioError>`
   instead of `anyhow::Result<StaticSoundHandle>`. `AudioError::NotStarted` tells "audio not
   started yet" apart from real failures (`UnknownSound`, `Backend`) (#39). `play` and
@@ -95,6 +87,8 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 
+- vello content was encoded to sRGB twice when composited, so vector colors showed lighter
+  than given; the composite now decodes it first.
 - The fixed-timestep accumulator was unbounded: after a long frame the game fast-forwarded
   through every missed step, and could fall into a spiral of death. It is capped at
   `max_frame_time` and reset when the window regains focus. Variable-`dt` games get `dt`
