@@ -670,12 +670,17 @@ fn make_attachments(
     (msaa_view, depth_view)
 }
 
-/// The sRGB format frames are rendered in: the surface's own, or its sRGB view format.
+/// The sRGB format frames are rendered in: the surface's own if it is sRGB, otherwise the
+/// sRGB view format `Graphics::new` added.
 fn render_format(config: &wgpu::SurfaceConfiguration) -> wgpu::TextureFormat {
+    if config.format.is_srgb() {
+        return config.format;
+    }
     config
         .view_formats
-        .first()
+        .iter()
         .copied()
+        .find(wgpu::TextureFormat::is_srgb)
         .unwrap_or(config.format)
 }
 

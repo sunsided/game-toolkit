@@ -48,7 +48,13 @@ impl VectorPass {
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("vector.composite.shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("vector_composite.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                concat!(
+                    include_str!("srgb.wgsl"),
+                    include_str!("vector_composite.wgsl")
+                )
+                .into(),
+            ),
         });
         let composite_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("vector.composite.bgl"),

@@ -64,7 +64,9 @@ impl PrimitiveBatcher {
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("prim.circle.shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("circle.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                concat!(include_str!("srgb.wgsl"), include_str!("circle.wgsl")).into(),
+            ),
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("prim.layout"),

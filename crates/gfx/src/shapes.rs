@@ -293,7 +293,9 @@ impl ShapeBatcher {
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("shape.shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shape.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                concat!(include_str!("srgb.wgsl"), include_str!("shape.wgsl")).into(),
+            ),
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("shape.layout"),
