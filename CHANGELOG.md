@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- The jam agent guide is published as the umbrella crate's `game_toolkit::guide` module on
+  docs.rs, generated from the same source as the templates' `CLAUDE.md` (agent-only sections
+  are left out). The README links it and gains a Drawing section with the `Painter` calls and
+  draw-order rules (#49).
+- The jam templates optimize dependencies in dev builds (`[profile.dev.package."*"]
+  opt-level = 3`); the README and guide recommend it for other projects (#48).
+
+### Changed
+
+- `task sync:templates` / `task check:templates` and CI's sync check run
+  `tools/sync-guide.sh`, which also writes `crates/prelude/src/guide.md`.
+
 ## [0.4.0] - 2026-10-25
 
 ### Added

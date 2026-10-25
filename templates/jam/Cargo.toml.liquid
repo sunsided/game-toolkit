@@ -11,3 +11,9 @@ game-toolkit = { git = "https://github.com/sunsided/game-toolkit", features = ["
 # Native builds log via env_logger; on the web the toolkit logs to the browser console.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
+
+# Optimize dependencies even in dev builds: decoding audio and images and pushing thousands of
+# sprites a frame is painfully slow unoptimized. Your own code still compiles fast and debugs
+# normally; only the dependencies (built once) get optimized.
+[profile.dev.package."*"]
+opt-level = 3

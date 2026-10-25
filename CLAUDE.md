@@ -85,8 +85,12 @@ atlas-packer is in `tools/atlas-packer`.
 copies only the chosen subdir, so each ships its **own** bundled agent doc as `CLAUDE.md`.
 
 - **Source of truth:** `templates/jam-agent-guide.md`. Edit it there.
-- After editing, run **`task sync:templates`** to stamp it into `templates/jam/CLAUDE.md` and
-  `templates/jam-3d/CLAUDE.md` (byte-identical copies).
+- After editing, run **`task sync:templates`** (`tools/sync-guide.sh`) to stamp it into
+  `templates/jam/CLAUDE.md` and `templates/jam-3d/CLAUDE.md`, and into
+  `crates/prelude/src/guide.md`, which docs.rs shows as the `game_toolkit::guide` module.
+- Wrap template- or agent-specific lines in `<!-- agent-only -->` / `<!-- /agent-only -->`
+  (each on its own line): they reach the `CLAUDE.md` copies but not the crate docs. The crate
+  copy also turns its Rust blocks into `rust,ignore` (they are fragments, not doctests).
 - `task check:templates` (folded into `task check`) and a CI step both fail on drift.
 - Keep the guide free of literal `{{` - cargo-generate runs files through liquid templating and
   would choke (the same reason `Taskfile.yaml` is in `cargo-generate.toml`'s `exclude`).

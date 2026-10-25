@@ -62,22 +62,14 @@ tasks:
       - cargo clippy --target wasm32-unknown-unknown --workspace --all-targets --all-features -- -D warnings {{.CLI_ARGS}}
 
   sync:templates:
-    desc: Stamp the canonical jam agent guide into each template as CLAUDE.md
+    desc: Stamp the canonical guide into each template's CLAUDE.md and the umbrella crate's docs
     cmds:
-      - cp templates/jam-agent-guide.md templates/jam/CLAUDE.md
-      - cp templates/jam-agent-guide.md templates/jam-3d/CLAUDE.md
+      - tools/sync-guide.sh
 
   check:templates:
-    desc: Verify each template's bundled CLAUDE.md matches the canonical jam agent guide
+    desc: Verify the templates' CLAUDE.md and crates/prelude/src/guide.md match the canonical guide
     cmds:
-      - |
-        for t in jam jam-3d; do
-          if ! cmp -s templates/jam-agent-guide.md "templates/$t/CLAUDE.md"; then
-            echo "templates/$t/CLAUDE.md is out of sync with templates/jam-agent-guide.md" >&2
-            echo "run: task sync:templates" >&2
-            exit 1
-          fi
-        done
+      - tools/sync-guide.sh --check
 
   test:templates:
     desc: Generate each jam template against this checkout and run fmt --check + clippy on it (needs cargo-generate)
