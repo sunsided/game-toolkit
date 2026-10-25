@@ -8,6 +8,16 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- `SoundHandle`, a toolkit-owned handle to a playing sound: `set_volume` (linear) /
+  `set_volume_db`, `fade_volume` / `fade_volume_db`, `pause`, `resume`, `stop`, `is_playing`,
+  `is_paused`, `is_finished`, and `with_kira` for the underlying kira handle (#38).
+- `Audio::play_with` / `play_samples_with` and `PlayOptions` (`looped`, `volume`, `deferred`),
+  so looping music at a set volume is one call (#38).
+- `PlayOptions::deferred` queues a sound while audio hasn't started (web, before the first user
+  gesture) and starts it once it has; its handle is pending until then (#39).
+- `kira`, `SoundHandle`, `PlayOptions` and `AudioError` are re-exported from the prelude, so
+  games don't need their own `kira` dependency (#51).
+- `examples/07_audio` plays a looping track (M pauses, Up/Down change its volume).
 - `Color` (`rgb` / `rgba` / `rgb8` / `rgba8` / `hex` / `hex_rgba`, named constants,
   `with_alpha`, `lerp`) and `Layer(i16)` (`DEFAULT`, `BOTTOM`, `TOP`). Painter calls take
   `impl Into<Color>` and `impl Into<Layer>`, so existing `[f32; 4]` and integer arguments keep
@@ -29,6 +39,10 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 
+- **Breaking:** `Audio::play` and `Audio::play_samples` return `Result<SoundHandle, AudioError>`
+  instead of `anyhow::Result<StaticSoundHandle>`. `AudioError::NotStarted` tells "audio not
+  started yet" apart from real failures (`UnknownSound`, `Backend`) (#39). `play` and
+  `play_samples` are documented, including the web caveat (#51).
 - `SpriteInstance::with_color` and `Painter::mesh` / `clear` take `impl Into<Color>`.
 - The text atlas is trimmed after each frame, so glyphs no longer drawn free their space.
 
