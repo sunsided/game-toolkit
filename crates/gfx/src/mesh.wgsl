@@ -29,7 +29,7 @@ fn vs_main(in: VsIn) -> VsOut {
     out.clip = camera.view_proj * world;
     // Rotate the normal by the model's upper-left 3x3 (assumes uniform scale).
     out.normal = mat3x3<f32>(in.m0.xyz, in.m1.xyz, in.m2.xyz) * in.normal;
-    out.color = in.color;
+    out.color = vec4<f32>(srgb_to_linear(in.color.rgb), in.color.a);
     return out;
 }
 
@@ -40,4 +40,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let diff = max(dot(n, l), 0.0);
     let lit = 0.25 + 0.75 * diff;
     return vec4<f32>(in.color.rgb * lit, in.color.a);
+}
+
+// Painter colors are sRGB (what a color picker shows); the frame is an sRGB target that
+// expects linear output, so decode them before use.
+fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
+    let lo = c / 12.92;
+    let hi = pow((c + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, c <= vec3<f32>(0.04045));
 }

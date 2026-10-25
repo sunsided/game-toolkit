@@ -115,12 +115,16 @@ impl Graphics {
             .context("request_device")?;
 
         let caps = surface.get_capabilities(&adapter);
-        let format = caps
+        let surface_format = caps
             .formats
             .iter()
             .copied()
             .find(wgpu::TextureFormat::is_srgb)
             .unwrap_or(caps.formats[0]);
+        // Always render through an sRGB view, so shaders write linear color and the hardware
+        // encodes it, the same on every platform. Surfaces without an sRGB format (WebGPU
+        // canvases) still allow the sRGB variant as a view format.
+        let format = surface_format.add_srgb_suffix();
         let present_mode = if vsync {
             wgpu::PresentMode::AutoVsync
         } else {
@@ -136,13 +140,17 @@ impl Graphics {
         };
         let surface_config = wgpu::SurfaceConfiguration {
             usage: surface_usage,
-            format,
+            format: surface_format,
             width,
             height,
             present_mode,
             desired_maximum_frame_latency: 2,
             alpha_mode: caps.alpha_modes[0],
-            view_formats: vec![],
+            view_formats: if format == surface_format {
+                vec![]
+            } else {
+                vec![format]
+            },
             color_space: wgpu::SurfaceColorSpace::Auto,
         };
         surface.configure(&device, &surface_config);
@@ -304,8 +312,10 @@ impl Graphics {
         (self.surface_config.width, self.surface_config.height)
     }
 
+    /// The color format the frame is rendered in: always an sRGB format, possibly a view of a
+    /// non-sRGB surface. Build render pipelines that draw into a [`Frame`] with this.
     pub fn surface_format(&self) -> wgpu::TextureFormat {
-        self.surface_config.format
+        render_format(&self.surface_config)
     }
 
     pub fn device(&self) -> &wgpu::Device {
@@ -460,7 +470,10 @@ impl Graphics {
         };
         let view = surface_texture
             .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+            .create_view(&wgpu::TextureViewDescriptor {
+                format: Some(render_format(&self.surface_config)),
+                ..Default::default()
+            });
         let encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -562,9 +575,10 @@ impl Graphics {
             label: Some("clear.pass"),
             color_attachments: &[Some(targets.color_attachment(wgpu::LoadOp::Clear(
                 wgpu::Color {
-                    r: frame.clear_color[0] as f64,
-                    g: frame.clear_color[1] as f64,
-                    b: frame.clear_color[2] as f64,
+                    // sRGB like every painter color; the clear value is linear.
+                    r: srgb_to_linear(frame.clear_color[0]),
+                    g: srgb_to_linear(frame.clear_color[1]),
+                    b: srgb_to_linear(frame.clear_color[2]),
                     a: frame.clear_color[3] as f64,
                 },
             )))],
@@ -633,7 +647,7 @@ fn make_attachments(
                 mip_level_count: 1,
                 sample_count,
                 dimension: wgpu::TextureDimension::D2,
-                format: config.format,
+                format: render_format(config),
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 view_formats: &[],
             })
@@ -654,4 +668,23 @@ fn make_attachments(
             .create_view(&wgpu::TextureViewDescriptor::default())
     });
     (msaa_view, depth_view)
+}
+
+/// The sRGB format frames are rendered in: the surface's own, or its sRGB view format.
+fn render_format(config: &wgpu::SurfaceConfiguration) -> wgpu::TextureFormat {
+    config
+        .view_formats
+        .first()
+        .copied()
+        .unwrap_or(config.format)
+}
+
+/// Decode one sRGB color component to linear, as the shaders do for painter colors.
+fn srgb_to_linear(c: f32) -> f64 {
+    let c = f64::from(c);
+    if c <= 0.04045 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
 }

@@ -3,12 +3,12 @@
 /// An RGBA colour with components in `0.0..=1.0`.
 ///
 /// Every painter call takes `impl Into<Color>`, so a plain `[r, g, b, a]` array works as well
-/// as a `Color`. The values reach the GPU unchanged, exactly like the arrays did: the 8-bit
-/// and hex constructors divide by 255 and do no colour-space conversion.
+/// as a `Color`.
 ///
-/// The surface is sRGB, so sprites, shapes and circles treat the components as linear and a
-/// `Color::hex` shows lighter on them than in a CSS colour picker, while text treats the
-/// same components as sRGB and matches it.
+/// Components are sRGB, the values a color picker or CSS shows: `Color::hex(0x2a3550)` puts
+/// exactly `#2a3550` on screen, on sprites, shapes, circles, text, meshes and the clear color
+/// alike. The renderer decodes them to linear for blending, so blends and the per-vertex
+/// gradients of filled shapes mix in sRGB, as CSS does.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct Color {
     pub r: f32,

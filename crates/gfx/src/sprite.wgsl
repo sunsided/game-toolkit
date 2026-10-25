@@ -31,7 +31,7 @@ fn vs_main(in: VsIn) -> VsOut {
     var out: VsOut;
     out.clip  = camera.view_proj * vec4<f32>(world, 0.0, 1.0);
     out.uv    = mix(in.i_uv_min, in.i_uv_max, in.v_uv);
-    out.color = in.i_color;
+    out.color = vec4<f32>(srgb_to_linear(in.i_color.rgb), in.i_color.a);
     return out;
 }
 
@@ -41,4 +41,12 @@ fn vs_main(in: VsIn) -> VsOut {
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     return textureSample(t_atlas, s_atlas, in.uv) * in.color;
+}
+
+// Painter colors are sRGB (what a color picker shows); the frame is an sRGB target that
+// expects linear output, so decode them before use.
+fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
+    let lo = c / 12.92;
+    let hi = pow((c + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, c <= vec3<f32>(0.04045));
 }
