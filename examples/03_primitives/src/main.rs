@@ -64,6 +64,57 @@ impl Game for App {
             18.0,
             [1.0, 1.0, 1.0, 1.0],
         );
+
+        // Filled shapes (#28): a road-like trapezoid strip, a hexagon and a raw triangle list.
+        // They interleave by layer too: the trapezoids sit on layer 1, above the layer-0 rect
+        // they overlap, with a layer-2 rect on top of them.
+        let (rx, ry) = (40.0, h - 200.0);
+        p.rect(
+            [rx + 60.0, ry - 20.0],
+            [60.0, 200.0],
+            [0.25, 0.80, 0.45, 1.0],
+        );
+        let road = [[0.30, 0.30, 0.32, 1.0], [0.38, 0.38, 0.40, 1.0]];
+        for row in 0..6 {
+            let (y0, y1) = (ry + row as f32 * 28.0, ry + (row + 1) as f32 * 28.0);
+            let (hw0, hw1) = (20.0 + row as f32 * 14.0, 20.0 + (row + 1) as f32 * 14.0);
+            let cx = rx + 90.0;
+            p.quad(
+                [
+                    [cx - hw0, y0],
+                    [cx + hw0, y0],
+                    [cx + hw1, y1],
+                    [cx - hw1, y1],
+                ],
+                road[row % 2],
+                1,
+            );
+        }
+        p.rect_ex(
+            [rx + 75.0, ry + 60.0],
+            [30.0, 30.0],
+            [0.95, 0.30, 0.30, 1.0],
+            2,
+            BlendMode::Alpha,
+        );
+
+        let (hx, hy, hr) = (w - 150.0, h - 120.0, 60.0);
+        let hexagon: Vec<[f32; 2]> = (0..6)
+            .map(|i| {
+                let a = i as f32 * std::f32::consts::TAU / 6.0 + t * 0.5;
+                [hx + a.cos() * hr, hy + a.sin() * hr]
+            })
+            .collect();
+        p.polygon(&hexagon, [0.6, 0.4, 0.9, 0.8], 0);
+
+        let bowtie = [
+            [cx - 60.0, 40.0],
+            [cx - 60.0, 120.0],
+            [cx, 80.0],
+            [cx + 60.0, 40.0],
+            [cx + 60.0, 120.0],
+        ];
+        p.triangles(&bowtie, &[0, 1, 2, 2, 3, 4], [1.0, 0.85, 0.2, 0.9], 0);
     }
 }
 

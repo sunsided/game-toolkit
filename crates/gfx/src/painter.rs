@@ -11,9 +11,10 @@ use crate::transform::Mat4;
 /// # Draw order
 ///
 /// 2D content is sorted by layer: lower layers draw under higher ones, across sprites,
-/// shapes and circles. Within a layer, sprites and shapes (`sprite*`, `rect*`, `line*`) draw
-/// first, grouped by [`BlendMode`] and then by texture; circles draw on top of them. Call
-/// order is kept only between draws that share layer, blend mode and texture.
+/// shapes and circles. Within a layer, sprites and sprite-based shapes (`sprite*`, `rect*`,
+/// `line*`) draw first, grouped by [`BlendMode`] and then by texture; call order is kept only
+/// between those draws that share layer, blend mode and texture. Filled shapes (`quad`,
+/// `polygon`, `triangles`) draw next, in call order; circles draw on top.
 ///
 /// Untextured shapes (`rect*`, `line*`) use the internal white texture, which sorts before
 /// every loaded texture. So on the same layer and blend mode, a `rect` lands *under* a
@@ -166,6 +167,32 @@ impl<'a> Painter<'a> {
             _pad: [0.0; 3],
         };
         self.gfx.sprites.draw(tex, layer, blend, inst);
+    }
+
+    /// Filled convex quad through `points` (in order, either winding), alpha-blended. Lands
+    /// above this layer's sprites and rects and below its circles; see [`Painter`].
+    pub fn quad(&mut self, points: [[f32; 2]; 4], color: [f32; 4], layer: i16) {
+        self.gfx.shapes.polygon(layer, &points, color);
+    }
+
+    /// Filled convex polygon through `points` (in order, either winding), fan-triangulated
+    /// from the first point and alpha-blended. Fewer than three points draw nothing. A
+    /// concave polygon would draw wrong; split it or use [`Painter::triangles`].
+    pub fn polygon(&mut self, points: &[[f32; 2]], color: [f32; 4], layer: i16) {
+        self.gfx.shapes.polygon(layer, points, color);
+    }
+
+    /// Filled triangle list: every three `indices` into `vertices` make one triangle,
+    /// alpha-blended. Draws nothing if an index is out of range or `indices.len()` is not a
+    /// multiple of three (a debug-build panic).
+    pub fn triangles(
+        &mut self,
+        vertices: &[[f32; 2]],
+        indices: &[u32],
+        color: [f32; 4],
+        layer: i16,
+    ) {
+        self.gfx.shapes.triangles(layer, vertices, indices, color);
     }
 
     /// Filled disk (layer 0).
