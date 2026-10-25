@@ -6,6 +6,34 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `AppConfig::max_frame_time` (default 250 ms) caps the time one frame advances the game (#45).
+- `Time::alpha`: with a fixed timestep, how far the frame is into the next step, for
+  interpolating motion in `render` (#45).
+- `channel_queue_impls!` implements sillyecs' generated `WorldUserCommand` /
+  `WorldCommandSender` / `WorldCommandReceiver` traits on `ChannelQueue` in one line; in the
+  prelude with the `ecs` feature (#43).
+
+### Changed
+
+- sillyecs 0.1. The `game-toolkit-ecs` docs ask for `sillyecs = "0.1"` and its `wasm` feature
+  on the web (#44), and explain how sillyecs' fixed phases relate to `fixed_timestep`, and
+  resetting the world's clock after a gap (#50). `examples/11_ecs` does that reset, and uses
+  `channel_queue_impls!`.
+- `AppConfig::fixed_timestep` documents that `update` may run zero or several times per frame
+  and that `render` runs once (#50).
+
+### Fixed
+
+- The fixed-timestep accumulator was unbounded: after a long frame the game fast-forwarded
+  through every missed step, and could fall into a spiral of death. It is capped at
+  `max_frame_time` and reset when the window regains focus. Variable-`dt` games get `dt`
+  capped the same way (#45).
+- With a fixed timestep, frames that ran no `update` cleared input edges anyway, so key and
+  button presses were lost when the display rate was above the step rate. Edges now reach
+  the first `update` after they happen, and only once.
+
 ## [0.4.0] - 2026-10-25
 
 ### Added

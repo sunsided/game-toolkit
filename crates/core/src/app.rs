@@ -20,8 +20,25 @@ pub struct AppConfig {
     pub width: u32,
     pub height: u32,
     pub vsync: bool,
-    /// `Some(d)` for deterministic fixed-step `update`; `None` for variable `dt`.
+    /// `Some(step)` calls `update` with a fixed `dt` of `step`: zero, one or several times per
+    /// frame, as many as the real time elapsed allows. `None` (default) calls it once per
+    /// frame with the frame's `dt`. Either way `render` runs once per frame; with a fixed
+    /// step, [`Time::alpha`](crate::Time::alpha) says how far the frame is into the next step,
+    /// for interpolating motion between steps.
+    ///
+    /// Leave this `None` if the game steps a simulation itself, e.g. a sillyecs world whose
+    /// `apply_system_phases` runs its own fixed phases from real time; otherwise those fixed
+    /// phases nest inside the toolkit's steps.
+    ///
+    /// Input edges (`key_pressed`, `mouse_delta`, ...) are seen by the first `update` of a
+    /// frame and carried over to the next frame when no step ran, so presses aren't dropped.
     pub fixed_timestep: Option<Duration>,
+    /// Upper bound on the time one frame advances the game (default 250 ms). After a long
+    /// frame - the window was dragged, the tab was in the background, a breakpoint hit - the
+    /// game slows down for that frame instead of fast-forwarding through the gap: `dt` is
+    /// capped at this, and with a fixed timestep at most `max_frame_time / step` updates run.
+    /// [`Time::delta`](crate::Time::delta) still reports the real frame time.
+    pub max_frame_time: Duration,
     /// Asset root directory. Defaults to `./assets`. On the web it is a URL path relative to
     /// the page, and the files listed in its `manifest.txt` are fetched before `Game::init`.
     pub asset_root: std::path::PathBuf,
@@ -49,6 +66,7 @@ impl Default for AppConfig {
             height: 720,
             vsync: true,
             fixed_timestep: None,
+            max_frame_time: Duration::from_millis(250),
             asset_root: std::path::PathBuf::from("assets"),
             web_preload: None,
             canvas_id: None,
@@ -184,6 +202,10 @@ impl<G: Game> ApplicationHandler<InitDone> for AppRunner<G> {
                 );
             }
             WindowEvent::Focused(focused) => {
+                if focused {
+                    // Don't replay time accumulated while the window was in the background.
+                    self.accumulator = Duration::ZERO;
+                }
                 state
                     .ctx
                     .input
@@ -213,6 +235,14 @@ impl<G: Game> ApplicationHandler<InitDone> for AppRunner<G> {
             state.game.shutdown(&mut state.ctx);
         }
     }
+}
+
+/// How far `accumulator` is into the next fixed `step`, in `0.0..1.0`.
+fn alpha(accumulator: Duration, step: Duration) -> f32 {
+    if step.is_zero() {
+        return 0.0;
+    }
+    (accumulator.as_secs_f64() / step.as_secs_f64()).clamp(0.0, 1.0) as f32
 }
 
 fn is_user_gesture(event: &WindowEvent) -> bool {
@@ -266,17 +296,26 @@ impl<G: Game> AppRunner<G> {
         state.ctx.time.tick();
         state.ctx.input.poll_gamepads();
 
+        let delta = state.ctx.time.delta.min(self.config.max_frame_time);
         match self.config.fixed_timestep {
             Some(step) => {
-                self.accumulator += state.ctx.time.delta;
+                self.accumulator += delta;
+                let mut updated = false;
                 while self.accumulator >= step {
                     state.game.update(&mut state.ctx, step.as_secs_f32());
                     self.accumulator -= step;
+                    // Edges belong to the first step; later steps this frame shouldn't see
+                    // the same press again. With no step at all they wait for the next frame.
+                    if !updated {
+                        state.ctx.input.end_frame();
+                        updated = true;
+                    }
                 }
+                state.ctx.time.alpha = alpha(self.accumulator, step);
             }
             None => {
-                let dt = state.ctx.time.delta.as_secs_f32();
-                state.game.update(&mut state.ctx, dt);
+                state.game.update(&mut state.ctx, delta.as_secs_f32());
+                state.ctx.input.end_frame();
             }
         }
 
@@ -284,8 +323,6 @@ impl<G: Game> AppRunner<G> {
             event_loop.exit();
             return;
         }
-
-        state.ctx.input.end_frame();
 
         match state.ctx.gfx.begin_frame() {
             Ok(mut frame) => {
@@ -298,5 +335,18 @@ impl<G: Game> AppRunner<G> {
                 state.ctx.gfx.resize(w, h);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn alpha_is_fraction_of_step() {
+        let step = Duration::from_millis(10);
+        assert_eq!(alpha(Duration::ZERO, step), 0.0);
+        assert!((alpha(Duration::from_millis(5), step) - 0.5).abs() < 1e-6);
+        assert_eq!(alpha(Duration::from_millis(5), Duration::ZERO), 0.0);
     }
 }
