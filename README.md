@@ -273,7 +273,9 @@ one. Differences from native:
 - **Assets are preloaded.** The browser can only fetch asynchronously, so before `Game::init`
   the toolkit fetches every file listed in `assets/manifest.txt` (one path per line;
   `task assets:manifest` regenerates it) or in `AppConfig::web_preload`. After that,
-  `ctx.load_*` and `ctx.assets.read` work synchronously as usual. The path-taking
+  `ctx.load_*` and `ctx.assets.read` work synchronously as usual. Native debug builds read
+  the manifest too and log a warning when a loaded file isn't listed, so a forgotten entry
+  shows up before the web build breaks. The path-taking
   `Graphics::load_texture` / `Audio::load_sound` are native-only; use the `*_bytes` variants or
   the `ctx.load_*` helpers.
 - **Audio starts on the first key press, click or touch** (browsers block audio before a user

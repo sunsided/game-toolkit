@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow, bail};
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
-use crate::{Assets, MANIFEST_FILE};
+use crate::{Assets, MANIFEST_FILE, parse_manifest};
 
 impl Assets {
     /// Fetch every path in `paths` (relative to the asset root) into memory, so later
@@ -46,12 +46,7 @@ impl Assets {
             }
         };
         let text = String::from_utf8(bytes).map_err(|e| anyhow!("{url} is not UTF-8: {e}"))?;
-        Ok(text
-            .lines()
-            .map(str::trim)
-            .filter(|l| !l.is_empty() && !l.starts_with('#'))
-            .map(str::to_owned)
-            .collect())
+        Ok(parse_manifest(&text))
     }
 
     fn url(&self, rel: &str) -> String {

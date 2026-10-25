@@ -6,20 +6,58 @@ use anyhow::{Context, Result};
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TextureId(pub u32);
 
+/// What a texture shows for UVs outside `0..1`. Set per texture with
+/// [`crate::Graphics::set_texture_wrap`].
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub enum TextureWrap {
+    /// Repeat the edge texels (default). Right for sprites and atlas regions, which sample up
+    /// to their edges and would bleed in the opposite edge with wrapping.
+    #[default]
+    Clamp,
+    /// Tile the texture: a UV of `2.5` samples the same texel as `0.5`.
+    Repeat,
+    /// Tile, mirroring every other repetition so the seams match.
+    MirrorRepeat,
+}
+
+impl TextureWrap {
+    const ALL: [Self; 3] = [Self::Clamp, Self::Repeat, Self::MirrorRepeat];
+
+    fn address_mode(self) -> wgpu::AddressMode {
+        match self {
+            Self::Clamp => wgpu::AddressMode::ClampToEdge,
+            Self::Repeat => wgpu::AddressMode::Repeat,
+            Self::MirrorRepeat => wgpu::AddressMode::MirrorRepeat,
+        }
+    }
+
+    /// Position in [`TextureWrap::ALL`] and the registry's sampler array.
+    fn index(self) -> usize {
+        match self {
+            Self::Clamp => 0,
+            Self::Repeat => 1,
+            Self::MirrorRepeat => 2,
+        }
+    }
+}
+
 pub struct Texture {
     pub size: [u32; 2],
     pub(crate) bind_group: wgpu::BindGroup,
     #[allow(dead_code)]
     pub(crate) texture: wgpu::Texture,
-    #[allow(dead_code)]
     pub(crate) view: wgpu::TextureView,
+    pub(crate) wrap: TextureWrap,
+    /// Debug label, reapplied when the bind group is rebuilt for a new wrap mode.
+    pub(crate) label: Option<String>,
 }
 
 pub(crate) struct TextureRegistry {
     map: HashMap<TextureId, Texture>,
     next: u32,
     pub(crate) layout: wgpu::BindGroupLayout,
-    sampler: wgpu::Sampler,
+    /// One sampler per [`TextureWrap`], indexed by [`TextureWrap::index`].
+    samplers: [wgpu::Sampler; 3],
     white: TextureId,
 }
 
@@ -47,22 +85,25 @@ impl TextureRegistry {
             ],
         });
 
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("sprite.sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
-            ..Default::default()
+        let samplers = TextureWrap::ALL.map(|wrap| {
+            let mode = wrap.address_mode();
+            device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("sprite.sampler"),
+                address_mode_u: mode,
+                address_mode_v: mode,
+                address_mode_w: mode,
+                mag_filter: wgpu::FilterMode::Nearest,
+                min_filter: wgpu::FilterMode::Nearest,
+                mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+                ..Default::default()
+            })
         });
 
         let mut me = Self {
             map: HashMap::new(),
             next: 1,
             layout,
-            sampler,
+            samplers,
             white: TextureId(0),
         };
         me.white = me.create_from_rgba(device, queue, 1, 1, &[255, 255, 255, 255], Some("white"));
@@ -83,6 +124,44 @@ impl TextureRegistry {
 
     pub fn get(&self, id: TextureId) -> Option<&Texture> {
         self.map.get(&id)
+    }
+
+    /// Switch `id` to `wrap` by rebuilding its bind group with the matching sampler. Returns
+    /// `false` for an unknown id.
+    pub fn set_wrap(&mut self, device: &wgpu::Device, id: TextureId, wrap: TextureWrap) -> bool {
+        let Some(tex) = self.map.get(&id) else {
+            return false;
+        };
+        if tex.wrap != wrap {
+            let bind_group = self.create_bind_group(device, &tex.view, wrap, tex.label.as_deref());
+            let tex = self.map.get_mut(&id).expect("checked above");
+            tex.bind_group = bind_group;
+            tex.wrap = wrap;
+        }
+        true
+    }
+
+    fn create_bind_group(
+        &self,
+        device: &wgpu::Device,
+        view: &wgpu::TextureView,
+        wrap: TextureWrap,
+        label: Option<&str>,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label,
+            layout: &self.layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.samplers[wrap.index()]),
+                },
+            ],
+        })
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -157,7 +236,10 @@ impl TextureRegistry {
         rgba: &[u8],
         label: Option<&str>,
     ) {
+        let wrap = self.map.get(&id).map(|t| t.wrap).unwrap_or_default();
         let new_id = self.create_from_rgba(device, queue, width, height, rgba, label);
+        // Keep the wrap mode across hot-reloads.
+        self.set_wrap(device, new_id, wrap);
         if let Some(new_tex) = self.map.remove(&new_id) {
             self.map.insert(id, new_tex);
         }
@@ -203,20 +285,7 @@ impl TextureRegistry {
             size,
         );
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label,
-            layout: &self.layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
-                },
-            ],
-        });
+        let bind_group = self.create_bind_group(device, &view, TextureWrap::Clamp, label);
 
         let id = TextureId(self.next);
         self.next += 1;
@@ -227,8 +296,22 @@ impl TextureRegistry {
                 bind_group,
                 texture,
                 view,
+                wrap: TextureWrap::Clamp,
+                label: label.map(str::to_owned),
             },
         );
         id
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn index_matches_position_in_all() {
+        for (i, wrap) in TextureWrap::ALL.into_iter().enumerate() {
+            assert_eq!(wrap.index(), i);
+        }
     }
 }

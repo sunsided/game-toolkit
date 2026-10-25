@@ -36,6 +36,6 @@ pub use mesh::{MeshId, MeshInstance, MeshVertex};
 pub use painter::Painter;
 pub use primitives::CircleInstance;
 pub use sprite::{BlendMode, SpriteInstance};
-pub use texture::{Texture, TextureId};
+pub use texture::{Texture, TextureId, TextureWrap};
 pub use tilemap::Tilemap;
 pub use transform::Mat4;

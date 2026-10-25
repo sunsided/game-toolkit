@@ -67,13 +67,18 @@ pub(crate) async fn init_parts(window: Arc<Window>, config: AppConfig) -> Result
 #[allow(clippy::unused_async)]
 async fn open_assets(config: &AppConfig) -> Result<game_toolkit_assets::Assets> {
     use game_toolkit_assets::Assets;
-    Assets::new(&config.asset_root).or_else(|e| {
+    let mut assets = Assets::new(&config.asset_root).or_else(|e| {
         log::warn!(
             "asset root {} unusable ({e}); falling back to cwd",
             config.asset_root.display()
         );
         Assets::new(".")
-    })
+    })?;
+    // Debug builds warn about assets the web build wouldn't preload.
+    if let Some(paths) = &config.web_preload {
+        assets.set_web_preload(paths);
+    }
+    Ok(assets)
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -120,7 +125,9 @@ impl Context {
         let rel = rel.as_ref();
         #[cfg(not(target_arch = "wasm32"))]
         if !self.assets.is_loaded(rel) {
-            return self.gfx.load_texture(self.assets.resolve(rel));
+            let id = self.gfx.load_texture(self.assets.resolve(rel))?;
+            self.assets.check_web_listed(rel);
+            return Ok(id);
         }
         let bytes = self.assets.read(rel)?;
         self.gfx

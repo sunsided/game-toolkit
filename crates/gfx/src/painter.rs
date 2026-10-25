@@ -211,8 +211,10 @@ impl<'a> Painter<'a> {
 
     /// Convex quad through `points` showing `tex`, with `uvs` the texture coordinates of the
     /// four corners (`[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]` for the whole
-    /// texture), tinted by `color`. UVs outside `0..1` clamp to the edge texels (textures
-    /// do not tile), so draw a tiling surface as one quad per tile.
+    /// texture), tinted by `color`. UVs outside `0..1` tile only if `tex` was set to
+    /// [`crate::TextureWrap::Repeat`] (or `MirrorRepeat`) with
+    /// [`crate::Graphics::set_texture_wrap`]; by default they clamp to the edge texels. A
+    /// scrolling road is one quad with `v` running from `scroll` to `scroll + 10.0`.
     ///
     /// Texturing is perspective-correct: the quad is treated as a flat rectangle seen in
     /// perspective (a road segment, a mode-7 floor), so a trapezoid shows the texture
@@ -312,8 +314,8 @@ impl<'a> Painter<'a> {
     }
 
     /// Triangle list showing `tex`, with `uvs` one texture coordinate per vertex, tinted by
-    /// `color`. UVs outside `0..1` clamp to the edge texels, as for
-    /// [`Painter::quad_textured`]. UVs are interpolated affinely (a triangle list carries no perspective); for
+    /// `color`. UVs outside `0..1` tile or clamp per the texture's
+    /// [`crate::TextureWrap`], as for [`Painter::quad_textured`]. UVs are interpolated affinely (a triangle list carries no perspective); for
     /// a perspective-correct quad use [`Painter::quad_textured`]. Draws nothing unless
     /// `uvs.len() == vertices.len()` and the indices are valid, as for
     /// [`Painter::triangles`].
