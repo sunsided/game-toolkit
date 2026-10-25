@@ -65,6 +65,10 @@ impl SpriteInstance {
         self.rotation = r;
         self
     }
+    /// Sample the UV rectangle `min..max` (`[0.0, 0.0]..[1.0, 1.0]` is the whole texture).
+    /// Beyond `0..1` the texture tiles only if it was set to [`crate::TextureWrap::Repeat`]
+    /// (or `MirrorRepeat`) with `Graphics::set_texture_wrap`; by default it clamps to the
+    /// edge texels.
     pub fn with_uv(mut self, min: [f32; 2], max: [f32; 2]) -> Self {
         self.uv_min = min;
         self.uv_max = max;

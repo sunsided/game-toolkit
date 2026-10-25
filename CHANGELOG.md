@@ -25,6 +25,11 @@ All notable changes to this project are documented here. The format is based on
 - `channel_queue_impls!` implements sillyecs' generated `WorldUserCommand` /
   `WorldCommandSender` / `WorldCommandReceiver` traits on `ChannelQueue` in one line; in the
   prelude with the `ecs` feature (#43).
+- Per-texture wrap modes: `Graphics::set_texture_wrap(id, TextureWrap::Repeat)` (or
+  `MirrorRepeat`) makes UVs outside `0..1` tile, so a scrolling road or a repeating floor is one
+  `quad_textured` instead of a quad per tile. `TextureWrap::Clamp` stays the default, so sprites
+  and atlas regions are unaffected; the mode survives hot-reloads. `Graphics::texture_wrap`
+  reads it back. `examples/03_primitives` scrolls a tiled road (#37).
 - Native debug builds check asset loads against the web preload list (`manifest.txt` under
   the asset root, or `AppConfig::web_preload`) and log a warning, once per file, for files
   the web build wouldn't preload. `Assets::check_web_listed` runs the check for files read by

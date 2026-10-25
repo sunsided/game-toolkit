@@ -3,6 +3,8 @@ use game_toolkit::prelude::*;
 struct App {
     /// 8x8 checkerboard, to make texture mapping on the road quads visible.
     checker: TextureId,
+    /// The same checkerboard set to `TextureWrap::Repeat`, so UVs beyond `0..1` tile.
+    checker_tiled: TextureId,
 }
 
 impl Game for App {
@@ -18,7 +20,14 @@ impl Game for App {
             })
             .collect();
         let checker = ctx.gfx.create_texture_rgba(8, 8, &rgba, Some("checker"));
-        Ok(Self { checker })
+        let checker_tiled = ctx
+            .gfx
+            .create_texture_rgba(8, 8, &rgba, Some("checker_tiled"));
+        ctx.gfx.set_texture_wrap(checker_tiled, TextureWrap::Repeat);
+        Ok(Self {
+            checker,
+            checker_tiled,
+        })
     }
     fn update(&mut self, ctx: &mut Context, _dt: f32) {
         if ctx.input.key_pressed(Key::Escape) {
@@ -195,6 +204,28 @@ impl Game for App {
             &road(695.0),
             &uvs,
             &[0, 1, 2, 0, 2, 3],
+            [1.0; 4],
+            0,
+            BlendMode::Alpha,
+        );
+
+        // Tiling (#37): one quad on a `Repeat` texture, with UVs running past 1.0, shows the
+        // checkerboard 2 x 6 times. Shifting `v` with time scrolls it like a road.
+        let scroll = -(t * 0.8).fract();
+        p.quad_textured(
+            self.checker_tiled,
+            [
+                [390.0, 480.0],
+                [450.0, 480.0],
+                [520.0, 590.0],
+                [320.0, 590.0],
+            ],
+            [
+                [0.0, scroll],
+                [2.0, scroll],
+                [2.0, scroll + 6.0],
+                [0.0, scroll + 6.0],
+            ],
             [1.0; 4],
             0,
             BlendMode::Alpha,
