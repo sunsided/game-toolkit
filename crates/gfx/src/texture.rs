@@ -81,9 +81,6 @@ impl TextureRegistry {
             .bind_group
     }
 
-    /// Reserved accessor: look up a texture by id (e.g. to inspect its size).
-    /// Kept as part of the registry's intended API though not yet wired up.
-    #[allow(dead_code)]
     pub fn get(&self, id: TextureId) -> Option<&Texture> {
         self.map.get(&id)
     }

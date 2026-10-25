@@ -70,6 +70,33 @@ impl SpriteInstance {
         self.uv_max = max;
         self
     }
+    /// Sample the `size` pixel rectangle at `min` (top-left, in pixels) of a texture that is
+    /// `tex_size` pixels large, e.g. one sprite of an atlas. Get `tex_size` from
+    /// `Graphics::texture_size` / `Painter::texture_size`, which never reports a zero side;
+    /// a zero `tex_size` side would produce non-finite UVs and is a debug-build panic.
+    pub fn with_region(self, min: [f32; 2], size: [f32; 2], tex_size: [u32; 2]) -> Self {
+        debug_assert!(
+            tex_size[0] > 0 && tex_size[1] > 0,
+            "with_region: zero-sized texture {tex_size:?}"
+        );
+        let [tw, th] = [tex_size[0] as f32, tex_size[1] as f32];
+        self.with_uv(
+            [min[0] / tw, min[1] / th],
+            [(min[0] + size[0]) / tw, (min[1] + size[1]) / th],
+        )
+    }
+    /// Mirror horizontally by swapping the u bounds. Works with any UV range or region;
+    /// apply it after [`with_uv`](Self::with_uv) / [`with_region`](Self::with_region).
+    pub fn flip_x(mut self) -> Self {
+        std::mem::swap(&mut self.uv_min[0], &mut self.uv_max[0]);
+        self
+    }
+    /// Mirror vertically by swapping the v bounds. Works with any UV range or region;
+    /// apply it after [`with_uv`](Self::with_uv) / [`with_region`](Self::with_region).
+    pub fn flip_y(mut self) -> Self {
+        std::mem::swap(&mut self.uv_min[1], &mut self.uv_max[1]);
+        self
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -312,5 +339,59 @@ impl SpriteBatcher {
 
     pub fn clear(&mut self) {
         self.pending.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn with_region_maps_pixels_to_uvs() {
+        let inst = SpriteInstance::at([0.0, 0.0], [32.0, 16.0]).with_region(
+            [64.0, 32.0],
+            [32.0, 16.0],
+            [256, 128],
+        );
+        assert_eq!(inst.uv_min, [0.25, 0.25]);
+        assert_eq!(inst.uv_max, [0.375, 0.375]);
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "zero-sized texture")]
+    fn with_region_rejects_a_zero_sized_texture_in_debug_builds() {
+        let _ =
+            SpriteInstance::at([0.0, 0.0], [1.0, 1.0]).with_region([0.0, 0.0], [1.0, 1.0], [0, 64]);
+    }
+
+    #[test]
+    fn flip_x_swaps_u_bounds_only() {
+        let inst = SpriteInstance::at([0.0, 0.0], [1.0, 1.0])
+            .with_uv([0.1, 0.2], [0.3, 0.4])
+            .flip_x();
+        assert_eq!(inst.uv_min, [0.3, 0.2]);
+        assert_eq!(inst.uv_max, [0.1, 0.4]);
+    }
+
+    #[test]
+    fn flip_y_swaps_v_bounds_only() {
+        let inst = SpriteInstance::at([0.0, 0.0], [1.0, 1.0])
+            .with_uv([0.1, 0.2], [0.3, 0.4])
+            .flip_y();
+        assert_eq!(inst.uv_min, [0.1, 0.4]);
+        assert_eq!(inst.uv_max, [0.3, 0.2]);
+    }
+
+    #[test]
+    fn flipping_twice_restores_the_region() {
+        let inst = SpriteInstance::at([0.0, 0.0], [1.0, 1.0]).with_region(
+            [8.0, 8.0],
+            [16.0, 16.0],
+            [64, 64],
+        );
+        let back = inst.flip_x().flip_y().flip_x().flip_y();
+        assert_eq!(back.uv_min, inst.uv_min);
+        assert_eq!(back.uv_max, inst.uv_max);
     }
 }

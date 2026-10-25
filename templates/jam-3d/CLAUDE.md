@@ -61,6 +61,7 @@ p.circle(center, radius, color);          // also circle_outline(center, radius,
 p.line(a, b, thickness, color);
 p.text(pos, "hi", 24.0, color);           // text always draws on top
 p.sprite(tex, pos, size);                 // tex: TextureId from ctx.load_texture(...)
+p.sprite_region(tex, src_pos, src_size, pos, size); // pixel rect of an atlas
 p.mesh(mesh, model, color);               // 3D, depth-tested under all 2D content
 ```
 
@@ -73,6 +74,11 @@ Draw order: lower layers draw under higher ones. Within one layer, call order ho
 draws with the same blend mode and texture, and untextured shapes (`rect`, `line`) sort under
 textured sprites. To draw a HUD rect over a sprite scene, give it a higher layer with `rect_ex`
 instead of relying on call order.
+
+Atlas sprites with a layer or mirroring: `ctx.gfx.texture_size(tex)` (or `p.texture_size(tex)`)
+gives the pixel size, then
+`SpriteInstance::at(pos, size).with_region(src_pos, src_size, tex_size).flip_x()` into
+`sprite_ex`. `flip_x` / `flip_y` work on any UV range.
 
 ## Input
 

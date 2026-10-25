@@ -366,6 +366,12 @@ impl Graphics {
         self.textures.white()
     }
 
+    /// Pixel size `[width, height]` of a loaded texture, or `None` for an unknown id. Follows
+    /// hot-reloads, so it reports the size of the current contents.
+    pub fn texture_size(&self, id: TextureId) -> Option<[u32; 2]> {
+        self.textures.get(id).map(|t| t.size)
+    }
+
     /// Upload a static mesh (positions + normals, indexed) and return its handle. Meshes are
     /// drawn depth-tested via [`Graphics::draw_mesh`] using the perspective [`Self::camera3d`].
     pub fn create_mesh(&mut self, vertices: &[MeshVertex], indices: &[u16]) -> MeshId {
