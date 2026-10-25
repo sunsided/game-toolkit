@@ -107,16 +107,19 @@ if let Some(pad) = ctx.input.first_gamepad() {
 ```rust
 // In init: load once. `None` = no audio device, the game runs muted.
 let boom: Option<SoundId> = ctx.load_sound("boom.wav")?;
+let music: Option<SoundId> = ctx.load_sound("music.ogg")?;
 
 // Later: one-shot effect.
 if let (Some(audio), Some(id)) = (&mut ctx.audio, boom) {
     let _ = audio.play(id); // -> Result<SoundHandle, AudioError>
 }
 
-// Music: loop at 30% volume. `deferred` queues it until audio may start (web).
-let handle = audio.play_with(music, PlayOptions::looped().volume(0.3).deferred())?;
-handle.set_volume(0.5);   // linear; also set_volume_db, fade_volume(v, Duration)
-handle.pause();           // resume, stop, is_playing, is_paused, is_finished
+// Music, e.g. in init: loop at 30% volume. `deferred` queues it until audio may start (web).
+if let (Some(audio), Some(id)) = (&mut ctx.audio, music) {
+    let handle = audio.play_with(id, PlayOptions::looped().volume(0.3).deferred())?;
+    handle.set_volume(0.5); // linear; also set_volume_db, fade_volume(v, Duration)
+    handle.pause();         // resume, stop, is_playing, is_paused, is_finished
+}
 ```
 
 Keep the `SoundHandle` to control the sound later; dropping it lets the sound play out.
