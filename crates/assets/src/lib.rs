@@ -62,8 +62,9 @@ pub struct Assets {
 /// The files a web build would preload, and the unlisted ones already warned about.
 #[cfg(not(target_arch = "wasm32"))]
 struct WebList {
-    /// Where the list came from, for the warning.
+    /// Where the list came from, and how to fix a missing entry, for the warning.
     source: String,
+    hint: &'static str,
     listed: HashSet<PathBuf>,
     warned: Mutex<HashSet<PathBuf>>,
 }
@@ -121,7 +122,11 @@ impl Assets {
     fn load_web_manifest(&mut self) {
         let path = self.root.join(MANIFEST_FILE);
         if let Ok(text) = std::fs::read_to_string(&path) {
-            self.set_web_list(path.display().to_string(), parse_manifest(&text));
+            self.set_web_list(
+                path.display().to_string(),
+                "regenerate the manifest, e.g. `task assets:manifest`",
+                parse_manifest(&text),
+            );
         }
     }
 
@@ -135,17 +140,22 @@ impl Assets {
         #[cfg(not(target_arch = "wasm32"))]
         if cfg!(debug_assertions) {
             let paths = paths.into_iter().map(|p| p.as_ref().to_owned()).collect();
-            self.set_web_list("AppConfig::web_preload".into(), paths);
+            self.set_web_list(
+                "AppConfig::web_preload".into(),
+                "add it to that list",
+                paths,
+            );
         }
         #[cfg(target_arch = "wasm32")]
         let _ = paths;
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn set_web_list(&mut self, source: String, paths: Vec<String>) {
+    fn set_web_list(&mut self, source: String, hint: &'static str, paths: Vec<String>) {
         let listed = paths.iter().map(|p| normalize(&self.resolve(p))).collect();
         self.web_list = Some(WebList {
             source,
+            hint,
             listed,
             warned: Mutex::new(HashSet::new()),
         });
@@ -171,10 +181,10 @@ impl Assets {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             if warned.insert(p) {
                 log::warn!(
-                    "asset {} is not listed in {}; it loads natively but will fail on the web \
-                     (regenerate the manifest, e.g. `task assets:manifest`)",
+                    "asset {} is not listed in {}; it loads natively but will fail on the web ({})",
                     rel.as_ref().display(),
-                    list.source
+                    list.source,
+                    list.hint
                 );
             }
         }
