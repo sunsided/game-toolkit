@@ -201,7 +201,9 @@ What's different on the web:
 
 - **Assets are preloaded.** Before `init`, the toolkit fetches every file listed in
   `assets/manifest.txt`; `task web` / `task web:build` regenerate it (`task assets:manifest`).
-  A file missing from the manifest fails to load at runtime.
+  A file missing from the manifest fails to load at runtime. Native debug builds warn
+  (`asset ... is not listed in .../manifest.txt`) when the game loads a file the manifest
+  doesn't list, so watch the log after adding assets.
 - **No filesystem paths.** Load through `ctx.load_texture` / `ctx.load_sound` /
   `ctx.load_aseprite` / `ctx.assets.read`, not `std::fs` or the path-taking `ctx.gfx.load_texture`
   (native only).

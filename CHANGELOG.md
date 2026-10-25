@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- Native debug builds check asset loads against the web preload list (`manifest.txt` under
+  the asset root, or `AppConfig::web_preload`) and log a warning, once per file, for files
+  the web build wouldn't preload. `Assets::check_web_listed` runs the check for files read by
+  path; `Assets::set_web_preload` replaces the list; `parse_manifest` is public (#46).
+
 ## [0.4.0] - 2026-10-25
 
 ### Added
