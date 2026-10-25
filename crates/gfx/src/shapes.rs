@@ -13,6 +13,41 @@ struct ShapeVertex {
     color: [f32; 4],
 }
 
+/// Vertex colours for a shape: one for the whole shape, or one per vertex (interpolated
+/// across each triangle).
+#[derive(Copy, Clone)]
+pub(crate) enum Colors<'a> {
+    Uniform([f32; 4]),
+    PerVertex(&'a [[f32; 4]]),
+}
+
+impl Colors<'_> {
+    /// Whether these colours fit a shape with `vertex_count` vertices.
+    fn fits(&self, vertex_count: usize) -> bool {
+        match self {
+            Colors::Uniform(_) => true,
+            Colors::PerVertex(colors) => colors.len() == vertex_count,
+        }
+    }
+
+    fn at(&self, i: usize) -> [f32; 4] {
+        match self {
+            Colors::Uniform(c) => *c,
+            Colors::PerVertex(colors) => colors[i],
+        }
+    }
+}
+
+/// Logs a skipped malformed shape. Debug builds panic; release builds warn once per process,
+/// since shape calls typically run every frame and would flood the log.
+fn reject(msg: std::fmt::Arguments<'_>) {
+    static WARNED: AtomicBool = AtomicBool::new(false);
+    debug_assert!(false, "{msg}");
+    if !WARNED.swap(true, Ordering::Relaxed) {
+        log::warn!("{msg}; skipping (further malformed shapes are not logged)");
+    }
+}
+
 /// Each drawn layer with its range into the combined index buffer, in layer order.
 type LayerRanges = Vec<(i16, Range<u32>)>;
 
@@ -31,49 +66,54 @@ struct ShapeBuffer {
 }
 
 impl ShapeBuffer {
-    /// Queue an indexed triangle list. Draws nothing when an index is out of range or the
-    /// index count is not a multiple of three: a debug-build panic, and in release builds a
-    /// warning logged once per process (this typically runs every frame).
-    fn triangles(&mut self, layer: i16, points: &[[f32; 2]], indices: &[u32], color: [f32; 4]) {
-        static WARNED: AtomicBool = AtomicBool::new(false);
-
-        let valid =
-            indices.len().is_multiple_of(3) && indices.iter().all(|&i| (i as usize) < points.len());
-        if !valid {
-            let msg = format!(
+    /// Queue an indexed triangle list. Draws nothing (see [`reject`]) when an index is out of
+    /// range, the index count is not a multiple of three, or there is not one colour per
+    /// vertex.
+    fn triangles(&mut self, layer: i16, points: &[[f32; 2]], colors: Colors<'_>, indices: &[u32]) {
+        if !indices.len().is_multiple_of(3) || indices.iter().any(|&i| i as usize >= points.len()) {
+            return reject(format_args!(
                 "triangles: {} indices into {} vertices; need whole triangles, all in range",
                 indices.len(),
                 points.len()
-            );
-            debug_assert!(false, "{msg}");
-            if !WARNED.swap(true, Ordering::Relaxed) {
-                log::warn!("{msg}; skipping (further malformed calls are not logged)");
-            }
-            return;
+            ));
+        }
+        if !colors.fits(points.len()) {
+            return reject(format_args!("shape: need one color per vertex"));
         }
         if indices.is_empty() {
             return;
         }
+        let base = self.push_vertices(layer, points, colors);
         let geo = self.layers.entry(layer).or_default();
-        let base = geo.vertices.len() as u32;
-        geo.vertices
-            .extend(points.iter().map(|&pos| ShapeVertex { pos, color }));
         geo.indices.extend(indices.iter().map(|&i| base + i));
     }
 
     /// Queue a convex polygon, fan-triangulated from its first point. Fewer than three
-    /// points draw nothing.
-    fn polygon(&mut self, layer: i16, points: &[[f32; 2]], color: [f32; 4]) {
+    /// points draw nothing; so does a colour count that does not match (see [`reject`]).
+    fn polygon(&mut self, layer: i16, points: &[[f32; 2]], colors: Colors<'_>) {
+        if !colors.fits(points.len()) {
+            return reject(format_args!("shape: need one color per vertex"));
+        }
         if points.len() < 3 {
             return;
         }
+        let base = self.push_vertices(layer, points, colors);
         let geo = self.layers.entry(layer).or_default();
-        let base = geo.vertices.len() as u32;
-        geo.vertices
-            .extend(points.iter().map(|&pos| ShapeVertex { pos, color }));
         for i in 1..points.len() as u32 - 1 {
             geo.indices.extend([base, base + i, base + i + 1]);
         }
+    }
+
+    /// Append `points` with their colours to `layer` and return the index of the first one.
+    fn push_vertices(&mut self, layer: i16, points: &[[f32; 2]], colors: Colors<'_>) -> u32 {
+        let geo = self.layers.entry(layer).or_default();
+        let base = geo.vertices.len() as u32;
+        geo.vertices
+            .extend(points.iter().enumerate().map(|(i, &pos)| ShapeVertex {
+                pos,
+                color: colors.at(i),
+            }));
+        base
     }
 
     fn collect_layers(&self, out: &mut std::collections::BTreeSet<i16>) {
@@ -198,12 +238,18 @@ impl ShapeBatcher {
         }
     }
 
-    pub fn triangles(&mut self, layer: i16, points: &[[f32; 2]], indices: &[u32], color: [f32; 4]) {
-        self.shapes.triangles(layer, points, indices, color);
+    pub fn triangles(
+        &mut self,
+        layer: i16,
+        points: &[[f32; 2]],
+        colors: Colors<'_>,
+        indices: &[u32],
+    ) {
+        self.shapes.triangles(layer, points, colors, indices);
     }
 
-    pub fn polygon(&mut self, layer: i16, points: &[[f32; 2]], color: [f32; 4]) {
-        self.shapes.polygon(layer, points, color);
+    pub fn polygon(&mut self, layer: i16, points: &[[f32; 2]], colors: Colors<'_>) {
+        self.shapes.polygon(layer, points, colors);
     }
 
     /// Record every layer that has pending shapes, for cross-batcher interleaving.
@@ -284,7 +330,7 @@ mod tests {
     fn polygon_is_fan_triangulated() {
         let mut buf = ShapeBuffer::default();
         let pentagon = [[0.0, 0.0], [2.0, 0.0], [3.0, 1.0], [1.0, 2.0], [-1.0, 1.0]];
-        buf.polygon(0, &pentagon, RED);
+        buf.polygon(0, &pentagon, Colors::Uniform(RED));
         let (v, i, ranges) = flatten(&buf);
         assert_eq!(v.len(), 5);
         assert_eq!(i, [0, 1, 2, 0, 2, 3, 0, 3, 4]);
@@ -294,7 +340,7 @@ mod tests {
     #[test]
     fn degenerate_polygons_draw_nothing() {
         let mut buf = ShapeBuffer::default();
-        buf.polygon(0, &[[0.0, 0.0], [1.0, 1.0]], RED);
+        buf.polygon(0, &[[0.0, 0.0], [1.0, 1.0]], Colors::Uniform(RED));
         let (v, i, ranges) = flatten(&buf);
         assert!(v.is_empty() && i.is_empty() && ranges.is_empty());
     }
@@ -303,8 +349,12 @@ mod tests {
     fn layers_flatten_in_order_with_rebased_indices() {
         let mut buf = ShapeBuffer::default();
         let tri = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
-        buf.triangles(2, &tri, &[0, 1, 2], RED);
-        buf.polygon(-1, &[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], BLUE);
+        buf.triangles(2, &tri, Colors::Uniform(RED), &[0, 1, 2]);
+        buf.polygon(
+            -1,
+            &[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+            Colors::Uniform(BLUE),
+        );
         let (v, i, ranges) = flatten(&buf);
         // Layer -1 (the quad) comes first even though it was queued second.
         assert_eq!(ranges, [(-1, 0..6), (2, 6..9)]);
@@ -318,8 +368,8 @@ mod tests {
     fn same_layer_keeps_call_order() {
         let mut buf = ShapeBuffer::default();
         let tri = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
-        buf.triangles(0, &tri, &[0, 1, 2], RED);
-        buf.triangles(0, &tri, &[2, 1, 0], BLUE);
+        buf.triangles(0, &tri, Colors::Uniform(RED), &[0, 1, 2]);
+        buf.triangles(0, &tri, Colors::Uniform(BLUE), &[2, 1, 0]);
         let (v, i, ranges) = flatten(&buf);
         assert_eq!(ranges, [(0, 0..6)]);
         assert_eq!(i, [0, 1, 2, 5, 4, 3]);
@@ -327,11 +377,59 @@ mod tests {
     }
 
     #[test]
+    fn per_vertex_colors_follow_their_vertices() {
+        let mut buf = ShapeBuffer::default();
+        let tri = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        let colors = [RED, BLUE, RED];
+        buf.triangles(0, &tri, Colors::PerVertex(&colors), &[0, 1, 2]);
+        buf.polygon(
+            0,
+            &[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+            Colors::PerVertex(&[BLUE, BLUE, RED, RED]),
+        );
+        let (v, i, _) = flatten(&buf);
+        let got: Vec<[f32; 4]> = v.iter().map(|v| v.color).collect();
+        assert_eq!(got, [RED, BLUE, RED, BLUE, BLUE, RED, RED]);
+        assert_eq!(i, [0, 1, 2, 3, 4, 5, 3, 5, 6]);
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "one color per vertex")]
+    fn mismatched_color_count_panics_in_debug_builds() {
+        let mut buf = ShapeBuffer::default();
+        let tri = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        buf.triangles(0, &tri, Colors::PerVertex(&[RED, BLUE]), &[0, 1, 2]);
+    }
+
+    #[test]
+    #[cfg(not(debug_assertions))]
+    fn mismatched_color_count_draws_nothing_in_release_builds() {
+        let mut buf = ShapeBuffer::default();
+        let quad = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
+        buf.polygon(0, &quad, Colors::PerVertex(&[RED]));
+        let tri = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        buf.triangles(0, &tri, Colors::PerVertex(&[RED, BLUE]), &[0, 1, 2]);
+        let (v, i, ranges) = flatten(&buf);
+        assert!(v.is_empty() && i.is_empty() && ranges.is_empty());
+    }
+
+    #[test]
     #[cfg(not(debug_assertions))]
     fn malformed_triangles_draw_nothing_in_release_builds() {
         let mut buf = ShapeBuffer::default();
-        buf.triangles(0, &[[0.0, 0.0], [1.0, 0.0]], &[0, 1, 2], RED);
-        buf.triangles(0, &[[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], &[0, 1], RED);
+        buf.triangles(
+            0,
+            &[[0.0, 0.0], [1.0, 0.0]],
+            Colors::Uniform(RED),
+            &[0, 1, 2],
+        );
+        buf.triangles(
+            0,
+            &[[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
+            Colors::Uniform(RED),
+            &[0, 1],
+        );
         let (v, i, ranges) = flatten(&buf);
         assert!(v.is_empty() && i.is_empty() && ranges.is_empty());
     }
@@ -341,7 +439,12 @@ mod tests {
     #[should_panic(expected = "need whole triangles, all in range")]
     fn out_of_range_indices_panic_in_debug_builds() {
         let mut buf = ShapeBuffer::default();
-        buf.triangles(0, &[[0.0, 0.0], [1.0, 0.0]], &[0, 1, 2], RED);
+        buf.triangles(
+            0,
+            &[[0.0, 0.0], [1.0, 0.0]],
+            Colors::Uniform(RED),
+            &[0, 1, 2],
+        );
     }
 
     #[test]
@@ -349,6 +452,11 @@ mod tests {
     #[should_panic(expected = "need whole triangles, all in range")]
     fn partial_triangles_panic_in_debug_builds() {
         let mut buf = ShapeBuffer::default();
-        buf.triangles(0, &[[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], &[0, 1], RED);
+        buf.triangles(
+            0,
+            &[[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]],
+            Colors::Uniform(RED),
+            &[0, 1],
+        );
     }
 }

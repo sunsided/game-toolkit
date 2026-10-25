@@ -22,6 +22,8 @@ All notable changes to this project are documented here. The format is based on
   quad), `Painter::polygon` (convex, fan-triangulated) and `Painter::triangles` (indexed
   triangle list). Within a layer they draw above sprites and rects, in call order, and below
   circles. `examples/03_primitives` shows them (#28).
+- Per-vertex colours for filled shapes, interpolated across each triangle:
+  `Painter::quad_colored`, `polygon_colored` and `triangles_colored` (#33).
 
 ## [0.3.1] - 2026-10-25
 

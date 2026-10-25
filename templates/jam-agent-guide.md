@@ -61,6 +61,7 @@ p.circle(center, radius, color);          // also circle_outline(center, radius,
 p.line(a, b, thickness, color);
 p.quad([a, b, c, d], color, layer);       // filled convex quad; also polygon(&points, color, layer)
 p.triangles(&verts, &indices, color, layer); // raw filled triangle list
+// gradients: quad_colored(points, [c0, c1, c2, c3], layer), polygon_colored, triangles_colored
 p.text(pos, "hi", 24.0, color);           // text always draws on top
 p.sprite(tex, pos, size);                 // tex: TextureId from ctx.load_texture(...)
 p.sprite_region(tex, src_pos, src_size, pos, size); // pixel rect of an atlas
