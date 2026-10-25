@@ -108,14 +108,24 @@ if let Some(pad) = ctx.input.first_gamepad() {
 // In init: load once. `None` = no audio device, the game runs muted.
 let boom: Option<SoundId> = ctx.load_sound("boom.wav")?;
 
-// Later:
+// Later: one-shot effect.
 if let (Some(audio), Some(id)) = (&mut ctx.audio, boom) {
-    audio.play(id)?;
+    let _ = audio.play(id); // -> Result<SoundHandle, AudioError>
 }
+
+// Music: loop at 30% volume. `deferred` queues it until audio may start (web).
+let handle = audio.play_with(music, PlayOptions::looped().volume(0.3).deferred())?;
+handle.set_volume(0.5);   // linear; also set_volume_db, fade_volume(v, Duration)
+handle.pause();           // resume, stop, is_playing, is_paused, is_finished
 ```
 
+Keep the `SoundHandle` to control the sound later; dropping it lets the sound play out.
+`play_samples` / `play_samples_with` take mono PCM (e.g. from `Synth`). The prelude re-exports
+`kira` for anything else (`handle.with_kira(|h| ...)`); don't add your own `kira` dependency.
+
 In the browser, audio starts on the player's first key press / click / touch (a browser rule);
-`play` returns an error before that, so don't `?` it in `update` - log or ignore it.
+before that `play` fails with `AudioError::NotStarted` (check `audio.is_started()`), so don't
+`?` it in `update` - log or ignore it, or use `PlayOptions::deferred` for music.
 
 ## Randomness
 
