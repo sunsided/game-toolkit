@@ -9,7 +9,7 @@
 [**game-toolkit**](https://github.com/sunsided/game-toolkit) - debug panels, inspectors and
 tweak sliders. Feature-gated; enable the prelude's `ui` feature.
 
-Part of game-toolkit, a Rust workspace of small crates for 2D-first game jams. See the
+Part of game-toolkit, a Rust workspace of small crates for 2D and 3D game jams. See the
 [workspace README](https://github.com/sunsided/game-toolkit#readme) for the full toolkit,
 examples, and quick-start.
 

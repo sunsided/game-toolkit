@@ -285,7 +285,8 @@ Plain `cargo run` works too. `task check` here enforces `rustfmt` - keep code fo
 
 - Reach for the prelude first; don't hand-roll types the toolkit already provides.
 - Set `asset_root: asset_root!()` (above) so the binary runs from anywhere and on the web.
-- 2D-first. The 3D mesh path needs `AppConfig::depth_format = Some(..)` (the jam-3d template's
+- 2D and 3D share one frame: meshes draw first, depth-tested, and all 2D content composites on
+  top. The 3D path needs `AppConfig::depth_format = Some(..)` (the jam-3d template's
   `src/main.rs` shows a full cube + 2D HUD).
 - Keep the `Game` struct small; push reusable systems into modules.
 
