@@ -30,6 +30,10 @@ All notable changes to this project are documented here. The format is based on
   `quad_textured` instead of a quad per tile. `TextureWrap::Clamp` stays the default, so sprites
   and atlas regions are unaffected; the mode survives hot-reloads. `Graphics::texture_wrap`
   reads it back. `examples/03_primitives` scrolls a tiled road (#37).
+- Native debug builds check asset loads against the web preload list (`manifest.txt` under
+  the asset root, or `AppConfig::web_preload`) and log a warning, once per file, for files
+  the web build wouldn't preload. `Assets::check_web_listed` runs the check for files read by
+  path; `Assets::set_web_preload` replaces the list; `parse_manifest` is public (#46).
 
 ### Changed
 
