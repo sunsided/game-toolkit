@@ -6,6 +6,19 @@ use crate::sprite::{BlendMode, SpriteInstance};
 use crate::texture::TextureId;
 use crate::transform::Mat4;
 
+/// Immediate-mode 2D drawing for one frame; everything queued is flushed when it drops.
+///
+/// # Draw order
+///
+/// 2D content is sorted by layer: lower layers draw under higher ones, across sprites,
+/// shapes and circles. Within a layer, sprites and shapes (`sprite*`, `rect*`, `line*`) draw
+/// first, grouped by [`BlendMode`] and then by texture; circles draw on top of them. Call
+/// order is kept only between draws that share layer, blend mode and texture.
+///
+/// Untextured shapes (`rect*`, `line*`) use the internal white texture, which sorts before
+/// every loaded texture. So on the same layer and blend mode, a `rect` lands *under* a
+/// textured sprite even when it is drawn after it; put it on a higher layer with
+/// [`Painter::rect_ex`] to draw it on top. Text is not layered and always draws last.
 pub struct Painter<'a> {
     frame: &'a mut Frame,
     gfx: &'a mut Graphics,
@@ -25,12 +38,15 @@ impl<'a> Painter<'a> {
         self.gfx.camera.visible_rect()
     }
 
+    /// Sprite covering the whole texture (layer 0, alpha blending).
     pub fn sprite(&mut self, tex: TextureId, pos: [f32; 2], size: [f32; 2]) {
         self.gfx
             .sprites
             .draw(tex, 0, BlendMode::Alpha, SpriteInstance::at(pos, size));
     }
 
+    /// Sprite on an explicit layer with an explicit blend mode. See the draw-order notes on
+    /// [`Painter`].
     pub fn sprite_ex(
         &mut self,
         tex: TextureId,
@@ -41,29 +57,68 @@ impl<'a> Painter<'a> {
         self.gfx.sprites.draw(tex, layer, blend, inst);
     }
 
-    /// Filled rectangle (uses the internal 1×1 white texture).
+    /// Filled rectangle (layer 0, alpha blending; uses the internal 1×1 white texture).
     pub fn rect(&mut self, pos: [f32; 2], size: [f32; 2], color: [f32; 4]) {
+        self.rect_ex(pos, size, color, 0, BlendMode::Alpha);
+    }
+
+    /// Filled rectangle on an explicit layer with an explicit blend mode.
+    pub fn rect_ex(
+        &mut self,
+        pos: [f32; 2],
+        size: [f32; 2],
+        color: [f32; 4],
+        layer: i16,
+        blend: BlendMode,
+    ) {
         let tex = self.gfx.white_texture();
         self.gfx.sprites.draw(
             tex,
-            0,
-            BlendMode::Alpha,
+            layer,
+            blend,
             SpriteInstance::at(pos, size).with_color(color),
         );
     }
 
-    /// 4 thin lines around the rectangle.
+    /// 4 thin lines around the rectangle (layer 0, alpha blending).
     pub fn rect_outline(&mut self, pos: [f32; 2], size: [f32; 2], thickness: f32, color: [f32; 4]) {
-        let [x, y] = pos;
-        let [w, h] = size;
-        self.line([x, y], [x + w, y], thickness, color);
-        self.line([x + w, y], [x + w, y + h], thickness, color);
-        self.line([x + w, y + h], [x, y + h], thickness, color);
-        self.line([x, y + h], [x, y], thickness, color);
+        self.rect_outline_ex(pos, size, thickness, color, 0, BlendMode::Alpha);
     }
 
-    /// Line segment, drawn as a rotated thin quad through the sprite batcher.
+    /// Rectangle outline on an explicit layer with an explicit blend mode.
+    pub fn rect_outline_ex(
+        &mut self,
+        pos: [f32; 2],
+        size: [f32; 2],
+        thickness: f32,
+        color: [f32; 4],
+        layer: i16,
+        blend: BlendMode,
+    ) {
+        let [x, y] = pos;
+        let [w, h] = size;
+        self.line_ex([x, y], [x + w, y], thickness, color, layer, blend);
+        self.line_ex([x + w, y], [x + w, y + h], thickness, color, layer, blend);
+        self.line_ex([x + w, y + h], [x, y + h], thickness, color, layer, blend);
+        self.line_ex([x, y + h], [x, y], thickness, color, layer, blend);
+    }
+
+    /// Line segment, drawn as a rotated thin quad through the sprite batcher (layer 0, alpha
+    /// blending).
     pub fn line(&mut self, a: [f32; 2], b: [f32; 2], thickness: f32, color: [f32; 4]) {
+        self.line_ex(a, b, thickness, color, 0, BlendMode::Alpha);
+    }
+
+    /// Line segment on an explicit layer with an explicit blend mode.
+    pub fn line_ex(
+        &mut self,
+        a: [f32; 2],
+        b: [f32; 2],
+        thickness: f32,
+        color: [f32; 4],
+        layer: i16,
+        blend: BlendMode,
+    ) {
         let dx = b[0] - a[0];
         let dy = b[1] - a[1];
         let len = (dx * dx + dy * dy).sqrt();
@@ -87,7 +142,7 @@ impl<'a> Painter<'a> {
             rotation: angle,
             _pad: [0.0; 3],
         };
-        self.gfx.sprites.draw(tex, 0, BlendMode::Alpha, inst);
+        self.gfx.sprites.draw(tex, layer, blend, inst);
     }
 
     /// Filled disk (layer 0).
