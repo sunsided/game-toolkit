@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::ops::Range;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use bytemuck::{Pod, Zeroable};
 
@@ -31,17 +32,26 @@ struct ShapeBuffer {
 
 impl ShapeBuffer {
     /// Queue an indexed triangle list. Draws nothing when an index is out of range or the
-    /// index count is not a multiple of three (a debug-build panic in both cases).
+    /// index count is not a multiple of three: a debug-build panic, and in release builds a
+    /// warning logged once per process (this typically runs every frame).
     fn triangles(&mut self, layer: i16, points: &[[f32; 2]], indices: &[u32], color: [f32; 4]) {
+        static WARNED: AtomicBool = AtomicBool::new(false);
+
         let valid =
             indices.len().is_multiple_of(3) && indices.iter().all(|&i| (i as usize) < points.len());
-        debug_assert!(
-            valid,
-            "triangles: {} indices into {} vertices; need whole triangles, all in range",
-            indices.len(),
-            points.len()
-        );
-        if !valid || indices.is_empty() {
+        if !valid {
+            let msg = format!(
+                "triangles: {} indices into {} vertices; need whole triangles, all in range",
+                indices.len(),
+                points.len()
+            );
+            debug_assert!(false, "{msg}");
+            if !WARNED.swap(true, Ordering::Relaxed) {
+                log::warn!("{msg}; skipping (further malformed calls are not logged)");
+            }
+            return;
+        }
+        if indices.is_empty() {
             return;
         }
         let geo = self.layers.entry(layer).or_default();
@@ -314,6 +324,16 @@ mod tests {
         assert_eq!(ranges, [(0, 0..6)]);
         assert_eq!(i, [0, 1, 2, 5, 4, 3]);
         assert_eq!(v[3].color, BLUE);
+    }
+
+    #[test]
+    #[cfg(not(debug_assertions))]
+    fn malformed_triangles_draw_nothing_in_release_builds() {
+        let mut buf = ShapeBuffer::default();
+        buf.triangles(0, &[[0.0, 0.0], [1.0, 0.0]], &[0, 1, 2], RED);
+        buf.triangles(0, &[[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], &[0, 1], RED);
+        let (v, i, ranges) = flatten(&buf);
+        assert!(v.is_empty() && i.is_empty() && ranges.is_empty());
     }
 
     #[test]
