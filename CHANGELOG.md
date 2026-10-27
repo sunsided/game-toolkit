@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** synthie 0.5 behind the `synth` feature. `Synth` is unchanged, but the re-exported
+  `game_toolkit::synthie` is now 0.5, so games that name synthie types and depend on
+  `synthie = "0.4"` themselves need `synthie = "0.5"`.
+
 ## [0.5.0] - 2026-10-25
 
 ### Added
