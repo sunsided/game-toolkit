@@ -5,7 +5,7 @@
 //! playback still goes through kira like every other sound, avoiding two backends competing
 //! for the device.
 
-use synthie::prelude::{AudioEvent, MidiNote, SynthParams, SynthProcessor};
+use synthie::prelude::{AudioEvent, MidiNote, SynthParams, SynthProcessor, VoiceNormalization};
 
 /// A small chiptune synth. Render a note (or a built-in retro effect) to a mono PCM buffer,
 /// then play it with [`crate::Audio::play_samples`]. Re-exported `synthie` types
@@ -18,8 +18,11 @@ pub struct Synth {
 
 impl Synth {
     pub fn new(sample_rate: u32) -> Self {
+        let mut processor = SynthProcessor::new(sample_rate as f32);
+        // Every render is a lone note, so dividing by the polyphony would only cost level.
+        processor.set_voice_normalization(VoiceNormalization::Off);
         Self {
-            processor: SynthProcessor::new(sample_rate as f32),
+            processor,
             sample_rate,
             target_peak: 0.9,
         }
@@ -55,7 +58,7 @@ impl Synth {
         let hold = (hold_secs.max(0.0) * sr) as usize;
         let release = (release_secs.max(0.0) * sr) as usize;
         let mut buf = vec![0.0f32; hold + release];
-        // Panic first so any lingering voice/tail from a previous render does not bleed in.
+        // Panic first so any lingering voice or FX tail from a previous render does not bleed in.
         let on = [
             AudioEvent::Panic,
             AudioEvent::LoadPatch(Box::new(params)),
@@ -65,8 +68,9 @@ impl Synth {
         let off = [AudioEvent::NoteOff(MidiNote(note))];
         self.processor.process_block(&off, &mut buf[hold..], 1);
 
-        // Normalize to a consistent peak: synthie applies a 0.5 master gain plus the patch's
-        // own volume/filtering, so raw output is much quieter than a typical sample file.
+        // Normalize to a consistent peak: synthie applies its master gain
+        // (`DEFAULT_MASTER_GAIN`, 0.5) plus the patch's own volume/filtering, so raw output is
+        // much quieter than a typical sample file.
         if self.target_peak > 0.0 {
             let peak = buf.iter().fold(0.0f32, |m, &s| m.max(s.abs()));
             if peak > 1e-4 {
@@ -115,7 +119,7 @@ mod tests {
         let mut synth = Synth::new(44_100).with_target_peak(0.0);
         let pcm = synth.blip();
         let peak = pcm.iter().fold(0.0f32, |m, &x| m.max(x.abs()));
-        // Raw synthie output (0.5 master gain etc.) is well below the normalized 0.9.
+        // Raw synthie output (0.5 master gain, 0.7 patch volume) is well below the normalized 0.9.
         assert!(
             peak > 0.0 && peak < 0.6,
             "raw peak unexpectedly high: {peak}"
