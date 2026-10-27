@@ -8,9 +8,17 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 
-- **Breaking:** synthie 0.5 behind the `synth` feature. `Synth` is unchanged, but the re-exported
-  `game_toolkit::synthie` is now 0.5, so games that name synthie types and depend on
-  `synthie = "0.4"` themselves need `synthie = "0.5"`.
+- **Breaking:** synthie 0.6 behind the `synth` feature. `Synth` is unchanged, but the re-exported
+  `game_toolkit::synthie` is now 0.6, so games that name synthie types and depend on
+  `synthie = "0.4"` themselves need `synthie = "0.6"`.
+- `Synth` renders with synthie's voice normalization off, so a note is no longer divided by the
+  polyphony (4) before the peak normalization. With `target_peak` at `0.0` the raw output is
+  about four times louder than before.
+
+### Fixed
+
+- `Synth` no longer lets a previous render's reverb, delay or chorus tail bleed into the next
+  one (synthie 0.6 clears the FX on panic).
 
 ## [0.5.0] - 2026-10-25
 
