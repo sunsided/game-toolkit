@@ -3778,9 +3778,9 @@ dependencies = [
 
 [[package]]
 name = "synthie"
-version = "0.4.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfd47a7e438fe19c5bb69481c620959f089104e64b3b2f4f132961039739ce41"
+checksum = "3e9e20cd5a025b5e7257b247c9e9e1906f9675c6c919a392d842643c04ebbb7b"
 
 [[package]]
 name = "sys-locale"
