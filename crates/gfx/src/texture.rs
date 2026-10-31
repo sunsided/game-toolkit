@@ -252,7 +252,8 @@ impl TextureRegistry {
             return false;
         };
         let [width, height] = tex.size;
-        if rgba.len() != (width as usize) * (height as usize) * 4 {
+        // u64 so the expected size cannot wrap on 32-bit targets (wasm32).
+        if rgba.len() as u64 != u64::from(width) * u64::from(height) * 4 {
             return false;
         }
         queue.write_texture(
