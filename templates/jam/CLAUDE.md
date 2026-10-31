@@ -152,7 +152,8 @@ Keep the `SoundHandle` to control the sound later; dropping it lets the sound pl
 it plays (a running synth, an emulated sound chip), `play_stream(source, sample_rate)` /
 `play_stream_with` call `source` (any `FnMut(&mut [f32]) + Send`, or an `AudioStream`) for mono
 samples on the audio thread, and return a `StreamHandle` (`set_volume`, `pause`, `resume`,
-`stop`). It works on the web too. The prelude re-exports `kira` for anything else (`handle.with_kira(|h| ...)`); don't add your own `kira` dependency.
+`stop`). It works on the web too. The prelude re-exports `kira` for anything else
+(`handle.with_kira(|h| ...)`); don't add your own `kira` dependency.
 
 In the browser, audio starts on the player's first key press / click / touch (a browser rule);
 before that `play` fails with `AudioError::NotStarted` (check `audio.is_started()`), so don't
