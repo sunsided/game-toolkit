@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- `Audio::play_stream` / `play_stream_with` play audio generated while it plays (a running
+  synth, an emulated sound chip): an `AudioStream` (any `FnMut(&mut [f32]) + Send`) is asked
+  for mono samples on the audio thread and resampled to the output rate, without a decoder
+  thread, so it works on the web. `StreamHandle` controls volume, pause and stop.
 - `Graphics::update_texture_rgba` overwrites an existing texture's pixels in place, for content
   that changes every frame such as a software-rendered framebuffer (#64).
 
