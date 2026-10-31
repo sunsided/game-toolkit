@@ -12,11 +12,11 @@ All notable changes to this project are documented here. The format is based on
   synth, an emulated sound chip): an `AudioStream` (any `FnMut(&mut [f32]) + Send`) is asked
   for mono samples on the audio thread and resampled to the output rate, without a decoder
   thread, so it works on the web. `StreamHandle` controls volume, pause and stop, and ramps
-  each change over one audio block so it does not click (#65).
+  each change over one audio block so it does not click (#65, #66).
 - `Graphics::update_texture_rgba` overwrites an existing texture's pixels in place, for content
   that changes every frame such as a software-rendered framebuffer (#64).
 - `examples/14_framebuffer` draws a CPU-rendered plasma through `update_texture_rgba`, and
-  `examples/07_audio` plays a generated tone through `play_stream` (key 4).
+  `examples/07_audio` plays a generated tone through `play_stream` (key 4) (#66).
 
 ## [0.6.0] - 2026-10-28
 
