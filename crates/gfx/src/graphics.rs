@@ -391,6 +391,16 @@ impl Graphics {
             .create_from_rgba(&self.device, &self.queue, width, height, rgba, label)
     }
 
+    /// Overwrite the pixels of an existing texture without reallocating it, for content that
+    /// changes every frame (a software-rendered framebuffer, a video frame). `rgba` must hold
+    /// `width * height * 4` bytes for the texture's size; create the texture once with
+    /// [`Self::create_texture_rgba`]. Unknown ids and size mismatches are logged and ignored.
+    pub fn update_texture_rgba(&mut self, id: TextureId, rgba: &[u8]) {
+        if !self.textures.write_rgba(&self.queue, id, rgba) {
+            log::warn!("update_texture_rgba: unknown {id:?} or wrong data size");
+        }
+    }
+
     pub fn white_texture(&self) -> TextureId {
         self.textures.white()
     }

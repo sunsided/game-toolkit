@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `Graphics::update_texture_rgba` overwrites an existing texture's pixels in place, for content
+  that changes every frame such as a software-rendered framebuffer (#64).
+
 ## [0.6.0] - 2026-10-28
 
 ### Changed
