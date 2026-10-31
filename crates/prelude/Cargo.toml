@@ -31,3 +31,14 @@ vector = ["game-toolkit-gfx/vector"]
 
 [lints]
 workspace = true
+
+# cargo-release (see the root release.toml): stamp the workspace CHANGELOG.md during
+# `cargo release`. Set on this crate only, so the shared changelog is rewritten once per
+# release rather than once per member. Paths are relative to this crate.
+[package.metadata.release]
+pre-release-replacements = [
+  # Turn the pending notes into the release's section and open a fresh [Unreleased] above it.
+  { file = "../../CHANGELOG.md", search = "## \\[Unreleased\\]", replace = "## [Unreleased]\n\n## [{{version}}] - {{date}}", exactly = 1 },
+  # Point [Unreleased] at the new tag and add a compare link for the release.
+  { file = "../../CHANGELOG.md", search = "\\[Unreleased\\]: (\\S+)/compare/(\\S+)\\.\\.\\.HEAD", replace = "[Unreleased]: $1/compare/{{tag_name}}...HEAD\n[{{version}}]: $1/compare/$2...{{tag_name}}", exactly = 1 },
+]

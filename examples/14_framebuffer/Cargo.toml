@@ -1,0 +1,18 @@
+[package]
+name = "ex_14_framebuffer"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "14_framebuffer"
+path = "src/main.rs"
+
+[dependencies]
+game-toolkit = { workspace = true }
+env_logger = { workspace = true }
+
+[lints]
+workspace = true

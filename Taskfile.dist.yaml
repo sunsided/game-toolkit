@@ -217,6 +217,13 @@ tasks:
       - task: run
         vars: {EXAMPLE: ex_12_vector}
 
+  example:framebuffer:
+    desc: Run the software-rendered framebuffer example (update_texture_rgba)
+    aliases: [run:framebuffer]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_14_framebuffer}
+
   web:
     desc: 'Serve a crate in the browser with live rebuild (WEB_DIR=examples/13_web), http://localhost:8080'
     aliases: [example:web, run:web]
