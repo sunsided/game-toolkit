@@ -52,7 +52,9 @@ impl StreamHandle {
     fn new(volume: f32, pending: bool) -> Self {
         Self {
             shared: Arc::new(Shared {
-                volume: AtomicU32::new(volume.to_bits()),
+                // Clamped like set_volume: a negative start volume is silence, not an
+                // inverted signal.
+                volume: AtomicU32::new(volume.max(0.0).to_bits()),
                 paused: AtomicBool::new(false),
                 stopped: AtomicBool::new(false),
                 pending: AtomicBool::new(pending),
@@ -229,7 +231,11 @@ mod tests {
     use super::*;
 
     fn sound(stream: impl AudioStream, rate: u32) -> (StreamSound, StreamHandle) {
-        let (data, handle) = StreamData::new(Box::new(stream), rate, 1.0, false);
+        sound_at(stream, rate, 1.0)
+    }
+
+    fn sound_at(stream: impl AudioStream, rate: u32, volume: f32) -> (StreamSound, StreamHandle) {
+        let (data, handle) = StreamData::new(Box::new(stream), rate, volume, false);
         let sound = StreamSound {
             stream: data.stream,
             sample_rate: f64::from(data.sample_rate),
@@ -317,6 +323,15 @@ mod tests {
         manager.backend_mut().on_start_processing();
         manager.backend_mut().process();
         assert!(handle.is_finished());
+    }
+
+    #[test]
+    fn negative_start_volume_is_silence() {
+        let (mut s, handle) = sound_at(|out: &mut [f32]| out.fill(1.0), 100, -0.5);
+        assert_eq!(handle.volume(), 0.0);
+        let mut out = [Frame::ZERO; 2];
+        s.render(&mut out, 0.01);
+        assert!(out.iter().all(|f| f.left == 0.0 && f.right == 0.0));
     }
 
     #[test]
