@@ -21,7 +21,9 @@ pub mod prelude {
     pub use winit;
 
     pub use game_toolkit_assets::Assets;
-    pub use game_toolkit_audio::{Audio, AudioError, PlayOptions, SoundHandle, SoundId, kira};
+    pub use game_toolkit_audio::{
+        Audio, AudioError, AudioStream, PlayOptions, SoundHandle, SoundId, StreamHandle, kira,
+    };
     pub use game_toolkit_core::{AppConfig, Context, Game, GameEvent, Rng, Time, asset_root, run};
     pub use game_toolkit_gfx::{
         Align, BlendMode, Camera, Camera2D, Camera3D, CircleInstance, Color, Frame, Graphics,

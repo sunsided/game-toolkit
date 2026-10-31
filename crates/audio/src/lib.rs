@@ -16,8 +16,10 @@
 //! # Ok(()) }
 //! ```
 //!
-//! Mixer tracks, spatial audio and streaming are not wrapped; [`kira`] is re-exported for
-//! anything beyond this API, and [`SoundHandle::with_kira`] reaches the underlying handle.
+//! Audio generated while it plays (a synthesizer, an emulated sound chip) goes through
+//! [`Audio::play_stream`]. Mixer tracks, spatial audio and file streaming are not wrapped;
+//! [`kira`] is re-exported for anything beyond this API, and [`SoundHandle::with_kira`]
+//! reaches the underlying handle.
 //!
 //! On the web, browsers keep an `AudioContext` suspended until the first user gesture, and kira
 //! offers no way to resume it. [`Audio`] therefore opens the backend lazily there: sounds can be
@@ -39,7 +41,10 @@ use kira::{AudioManager, AudioManagerSettings, Decibels, DefaultBackend, Frame, 
 mod handle;
 use handle::Slot;
 pub use handle::SoundHandle;
+mod stream;
 pub use kira;
+use stream::StreamData;
+pub use stream::{AudioStream, StreamHandle};
 
 #[cfg(feature = "synth")]
 mod synth;
@@ -132,6 +137,8 @@ pub struct Audio {
     master_volume: Decibels,
     /// [`PlayOptions::deferred`] sounds waiting for [`Audio::start`].
     queued: Vec<(StaticSoundData, SoundHandle)>,
+    /// [`PlayOptions::deferred`] streams waiting for [`Audio::start`].
+    queued_streams: Vec<StreamData>,
 }
 
 impl Audio {
@@ -144,6 +151,7 @@ impl Audio {
             next_id: 1,
             master_volume: Decibels::IDENTITY,
             queued: Vec::new(),
+            queued_streams: Vec::new(),
         };
         if !cfg!(target_arch = "wasm32") {
             audio.start()?;
@@ -166,6 +174,11 @@ impl Audio {
         self.manager = Some(manager);
         for (data, handle) in std::mem::take(&mut self.queued) {
             self.start_queued(data, &handle);
+        }
+        for data in std::mem::take(&mut self.queued_streams) {
+            if !data.handle().is_finished() {
+                self.start_stream(data);
+            }
         }
         Ok(())
     }
@@ -311,6 +324,54 @@ impl Audio {
             .ok_or(AudioError::NotStarted)?
             .play(data)
             .map_err(|e| AudioError::Backend(e.to_string()))
+    }
+
+    /// Play audio generated while it plays, such as a synthesizer or an emulated sound
+    /// chip: `stream` is asked for mono samples at `sample_rate` as the mixer needs them,
+    /// on the audio thread, and resampled to the output rate. It plays until stopped
+    /// through the returned handle. Fails like [`Audio::play`] before audio has started.
+    pub fn play_stream(
+        &mut self,
+        stream: impl AudioStream,
+        sample_rate: u32,
+    ) -> Result<StreamHandle, AudioError> {
+        self.play_stream_with(stream, sample_rate, PlayOptions::default())
+    }
+
+    /// [`Audio::play_stream`] with [`PlayOptions`]. `volume` and `deferred` apply;
+    /// `looped` has no meaning for a stream, which runs until stopped.
+    pub fn play_stream_with(
+        &mut self,
+        stream: impl AudioStream,
+        sample_rate: u32,
+        options: PlayOptions,
+    ) -> Result<StreamHandle, AudioError> {
+        let pending = self.manager.is_none();
+        if pending && !options.deferred {
+            return Err(AudioError::NotStarted);
+        }
+        let (data, handle) =
+            StreamData::new(Box::new(stream), sample_rate, options.volume, pending);
+        if pending {
+            self.queued_streams.push(data);
+        } else {
+            self.start_stream(data);
+        }
+        Ok(handle)
+    }
+
+    fn start_stream(&mut self, data: StreamData) {
+        let handle = data.handle().clone();
+        let Some(manager) = self.manager.as_mut() else {
+            return;
+        };
+        match manager.play(data) {
+            Ok(()) => handle.mark_started(),
+            Err(e) => {
+                log::warn!("stream failed to start: {e}");
+                handle.stop();
+            }
+        }
     }
 
     /// Master volume on the default main track, as a linear amplitude
