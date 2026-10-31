@@ -307,7 +307,10 @@ mod tests {
         handle.mark_started();
         manager.backend_mut().on_start_processing();
         manager.backend_mut().process();
-        assert!(pulled.load(Ordering::Relaxed) > 0, "stream was never asked for samples");
+        assert!(
+            pulled.load(Ordering::Relaxed) > 0,
+            "stream was never asked for samples"
+        );
         assert!(handle.is_playing());
 
         handle.stop();
