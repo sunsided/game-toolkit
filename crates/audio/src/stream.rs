@@ -42,7 +42,8 @@ struct Shared {
 /// Controls one playing [`AudioStream`], as returned by [`crate::Audio::play_stream`].
 ///
 /// Dropping the handle does not stop the stream; it plays until [`StreamHandle::stop`].
-/// Clones refer to the same stream. Changes apply from the next audio block.
+/// Clones refer to the same stream. Changes apply from the next audio block, and volume
+/// changes, pausing and stopping ramp over that block so they do not click.
 #[derive(Clone, Debug)]
 pub struct StreamHandle {
     shared: Arc<Shared>,
@@ -74,17 +75,19 @@ impl StreamHandle {
         f32::from_bits(self.shared.volume.load(Ordering::Relaxed))
     }
 
-    /// Pause: the stream outputs silence and is not asked for samples until resumed.
+    /// Pause: the stream fades out over one audio block, then outputs silence and is not
+    /// asked for samples until resumed.
     pub fn pause(&self) {
         self.shared.paused.store(true, Ordering::Relaxed);
     }
 
-    /// Resume a paused stream where it left off.
+    /// Resume a paused stream where it left off, fading back in over one audio block.
     pub fn resume(&self) {
         self.shared.paused.store(false, Ordering::Relaxed);
     }
 
-    /// Stop the stream for good; it is dropped from the mixer.
+    /// Stop the stream for good; it fades out over one audio block and is then dropped from
+    /// the mixer.
     pub fn stop(&self) {
         self.shared.stopped.store(true, Ordering::Relaxed);
     }
@@ -147,17 +150,7 @@ impl SoundData for StreamData {
     type Handle = ();
 
     fn into_sound(self) -> Result<(Box<dyn Sound>, ()), Self::Error> {
-        let sound = StreamSound {
-            stream: self.stream,
-            sample_rate: f64::from(self.sample_rate),
-            shared: self.handle.shared,
-            chunk: vec![0.0; CHUNK],
-            next_in_chunk: CHUNK,
-            previous: 0.0,
-            current: 0.0,
-            phase: 0.0,
-            primed: false,
-        };
+        let sound = StreamSound::new(self.stream, self.sample_rate, self.handle.shared);
         Ok((Box::new(sound), ()))
     }
 }
@@ -176,9 +169,32 @@ struct StreamSound {
     phase: f64,
     /// Whether `previous` and `current` hold the first two samples yet.
     primed: bool,
+    /// The gain the last block ended on; each block ramps from it to the target gain.
+    applied_volume: f32,
 }
 
 impl StreamSound {
+    fn new(stream: Box<dyn AudioStream>, sample_rate: u32, shared: Arc<Shared>) -> Self {
+        // Start at the target volume (or silence if paused) so playback does not fade in.
+        let applied_volume = if shared.paused.load(Ordering::Relaxed) {
+            0.0
+        } else {
+            f32::from_bits(shared.volume.load(Ordering::Relaxed))
+        };
+        Self {
+            stream,
+            sample_rate: f64::from(sample_rate),
+            shared,
+            chunk: vec![0.0; CHUNK],
+            next_in_chunk: CHUNK,
+            previous: 0.0,
+            current: 0.0,
+            phase: 0.0,
+            primed: false,
+            applied_volume,
+        }
+    }
+
     fn next_sample(&mut self) -> f32 {
         if self.next_in_chunk == self.chunk.len() {
             self.stream.fill(&mut self.chunk);
@@ -191,8 +207,14 @@ impl StreamSound {
 
     /// Produces `out` at an output frame duration of `dt` seconds.
     fn render(&mut self, out: &mut [Frame], dt: f64) {
-        if self.shared.paused.load(Ordering::Relaxed) || self.shared.stopped.load(Ordering::Relaxed)
-        {
+        let silenced = self.shared.paused.load(Ordering::Relaxed)
+            || self.shared.stopped.load(Ordering::Relaxed);
+        let target = if silenced {
+            0.0
+        } else {
+            f32::from_bits(self.shared.volume.load(Ordering::Relaxed))
+        };
+        if silenced && self.applied_volume == 0.0 {
             out.fill(Frame::ZERO);
             return;
         }
@@ -201,9 +223,12 @@ impl StreamSound {
             self.current = self.next_sample();
             self.primed = true;
         }
-        let volume = f32::from_bits(self.shared.volume.load(Ordering::Relaxed));
+        let from = self.applied_volume;
+        let len = out.len() as f32;
         let step = self.sample_rate * dt;
-        for frame in out {
+        for (i, frame) in out.iter_mut().enumerate() {
+            // Linear ramp that lands exactly on `target` at the block's last frame.
+            let volume = from + (target - from) * ((i + 1) as f32 / len);
             let s = self.previous + (self.current - self.previous) * self.phase as f32;
             *frame = Frame::from_mono(s * volume);
             self.phase += step;
@@ -212,6 +237,9 @@ impl StreamSound {
                 self.previous = self.current;
                 self.current = self.next_sample();
             }
+        }
+        if !out.is_empty() {
+            self.applied_volume = target;
         }
     }
 }
@@ -222,7 +250,8 @@ impl Sound for StreamSound {
     }
 
     fn finished(&self) -> bool {
-        self.shared.stopped.load(Ordering::Relaxed)
+        // Only once the fade-out block has played, so stopping does not click.
+        self.shared.stopped.load(Ordering::Relaxed) && self.applied_volume == 0.0
     }
 }
 
@@ -236,17 +265,7 @@ mod tests {
 
     fn sound_at(stream: impl AudioStream, rate: u32, volume: f32) -> (StreamSound, StreamHandle) {
         let (data, handle) = StreamData::new(Box::new(stream), rate, volume, false);
-        let sound = StreamSound {
-            stream: data.stream,
-            sample_rate: f64::from(data.sample_rate),
-            shared: handle.shared.clone(),
-            chunk: vec![0.0; CHUNK],
-            next_in_chunk: CHUNK,
-            previous: 0.0,
-            current: 0.0,
-            phase: 0.0,
-            primed: false,
-        };
+        let sound = StreamSound::new(data.stream, data.sample_rate, handle.shared.clone());
         (sound, handle)
     }
 
@@ -279,15 +298,49 @@ mod tests {
     }
 
     #[test]
-    fn paused_and_stopped_streams_are_silent() {
-        let (mut s, handle) = sound(ramp(), 100);
+    fn paused_and_stopped_streams_fade_out_then_go_silent() {
+        let (mut s, handle) = sound(|out: &mut [f32]| out.fill(1.0), 100);
         let mut out = [Frame::ZERO; 4];
         handle.pause();
         s.render(&mut out, 0.01);
+        let left: Vec<f32> = out.iter().map(|f| f.left).collect();
+        assert_eq!(left, [0.75, 0.5, 0.25, 0.0]);
+        s.render(&mut out, 0.01);
         assert!(out.iter().all(|f| *f == Frame::ZERO));
+
         handle.resume();
+        s.render(&mut out, 0.01);
+        let left: Vec<f32> = out.iter().map(|f| f.left).collect();
+        assert_eq!(left, [0.25, 0.5, 0.75, 1.0]);
+
         handle.stop();
-        assert!(s.finished() && handle.is_finished() && !handle.is_playing());
+        assert!(handle.is_finished() && !handle.is_playing());
+        assert!(!s.finished(), "dropped before the fade-out block");
+        s.render(&mut out, 0.01);
+        assert_eq!(out[3].left, 0.0);
+        assert!(s.finished());
+    }
+
+    #[test]
+    fn a_paused_stream_is_not_asked_for_samples() {
+        use std::sync::atomic::AtomicUsize;
+
+        let pulled = Arc::new(AtomicUsize::new(0));
+        let counter = Arc::clone(&pulled);
+        let (mut s, handle) = sound(
+            move |out: &mut [f32]| {
+                counter.fetch_add(1, Ordering::Relaxed);
+                out.fill(1.0);
+            },
+            100,
+        );
+        let mut out = [Frame::ZERO; 4];
+        handle.pause();
+        s.render(&mut out, 0.01); // fade-out block
+        let after_fade = pulled.load(Ordering::Relaxed);
+        s.render(&mut out, 0.01);
+        s.render(&mut out, 0.01);
+        assert_eq!(pulled.load(Ordering::Relaxed), after_fade);
     }
 
     #[test]
@@ -335,11 +388,22 @@ mod tests {
     }
 
     #[test]
-    fn volume_scales_output() {
+    fn volume_changes_ramp_over_one_block() {
         let (mut s, handle) = sound(|out: &mut [f32]| out.fill(1.0), 100);
         handle.set_volume(0.25);
         let mut out = [Frame::ZERO; 3];
         s.render(&mut out, 0.01);
-        assert_eq!(out[2].left, 0.25);
+        let left: Vec<f32> = out.iter().map(|f| f.left).collect();
+        assert_eq!(left, [0.75, 0.5, 0.25]);
+        s.render(&mut out, 0.01);
+        assert!(out.iter().all(|f| f.left == 0.25));
+    }
+
+    #[test]
+    fn a_stream_starts_at_its_volume_without_fading_in() {
+        let (mut s, _) = sound_at(|out: &mut [f32]| out.fill(1.0), 100, 0.5);
+        let mut out = [Frame::ZERO; 3];
+        s.render(&mut out, 0.01);
+        assert!(out.iter().all(|f| f.left == 0.5));
     }
 }
