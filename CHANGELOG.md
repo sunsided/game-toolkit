@@ -11,6 +11,22 @@ All notable changes to this project are documented here. The format is based on
 - `Graphics::update_texture_rgba` overwrites an existing texture's pixels in place, for content
   that changes every frame such as a software-rendered framebuffer (#64).
 
+## [0.6.0] - 2026-10-28
+
+### Changed
+
+- **Breaking:** synthie 0.6 behind the `synth` feature. `Synth`'s API is unchanged, but the
+  re-exported `game_toolkit::synthie` is now 0.6, so games that name synthie types and depend on
+  `synthie = "0.4"` themselves need `synthie = "0.6"`.
+- `Synth` renders with synthie's voice normalization off, so a note is no longer divided by the
+  polyphony (4) before the peak normalization. With `target_peak` at `0.0` the raw output is
+  about four times louder than before.
+
+### Fixed
+
+- `Synth` no longer lets a previous render's reverb, delay or chorus tail bleed into the next
+  one (synthie 0.6 clears the FX on panic).
+
 ## [0.5.0] - 2026-10-25
 
 ### Added
@@ -267,7 +283,8 @@ the `game-toolkit` umbrella; add one dependency and `use game_toolkit::prelude::
 - Top-level and per-crate `README.md`s, crates.io metadata, and `#![forbid(unsafe_code)]`
   across every crate.
 
-[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/sunsided/game-toolkit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/sunsided/game-toolkit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/sunsided/game-toolkit/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/sunsided/game-toolkit/compare/v0.3.0...v0.3.1
