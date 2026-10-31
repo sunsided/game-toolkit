@@ -16,8 +16,10 @@
 //! # Ok(()) }
 //! ```
 //!
-//! Mixer tracks, spatial audio and streaming are not wrapped; [`kira`] is re-exported for
-//! anything beyond this API, and [`SoundHandle::with_kira`] reaches the underlying handle.
+//! Audio generated while it plays (a synthesizer, an emulated sound chip) goes through
+//! [`Audio::play_stream`]. Mixer tracks, spatial audio and file streaming are not wrapped;
+//! [`kira`] is re-exported for anything beyond this API, and [`SoundHandle::with_kira`]
+//! reaches the underlying handle.
 //!
 //! On the web, browsers keep an `AudioContext` suspended until the first user gesture, and kira
 //! offers no way to resume it. [`Audio`] therefore opens the backend lazily there: sounds can be
