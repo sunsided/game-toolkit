@@ -44,7 +44,6 @@ impl TextureWrap {
 pub struct Texture {
     pub size: [u32; 2],
     pub(crate) bind_group: wgpu::BindGroup,
-    #[allow(dead_code)]
     pub(crate) texture: wgpu::Texture,
     pub(crate) view: wgpu::TextureView,
     pub(crate) wrap: TextureWrap,
@@ -243,6 +242,39 @@ impl TextureRegistry {
         if let Some(new_tex) = self.map.remove(&new_id) {
             self.map.insert(id, new_tex);
         }
+    }
+
+    /// Overwrite the pixels of `id` in place. `rgba` must hold exactly `width * height * 4`
+    /// bytes for the texture's current size. Returns `false` (and writes nothing) for an
+    /// unknown id or a size mismatch.
+    pub fn write_rgba(&self, queue: &wgpu::Queue, id: TextureId, rgba: &[u8]) -> bool {
+        let Some(tex) = self.map.get(&id) else {
+            return false;
+        };
+        let [width, height] = tex.size;
+        if rgba.len() != (width as usize) * (height as usize) * 4 {
+            return false;
+        }
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &tex.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            rgba,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * width),
+                rows_per_image: Some(height),
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+        true
     }
 
     pub fn create_from_rgba(
