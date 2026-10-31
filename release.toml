@@ -17,6 +17,10 @@
 #   All local (no CI; needs CARGO_REGISTRY_TOKEN in your env):
 #     cargo release 0.1.0 --execute                # bump + commit + tag + push + publish
 #
+# CHANGELOG.md is stamped during the bump: `## [Unreleased]` becomes `## [X.Y.Z] - <date>`
+# under a fresh `[Unreleased]`, and the compare links are updated. Those replacements live in
+# crates/prelude/Cargo.toml ([package.metadata.release]) so the shared file is edited once.
+#
 # Dry-run either by dropping --execute. `task publish` does just the ordered publish step
 # with no tooling to install; cargo-release adds the version-bump, commit, and tagging.
 
