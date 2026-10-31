@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-31
+
 ### Added
 
 - `Audio::play_stream` / `play_stream_with` play audio generated while it plays (a running
@@ -290,7 +292,8 @@ the `game-toolkit` umbrella; add one dependency and `use game_toolkit::prelude::
 - Top-level and per-crate `README.md`s, crates.io metadata, and `#![forbid(unsafe_code)]`
   across every crate.
 
-[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/sunsided/game-toolkit/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/sunsided/game-toolkit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/sunsided/game-toolkit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/sunsided/game-toolkit/compare/v0.3.1...v0.4.0
