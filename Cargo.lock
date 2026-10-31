@@ -1117,6 +1117,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ex_14_framebuffer"
+version = "0.6.0"
+dependencies = [
+ "env_logger",
+ "game-toolkit",
+]
+
+[[package]]
 name = "extended"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

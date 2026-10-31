@@ -1,5 +1,6 @@
 //! Plays a loaded WAV (Space) and synthesized retro effects (1/2/3) through `game-toolkit-audio`,
-//! plus a looping "music" track (M to pause/resume, Up/Down for its volume).
+//! plus a looping "music" track (M to pause/resume, Up/Down for its volume) and a tone generated
+//! while it plays (4 to start/stop).
 //!
 //! `ctx.audio` is an `Option<Audio>`: when the audio backend fails to initialize the
 //! toolkit keeps running muted rather than aborting. This example mirrors that contract -
@@ -11,6 +12,9 @@
 //! Every play call returns a `SoundHandle` for that instance. The music is started in `init`
 //! with `PlayOptions::looped().deferred()`: on the web, where audio only starts after the first
 //! key press or click, the deferred play is queued and begins on that gesture instead of failing.
+//!
+//! The tone on 4 is an `Audio::play_stream`: a closure that computes samples on the audio
+//! thread as the mixer asks for them, the way a running synth or an emulated sound chip would.
 
 use game_toolkit::prelude::*;
 
@@ -20,6 +24,7 @@ struct AudioDemo {
     plays: u32,
     music: Option<SoundHandle>,
     music_volume: f32,
+    tone: Option<StreamHandle>,
 }
 
 impl Game for AudioDemo {
@@ -54,6 +59,7 @@ impl Game for AudioDemo {
             plays: 0,
             music,
             music_volume,
+            tone: None,
         })
     }
 
@@ -91,6 +97,23 @@ impl Game for AudioDemo {
             }
         }
 
+        // A generated tone, toggled on 4. Stopping fades it out; a stopped stream is gone,
+        // so the next press starts a fresh one.
+        if ctx.input.key_pressed(Key::Digit4)
+            && let Some(audio) = ctx.audio.as_mut()
+        {
+            match self.tone.take() {
+                Some(tone) => tone.stop(),
+                None => match audio.play_stream(warble(TONE_RATE), TONE_RATE) {
+                    Ok(handle) => {
+                        handle.set_volume(self.music_volume);
+                        self.tone = Some(handle);
+                    }
+                    Err(e) => log::warn!("tone failed to start: {e}"),
+                },
+            }
+        }
+
         // Synthesized retro effects on the number keys.
         let pcm = if ctx.input.key_pressed(Key::Digit1) {
             Some(self.synth.blip())
@@ -115,9 +138,9 @@ impl Game for AudioDemo {
         let mut p = frame.painter(&mut ctx.gfx);
         p.clear([0.06, 0.07, 0.1, 1.0]);
         let status = if self.sound.is_some() {
-            "Space: WAV   1: blip   2: coin   3: thud   (Esc to quit)"
+            "Space: WAV   1: blip   2: coin   3: thud   4: tone   (Esc to quit)"
         } else {
-            "No device - running muted. 1/2/3 synth, Space WAV (Esc to quit)"
+            "No device - running muted. 1/2/3/4 synth, Space WAV (Esc to quit)"
         };
         p.text([24.0, 24.0], status, 20.0, [0.9, 0.9, 0.95, 1.0]);
         p.text(
@@ -136,6 +159,29 @@ impl Game for AudioDemo {
             ),
         };
         p.text([24.0, 88.0], &music, 20.0, [0.6, 0.8, 1.0, 1.0]);
+        let tone = if self.tone.is_some() {
+            "tone: streaming (4 to stop)"
+        } else {
+            "tone: off (4 to start)"
+        };
+        p.text([24.0, 120.0], tone, 20.0, [0.6, 0.8, 1.0, 1.0]);
+    }
+}
+
+/// Sample rate the tone is generated at; the stream resamples it to the output rate.
+const TONE_RATE: u32 = 22_050;
+
+/// A square-ish lead whose pitch wobbles with a slow vibrato, computed sample by sample.
+fn warble(sample_rate: u32) -> impl AudioStream {
+    let rate = sample_rate as f32;
+    let (mut phase, mut lfo) = (0.0f32, 0.0f32);
+    move |out: &mut [f32]| {
+        for s in out {
+            let freq = 330.0 * (1.0 + 0.03 * (lfo * std::f32::consts::TAU).sin());
+            *s = if phase < 0.5 { 0.15 } else { -0.15 };
+            phase = (phase + freq / rate).fract();
+            lfo = (lfo + 5.0 / rate).fract();
+        }
     }
 }
 

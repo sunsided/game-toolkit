@@ -154,13 +154,14 @@ Run any example with `cargo run -p <package>`.
 | `05_tilemap` | `ex_05_tilemap` | Instanced atlas tilemap. |
 | `06_egui` | `ex_06_egui` | egui debug overlay (uses the `ui` feature). |
 | `07_3d` | `ex_07_3d` | Depth-tested perspective cubes (instanced meshes) with a 2D HUD on top. |
-| `07_audio` | `ex_07_audio` | Play a WAV (Space) and synthesized retro effects (1/2/3); runs muted with no device. |
+| `07_audio` | `ex_07_audio` | Play a WAV (Space), synthesized retro effects (1/2/3) and a generated tone stream (4); runs muted with no device. |
 | `08_hot_reload` | `ex_08_hot_reload` | Edit `assets/reload_me.png` while it runs and watch the texture update live. |
 | `09_aseprite` | `ex_09_aseprite` | Load a native `.aseprite`, pack its frames into an atlas, and play a tagged animation. |
 | `10_gamepad` | `ex_10_gamepad` | Live gamepad overlay: sticks, buttons, stick-clicks, and rumble on A. |
 | `11_ecs` | `ex_11_ecs` | Bouncing particles driven by the `sillyecs` archetype ECS (build.rs codegen). |
 | `12_vector` | `ex_12_vector` | Vector graphics (filled circles, stroked path) via the optional vello backend. |
 | `13_web` | `ex_13_web` | Same code natively and in the browser: sprite, text, sound on click, gamepad. `task web`. |
+| `14_framebuffer` | `ex_14_framebuffer` | A CPU-rendered plasma uploaded every frame with `update_texture_rgba`. |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
 
 ## Audio
@@ -182,7 +183,26 @@ if let (Some(audio), Some(id)) = (&mut ctx.audio, music) {
 
 Plain `audio.play(id)` plays once. On the web it fails with `AudioError::NotStarted` until the
 player's first key press, click or touch, so log or ignore its error rather than `?`-ing it in
-`update`. `examples/07_audio` shows one-shots, synthesized effects and a looping track.
+`update`. `examples/07_audio` shows one-shots, synthesized effects, a looping track and a stream.
+
+Audio produced while it plays (a running synth, an emulated sound chip) goes through
+`play_stream`: the source is any `FnMut(&mut [f32]) + Send` (or an `AudioStream`), called on the
+audio thread for mono samples at the rate you name, and the returned `StreamHandle` controls
+it. No decoder thread is involved, so it works on the web as well:
+
+```rust
+let mut phase = 0.0f32;
+let tone = audio.play_stream(
+    move |out: &mut [f32]| {
+        for s in out {
+            *s = (phase * std::f32::consts::TAU).sin() * 0.2;
+            phase = (phase + 440.0 / 48_000.0).fract();
+        }
+    },
+    48_000,
+)?;
+tone.set_volume(0.5);                                // pause, resume, stop
+```
 
 ## Aseprite
 
