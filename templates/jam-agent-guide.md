@@ -155,8 +155,11 @@ if let (Some(audio), Some(id)) = (&mut ctx.audio, music) {
 ```
 
 Keep the `SoundHandle` to control the sound later; dropping it lets the sound play out.
-`play_samples` / `play_samples_with` take mono PCM (e.g. from `Synth`). The prelude re-exports
-`kira` for anything else (`handle.with_kira(|h| ...)`); don't add your own `kira` dependency.
+`play_samples` / `play_samples_with` take mono PCM (e.g. from `Synth`). For audio produced while
+it plays (a running synth, an emulated sound chip), `play_stream(source, sample_rate)` /
+`play_stream_with` call `source` (any `FnMut(&mut [f32]) + Send`, or an `AudioStream`) for mono
+samples on the audio thread, and return a `StreamHandle` (`set_volume`, `pause`, `resume`,
+`stop`). It works on the web too. The prelude re-exports `kira` for anything else (`handle.with_kira(|h| ...)`); don't add your own `kira` dependency.
 
 In the browser, audio starts on the player's first key press / click / touch (a browser rule);
 before that `play` fails with `AudioError::NotStarted` (check `audio.is_started()`), so don't
