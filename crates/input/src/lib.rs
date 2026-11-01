@@ -79,6 +79,10 @@ impl Gamepad {
     pub fn button_released(&self, b: Button) -> bool {
         self.released.contains(&b)
     }
+    /// Any button on this controller went down this frame.
+    pub fn any_button_pressed(&self) -> bool {
+        !self.pressed.is_empty()
+    }
     /// Axis value in `[-1, 1]` (triggers in `[0, 1]`); `0.0` if never reported.
     pub fn axis(&self, axis: Axis) -> f32 {
         self.axes.get(&axis).copied().unwrap_or(0.0)
@@ -217,6 +221,50 @@ impl Input {
         self.keys_released.contains(&k)
     }
 
+    /// Any key other than a modifier (Shift, Ctrl, Alt, Super, ...) went down this frame: the
+    /// classic "press any key". Modifiers alone don't count, so Alt-Tabbing away or holding
+    /// Shift doesn't skip a screen; [`Input::keys_pressed`] still reports them.
+    pub fn any_key_pressed(&self) -> bool {
+        self.keys_pressed.iter().any(|k| !is_modifier(*k))
+    }
+
+    /// Every key that went down this frame, modifiers included, in no particular order (for
+    /// "press a key to bind it", cheat codes, typing a name).
+    pub fn keys_pressed(&self) -> impl Iterator<Item = Key> + '_ {
+        self.keys_pressed.iter().copied()
+    }
+
+    /// Any mouse button went down this frame.
+    pub fn any_mouse_pressed(&self) -> bool {
+        !self.mouse_pressed.is_empty()
+    }
+
+    /// Anything at all went down this frame: a non-modifier key ([`Input::any_key_pressed`]),
+    /// a mouse button, or a button on any connected gamepad. For "press any key to continue",
+    /// skipping intros, and waking an idle game. Touches don't reach [`Input`]; games that
+    /// handle them in `raw_window_event` need to check those separately.
+    ///
+    /// ```
+    /// use game_toolkit_input::Input;
+    ///
+    /// enum Screen { Title, Playing }
+    ///
+    /// fn update(input: &Input, screen: &mut Screen) {
+    ///     if matches!(screen, Screen::Title) && input.any_pressed() {
+    ///         *screen = Screen::Playing;
+    ///     }
+    /// }
+    ///
+    /// let mut screen = Screen::Title;
+    /// update(&Input::default(), &mut screen); // nothing pressed yet
+    /// assert!(matches!(screen, Screen::Title));
+    /// ```
+    pub fn any_pressed(&self) -> bool {
+        self.any_key_pressed()
+            || self.any_mouse_pressed()
+            || self.gamepads().any(Gamepad::any_button_pressed)
+    }
+
     pub fn mouse_held(&self, b: MouseButton) -> bool {
         self.mouse_held.contains(&b)
     }
@@ -308,5 +356,73 @@ impl Input {
             pad.pressed.clear();
             pad.released.clear();
         }
+    }
+}
+
+/// Keys that only modify other keys, ignored by [`Input::any_key_pressed`].
+fn is_modifier(k: Key) -> bool {
+    matches!(
+        k,
+        Key::ShiftLeft
+            | Key::ShiftRight
+            | Key::ControlLeft
+            | Key::ControlRight
+            | Key::AltLeft
+            | Key::AltRight
+            | Key::SuperLeft
+            | Key::SuperRight
+            | Key::Meta
+            | Key::Hyper
+            | Key::Fn
+            | Key::FnLock
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // winit's `KeyEvent` can't be built outside winit, so these drive the edge sets directly,
+    // the way `handle_window_event` and `poll_gamepads` fill them.
+
+    #[test]
+    fn nothing_pressed_by_default() {
+        let input = Input::default();
+        assert!(!input.any_key_pressed());
+        assert!(!input.any_mouse_pressed());
+        assert!(!input.any_pressed());
+        assert_eq!(input.keys_pressed().count(), 0);
+    }
+
+    #[test]
+    fn a_key_counts_but_a_lone_modifier_does_not() {
+        let mut input = Input::default();
+        input.keys_pressed.insert(Key::ShiftLeft);
+        assert!(!input.any_key_pressed());
+        assert!(!input.any_pressed());
+        assert_eq!(input.keys_pressed().collect::<Vec<_>>(), [Key::ShiftLeft]);
+
+        input.keys_pressed.insert(Key::KeyX);
+        assert!(input.any_key_pressed());
+        assert!(input.any_pressed());
+        assert_eq!(input.keys_pressed().count(), 2);
+    }
+
+    #[test]
+    fn mouse_buttons_count() {
+        let mut input = Input::default();
+        input.mouse_pressed.insert(MouseButton::Right);
+        assert!(input.any_mouse_pressed());
+        assert!(input.any_pressed());
+        assert!(!input.any_key_pressed());
+    }
+
+    #[test]
+    fn end_frame_clears_the_edges() {
+        let mut input = Input::default();
+        input.keys_pressed.insert(Key::Space);
+        input.mouse_pressed.insert(MouseButton::Left);
+        input.end_frame();
+        assert!(!input.any_pressed());
     }
 }
