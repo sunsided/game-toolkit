@@ -118,8 +118,9 @@ Atlas sprites with a layer or mirroring: `p.draw_sprite(..).region(..)` above, o
 ```rust
 ctx.input.key_pressed(Key::Space)   // also key_held / key_released
 ctx.input.mouse_pressed(MouseButton::Left) // mouse_held / mouse_released / mouse_pos() / mouse_delta() / scroll()
-ctx.input.any_pressed()             // "press any key": any non-modifier key, mouse button or pad button
+ctx.input.any_pressed()             // "press any key": any non-modifier key, mouse/pad button or touch
 // also any_key_pressed / any_mouse_pressed / keys_pressed() (iterator) / pad.any_button_pressed()
+for t in ctx.input.touches_started() { /* t.id(), t.pos() */ } // touches() / touch(id) / touches_ended()
 if let Some(pad) = ctx.input.first_gamepad() {
     let id = pad.id();
     let move_x = pad.axis(Axis::LeftStickX);   // -1.0..=1.0, feed into movement

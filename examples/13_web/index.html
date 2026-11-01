@@ -10,8 +10,9 @@
     <style>
       html, body { margin: 0; height: 100%; background: #141419; }
       body { display: flex; align-items: center; justify-content: center; }
-      /* Keep keyboard focus on the game and hide the focus ring. */
-      canvas { outline: none; }
+      /* Keep keyboard focus on the game and hide the focus ring. touch-action: none hands
+         touches to the game instead of letting the browser scroll or zoom (and cancel them). */
+      canvas { outline: none; touch-action: none; }
     </style>
   </head>
   <body>

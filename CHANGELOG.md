@@ -13,6 +13,16 @@ All notable changes to this project are documented here. The format is based on
   an iterator over every key that went down this frame; plus `Gamepad::any_button_pressed`.
   Modifier keys alone don't count as "any key", so holding Shift or Alt-Tabbing away doesn't
   skip a screen (#67).
+- Touch input on `Input`: `touches()` (fingers currently down) and `touch(id)`, plus
+  `touches_started()` / `touches_ended()` for this frame's edges. Each `Touch` carries its
+  `id`, `pos`, `start_pos` (tap vs. swipe) and per-frame `delta`, in physical pixels like
+  `mouse_pos`. Cancelled touches vanish without counting as ended. `any_pressed` now includes
+  a finger going down (`any_touch_pressed`) (#69).
+
+### Changed
+
+- The web example and both templates set `touch-action: none` on the canvas, so the browser
+  hands touches to the game instead of scrolling or zooming the page (#69).
 
 ## [0.6.1] - 2026-10-31
 

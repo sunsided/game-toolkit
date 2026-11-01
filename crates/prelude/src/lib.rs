@@ -30,7 +30,9 @@ pub mod prelude {
         Layer, Mat4, MeshId, MeshInstance, MeshVertex, Painter, SpriteInstance, TextureId,
         TextureWrap, Tilemap, transform, wgpu,
     };
-    pub use game_toolkit_input::{Axis, Button, Gamepad, GamepadId, Input, Key, MouseButton};
+    pub use game_toolkit_input::{
+        Axis, Button, Gamepad, GamepadId, Input, Key, MouseButton, Touch,
+    };
 
     #[cfg(feature = "ui")]
     pub use game_toolkit_ui::{self, Ui, egui};
