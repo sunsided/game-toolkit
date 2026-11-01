@@ -18,6 +18,11 @@ All notable changes to this project are documented here. The format is based on
   `id`, `pos`, `start_pos` (tap vs. swipe) and per-frame `delta`, in physical pixels like
   `mouse_pos`. Cancelled touches vanish without counting as ended. `any_pressed` now includes
   a finger going down (`any_touch_pressed`) (#69).
+- `examples/15_touch`: every finger as a ring, taps vs. swipes, and counters, for checking
+  touch on a phone or tablet.
+- `task web:lan` (toolkit and both templates) serves the web build on all interfaces, so a
+  phone on the same network can open it; trunk prints the LAN URLs. Over plain http browsers
+  offer only WebGL2, not WebGPU.
 
 ### Changed
 

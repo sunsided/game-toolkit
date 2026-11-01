@@ -67,6 +67,7 @@ task lint                  # clippy -D warnings   (lint:fix to auto-fix + fmt)
 task test                  # nextest if present, else cargo test; doctests run separately
 task run EXAMPLE=ex_05_tilemap   # run an example by package; see example:* / run:* aliases
 task web                   # serve examples/13_web in a browser via trunk (WEB_DIR=... to switch)
+task web:lan               # same on 0.0.0.0, for phones on the LAN (touch: WEB_DIR=examples/15_touch)
 task check:wasm            # clippy for wasm32-unknown-unknown, all features
 task assets:manifest       # regenerate <WEB_DIR>/assets/manifest.txt (web preload list)
 task atlas -- --input sprites/ --output a.png --metadata a.json   # atlas-packer CLI
@@ -77,7 +78,7 @@ task labels                # create/update GitHub PR labels (gh); keep in sync w
 PRs are labelled by changed paths (`.github/workflows/labeler.yml`, config in
 `.github/labeler.yml`). Adding a crate or top-level area means a new entry there and in `task labels`.
 
-Examples live in `examples/` (`ex_01_window` … `ex_13_web`, `bouncing_ball`); the offline
+Examples live in `examples/` (`ex_01_window` … `ex_15_touch`, `bouncing_ball`); the offline
 atlas-packer is in `tools/atlas-packer`.
 
 ## Templates

@@ -283,6 +283,7 @@ task fmt                 # cargo fmt --all
 task check               # fmt --check AND clippy -D warnings  (run before you call it done)
 task check:wasm          # clippy for the browser target
 task web                 # serve in the browser at http://localhost:8080 (trunk)
+task web:lan             # same, reachable from phones on the network (prints LAN URLs)
 task web:build           # browser build into dist/ (PROFILE=release for upload)
 ```
 
