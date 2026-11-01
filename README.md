@@ -165,6 +165,12 @@ Run any example with `cargo run -p <package>`.
 | `15_touch` | `ex_15_touch` | Every finger as a ring, taps vs. swipes, counters, touch-as-mouse toggle. Best on a phone: `task web:lan WEB_DIR=examples/15_touch`. |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
 
+### Made with game-toolkit
+
+- [**Cookie D'oh!**](https://github.com/sunsided/cookie-doh) ([play in the browser](https://sunsided.github.io/cookie-doh/)):
+  a C64/Amiga-era arcade game about accepting every cookie the Internet throws at you. A complete
+  game on the toolkit, native and web from the same code, with keyboard, gamepad and touch.
+
 ## Audio
 
 `ctx.audio` is an `Option<Audio>` (`None` when there is no output device; the game runs muted).
