@@ -102,10 +102,12 @@ impl Context {
                 None
             }
         };
+        let mut input = game_toolkit_input::Input::new();
+        input.set_touch_emulates_mouse(config.touch_emulates_mouse);
         Self {
             gfx: parts.gfx,
             audio,
-            input: game_toolkit_input::Input::new(),
+            input,
             assets: parts.assets,
             time: Time::new(),
             rng: Rng::new(config.random_seed),

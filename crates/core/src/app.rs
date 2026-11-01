@@ -57,6 +57,12 @@ pub struct AppConfig {
     /// MSAA sample count for the surface. `1` (default) disables MSAA; `2`/`4`/`8` enable it
     /// (the value must be supported by the adapter for the surface format).
     pub msaa_samples: u32,
+    /// Let the first finger on a touchscreen act as the mouse: it moves the cursor and
+    /// presses, holds and releases [`MouseButton::Left`](game_toolkit_input::MouseButton),
+    /// so a game written for the mouse also works on a phone. Off by default; toggle later
+    /// with [`Input::set_touch_emulates_mouse`](game_toolkit_input::Input::set_touch_emulates_mouse),
+    /// which has the details. No effect on Windows, where the OS already does this.
+    pub touch_emulates_mouse: bool,
 }
 
 impl Default for AppConfig {
@@ -74,6 +80,7 @@ impl Default for AppConfig {
             random_seed: crate::Rng::DEFAULT_SEED,
             depth_format: None,
             msaa_samples: 1,
+            touch_emulates_mouse: false,
         }
     }
 }

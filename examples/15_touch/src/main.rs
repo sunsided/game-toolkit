@@ -1,6 +1,7 @@
 //! Touch input: every finger on the screen as a ring with a line back to where it went down,
 //! a burst where a finger lifts (green for a tap, blue for a swipe), and counters. The mouse
-//! draws a small crosshair so it's easy to see touches don't move it.
+//! draws a crosshair: touches leave it alone until the button in the top-right corner (or M)
+//! turns on `Input::set_touch_emulates_mouse`, which makes the first finger drive it.
 //!
 //! Best on a phone or tablet: `task web:lan WEB_DIR=examples/15_touch`, then open one of the
 //! LAN addresses trunk prints on a device in the same network. On a desktop with a
@@ -12,6 +13,8 @@ use game_toolkit::prelude::*;
 const TAP_SLOP: f32 = 12.0;
 /// How long a lift burst stays on screen, in seconds.
 const BURST_TIME: f32 = 0.6;
+/// Size of the emulation toggle in the top-right corner, in logical pixels.
+const BUTTON: [f32; 2] = [180.0, 44.0];
 
 /// Distinct colors so simultaneous fingers are easy to tell apart.
 const FINGER_COLORS: [[f32; 4]; 5] = [
@@ -34,7 +37,20 @@ struct TouchDemo {
     swipes: u32,
     most_fingers: usize,
     any_presses: u32,
+    clicks: u32,
     bursts: Vec<Burst>,
+}
+
+/// Top-left corner and size of the emulation toggle, in physical pixels.
+fn button_rect(ctx: &Context) -> ([f32; 2], [f32; 2]) {
+    let scale = ctx.window.scale_factor() as f32;
+    let (w, _) = ctx.gfx.size();
+    let size = [BUTTON[0] * scale, BUTTON[1] * scale];
+    ([w as f32 - size[0] - 12.0 * scale, 12.0 * scale], size)
+}
+
+fn inside(p: (f32, f32), (pos, size): ([f32; 2], [f32; 2])) -> bool {
+    p.0 >= pos[0] && p.0 <= pos[0] + size[0] && p.1 >= pos[1] && p.1 <= pos[1] + size[1]
 }
 
 impl Game for TouchDemo {
@@ -46,9 +62,26 @@ impl Game for TouchDemo {
         if ctx.input.key_pressed(Key::Escape) {
             ctx.quit();
         }
+        // Toggle on a finger landing on the button (not with the mouse: with emulation on, that
+        // same finger would also click it and flip it right back).
+        let button = button_rect(ctx);
+        if ctx.input.key_pressed(Key::KeyM)
+            || ctx
+                .input
+                .touches_started()
+                .iter()
+                .any(|t| inside(t.pos(), button))
+        {
+            let on = !ctx.input.touch_emulates_mouse();
+            ctx.input.set_touch_emulates_mouse(on);
+        }
+
         let scale = ctx.window.scale_factor() as f32;
         let input = &ctx.input;
 
+        if input.mouse_pressed(MouseButton::Left) {
+            self.clicks += 1;
+        }
         if input.any_pressed() {
             self.any_presses += 1;
         }
@@ -77,6 +110,8 @@ impl Game for TouchDemo {
         // Touch and mouse positions are physical pixels; scale sizes so they read the same on a
         // phone (device pixel ratio 2-3) as on a desktop monitor.
         let scale = ctx.window.scale_factor() as f32;
+        let (bpos, bsize) = button_rect(ctx);
+        let emulating = ctx.input.touch_emulates_mouse();
         let input = &ctx.input;
         let mut p = frame.painter(&mut ctx.gfx);
         p.clear([0.08, 0.08, 0.11, 1.0]);
@@ -112,9 +147,26 @@ impl Game for TouchDemo {
 
         let (mx, my) = input.mouse_pos();
         let arm = 8.0 * scale;
-        let grey = [0.5, 0.5, 0.55, 1.0];
-        p.line([mx - arm, my], [mx + arm, my], 1.5 * scale, grey);
-        p.line([mx, my - arm], [mx, my + arm], 1.5 * scale, grey);
+        let cross = if input.mouse_held(MouseButton::Left) {
+            [1.0, 1.0, 1.0, 1.0]
+        } else {
+            [0.5, 0.5, 0.55, 1.0]
+        };
+        p.line([mx - arm, my], [mx + arm, my], 1.5 * scale, cross);
+        p.line([mx, my - arm], [mx, my + arm], 1.5 * scale, cross);
+
+        let (fill, label) = if emulating {
+            ([0.2, 0.45, 0.3, 1.0], "mouse emulation: on")
+        } else {
+            ([0.22, 0.22, 0.28, 1.0], "mouse emulation: off")
+        };
+        p.rect(bpos, bsize, fill);
+        p.text(
+            [bpos[0] + 10.0 * scale, bpos[1] + 13.0 * scale],
+            label,
+            14.0 * scale,
+            [0.9, 0.9, 0.95, 1.0],
+        );
 
         let fg = [0.85, 0.85, 0.9, 1.0];
         let (x, line) = (12.0 * scale, 24.0 * scale);
@@ -137,8 +189,8 @@ impl Game for TouchDemo {
         p.text(
             [x, x + 2.0 * line],
             &format!(
-                "taps: {}  swipes: {}  any_pressed: {}",
-                self.taps, self.swipes, self.any_presses
+                "taps: {}  swipes: {}  any_pressed: {}  mouse clicks: {}",
+                self.taps, self.swipes, self.any_presses, self.clicks
             ),
             16.0 * scale,
             [0.6, 0.8, 1.0, 1.0],
