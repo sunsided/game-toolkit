@@ -23,6 +23,10 @@ All notable changes to this project are documented here. The format is based on
 - `task web:lan` (toolkit and both templates) serves the web build on all interfaces, so a
   phone on the same network can open it; trunk prints the LAN URLs. Over plain http browsers
   offer only WebGL2, not WebGPU.
+- Opt-in touch-as-mouse: `AppConfig::touch_emulates_mouse` / `Input::set_touch_emulates_mouse`
+  let the first finger move `mouse_pos` and press, hold and release `MouseButton::Left`, so a
+  mouse-only game works on a phone. Off by default. No effect on Windows, where the OS already
+  turns touches into mouse events. `15_touch` has a button to toggle it (#70).
 
 ### Changed
 

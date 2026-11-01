@@ -133,6 +133,10 @@ pub struct Input {
     touches: HashMap<u64, Touch>,
     touches_started: Vec<Touch>,
     touches_ended: Vec<Touch>,
+    /// See [`Input::set_touch_emulates_mouse`].
+    touch_emulates_mouse: bool,
+    /// The finger currently acting as the mouse, while emulation is on.
+    mouse_finger: Option<u64>,
     /// `None` when no gamepad backend could initialize (the toolkit keeps running).
     gilrs: Option<Gilrs>,
     gamepads: HashMap<GamepadId, Gamepad>,
@@ -327,6 +331,30 @@ impl Input {
         !self.touches_started.is_empty()
     }
 
+    /// Let the first finger on a touchscreen act as the mouse, so a game written for the
+    /// mouse also works on a phone. Off by default (also settable through
+    /// `AppConfig::touch_emulates_mouse`).
+    ///
+    /// While on, the first finger down moves [`Input::mouse_pos`] to where it touched (without
+    /// a [`Input::mouse_delta`] jump), presses and holds [`MouseButton::Left`], drags the
+    /// cursor along, and releases the button where it lifts. Other fingers are ignored until
+    /// it lifts. A cancelled touch lets go of the button without a [`Input::mouse_released`]
+    /// edge, so it never counts as a click. [`Input::touches`] and friends keep working.
+    ///
+    /// No effect on Windows: the OS already turns touches into mouse events there, which
+    /// winit passes on, so emulating them again would press twice.
+    pub fn set_touch_emulates_mouse(&mut self, on: bool) {
+        self.touch_emulates_mouse = on;
+        if !on && self.mouse_finger.take().is_some() {
+            self.mouse_held.remove(&MouseButton::Left);
+        }
+    }
+
+    /// Whether [`Input::set_touch_emulates_mouse`] is on.
+    pub fn touch_emulates_mouse(&self) -> bool {
+        self.touch_emulates_mouse
+    }
+
     pub fn mouse_held(&self, b: MouseButton) -> bool {
         self.mouse_held.contains(&b)
     }
@@ -406,6 +434,7 @@ impl Input {
                 self.keys_held.clear();
                 self.mouse_held.clear();
                 self.touches.clear();
+                self.mouse_finger = None;
             }
             _ => {}
         }
@@ -413,6 +442,9 @@ impl Input {
 
     fn handle_touch(&mut self, id: u64, phase: winit::event::TouchPhase, pos: (f32, f32)) {
         use winit::event::TouchPhase;
+        if self.touch_emulates_mouse && !cfg!(target_os = "windows") {
+            self.emulate_mouse(id, phase, pos);
+        }
         match phase {
             TouchPhase::Started => {
                 let touch = Touch {
@@ -441,6 +473,38 @@ impl Input {
             }
             TouchPhase::Cancelled => {
                 self.touches.remove(&id);
+            }
+        }
+    }
+
+    /// Drive the mouse from the first finger; see [`Input::set_touch_emulates_mouse`].
+    fn emulate_mouse(&mut self, id: u64, phase: winit::event::TouchPhase, pos: (f32, f32)) {
+        use winit::event::TouchPhase;
+        match phase {
+            TouchPhase::Started if self.mouse_finger.is_none() => {
+                self.mouse_finger = Some(id);
+                // Jump without a delta: a finger landing elsewhere isn't a mouse movement.
+                self.mouse_pos = pos;
+                if self.mouse_held.insert(MouseButton::Left) {
+                    self.mouse_pressed.insert(MouseButton::Left);
+                }
+            }
+            _ if self.mouse_finger != Some(id) => {}
+            TouchPhase::Started => {}
+            TouchPhase::Moved | TouchPhase::Ended => {
+                self.mouse_delta.0 += pos.0 - self.mouse_pos.0;
+                self.mouse_delta.1 += pos.1 - self.mouse_pos.1;
+                self.mouse_pos = pos;
+                if phase == TouchPhase::Ended {
+                    self.mouse_finger = None;
+                    if self.mouse_held.remove(&MouseButton::Left) {
+                        self.mouse_released.insert(MouseButton::Left);
+                    }
+                }
+            }
+            TouchPhase::Cancelled => {
+                self.mouse_finger = None;
+                self.mouse_held.remove(&MouseButton::Left);
             }
         }
     }
@@ -616,6 +680,84 @@ mod tests {
         touch(&mut input, 4, winit::event::TouchPhase::Started, 0.0, 0.0);
         input.handle_window_event(&winit::event::WindowEvent::Focused(false));
         assert_eq!(input.touches().count(), 0);
+    }
+
+    #[test]
+    fn touches_leave_the_mouse_alone_by_default() {
+        use winit::event::TouchPhase::*;
+        let mut input = Input::default();
+        touch(&mut input, 1, Started, 50.0, 60.0);
+        assert_eq!(input.mouse_pos(), (0.0, 0.0));
+        assert!(!input.mouse_held(MouseButton::Left));
+        assert!(!input.any_mouse_pressed());
+    }
+
+    // Windows promotes touches to mouse events itself, so emulation is off there.
+    #[test]
+    #[cfg_attr(target_os = "windows", ignore)]
+    fn the_first_finger_drives_the_mouse() {
+        use winit::event::TouchPhase::*;
+        let mut input = Input::default();
+        input.set_touch_emulates_mouse(true);
+
+        touch(&mut input, 1, Started, 50.0, 60.0);
+        assert!(input.mouse_pressed(MouseButton::Left));
+        assert!(input.mouse_held(MouseButton::Left));
+        assert_eq!(input.mouse_pos(), (50.0, 60.0));
+        assert_eq!(input.mouse_delta(), (0.0, 0.0), "landing is not a movement");
+        input.end_frame();
+
+        // A second finger doesn't take over.
+        touch(&mut input, 2, Started, 300.0, 300.0);
+        touch(&mut input, 2, Moved, 310.0, 300.0);
+        assert!(!input.mouse_pressed(MouseButton::Left));
+        assert_eq!(input.mouse_pos(), (50.0, 60.0));
+
+        touch(&mut input, 1, Moved, 55.0, 70.0);
+        assert_eq!(input.mouse_pos(), (55.0, 70.0));
+        assert_eq!(input.mouse_delta(), (5.0, 10.0));
+        input.end_frame();
+
+        touch(&mut input, 1, Ended, 57.0, 70.0);
+        assert!(input.mouse_released(MouseButton::Left));
+        assert!(!input.mouse_held(MouseButton::Left));
+        assert_eq!(input.mouse_pos(), (57.0, 70.0));
+        input.end_frame();
+
+        // Finger 2 is still down, but only a new finger becomes the mouse.
+        touch(&mut input, 2, Moved, 320.0, 300.0);
+        assert_eq!(input.mouse_pos(), (57.0, 70.0));
+        touch(&mut input, 3, Started, 100.0, 100.0);
+        assert!(input.mouse_pressed(MouseButton::Left));
+        assert_eq!(input.mouse_pos(), (100.0, 100.0));
+    }
+
+    #[test]
+    #[cfg_attr(target_os = "windows", ignore)]
+    fn a_cancelled_mouse_finger_is_not_a_click() {
+        use winit::event::TouchPhase::*;
+        let mut input = Input::default();
+        input.set_touch_emulates_mouse(true);
+        touch(&mut input, 1, Started, 0.0, 0.0);
+        input.end_frame();
+        touch(&mut input, 1, Cancelled, 0.0, 0.0);
+        assert!(!input.mouse_held(MouseButton::Left));
+        assert!(!input.mouse_released(MouseButton::Left));
+        // The next finger can take over.
+        touch(&mut input, 2, Started, 5.0, 5.0);
+        assert!(input.mouse_pressed(MouseButton::Left));
+    }
+
+    #[test]
+    #[cfg_attr(target_os = "windows", ignore)]
+    fn turning_emulation_off_lets_go_of_the_button() {
+        let mut input = Input::default();
+        input.set_touch_emulates_mouse(true);
+        touch(&mut input, 1, winit::event::TouchPhase::Started, 0.0, 0.0);
+        input.set_touch_emulates_mouse(false);
+        assert!(!input.mouse_held(MouseButton::Left));
+        touch(&mut input, 1, winit::event::TouchPhase::Ended, 0.0, 0.0);
+        assert!(!input.mouse_released(MouseButton::Left));
     }
 
     #[test]
