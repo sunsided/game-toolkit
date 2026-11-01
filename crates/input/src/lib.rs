@@ -1,5 +1,5 @@
-//! Input subsystem: keyboard + mouse + gamepads, with held / just-pressed / just-released
-//! semantics.
+//! Input subsystem: keyboard + mouse + gamepads + touch, with held / just-pressed /
+//! just-released semantics.
 //!
 //! Call [`Input::handle_window_event`] for every `winit::event::WindowEvent` and
 //! [`Input::poll_gamepads`] once per frame before `update`, then [`Input::end_frame`] once
@@ -33,6 +33,36 @@ impl From<winit::event::MouseButton> for MouseButton {
             winit::event::MouseButton::Forward => MouseButton::Other(4),
             winit::event::MouseButton::Other(n) => MouseButton::Other(n),
         }
+    }
+}
+
+/// One finger on a touchscreen. Positions are in physical pixels, the same space as
+/// [`Input::mouse_pos`]. Obtain via [`Input::touches`], [`Input::touches_started`] or
+/// [`Input::touches_ended`].
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Touch {
+    id: u64,
+    pos: (f32, f32),
+    start_pos: (f32, f32),
+    delta: (f32, f32),
+}
+
+impl Touch {
+    /// Stable for as long as the finger stays down; the platform may reuse it afterwards.
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+    /// Where the finger is (for an ended touch: where it lifted).
+    pub fn pos(&self) -> (f32, f32) {
+        self.pos
+    }
+    /// Where the finger went down. Compare with [`Touch::pos`] to tell a tap from a swipe.
+    pub fn start_pos(&self) -> (f32, f32) {
+        self.start_pos
+    }
+    /// How far the finger moved this frame.
+    pub fn delta(&self) -> (f32, f32) {
+        self.delta
     }
 }
 
@@ -100,6 +130,9 @@ pub struct Input {
     mouse_pos: (f32, f32),
     mouse_delta: (f32, f32),
     scroll: (f32, f32),
+    touches: HashMap<u64, Touch>,
+    touches_started: Vec<Touch>,
+    touches_ended: Vec<Touch>,
     /// `None` when no gamepad backend could initialize (the toolkit keeps running).
     gilrs: Option<Gilrs>,
     gamepads: HashMap<GamepadId, Gamepad>,
@@ -240,9 +273,9 @@ impl Input {
     }
 
     /// Anything at all went down this frame: a non-modifier key ([`Input::any_key_pressed`]),
-    /// a mouse button, or a button on any connected gamepad. For "press any key to continue",
-    /// skipping intros, and waking an idle game. Touches don't reach [`Input`]; games that
-    /// handle them in `raw_window_event` need to check those separately.
+    /// a mouse button, a button on any connected gamepad, or a finger touching the screen
+    /// ([`Input::any_touch_pressed`]). For "press any key to continue", skipping intros, and
+    /// waking an idle game.
     ///
     /// ```
     /// use game_toolkit_input::Input;
@@ -263,6 +296,35 @@ impl Input {
         self.any_key_pressed()
             || self.any_mouse_pressed()
             || self.gamepads().any(Gamepad::any_button_pressed)
+            || self.any_touch_pressed()
+    }
+
+    /// Fingers currently on the screen, in no particular order.
+    pub fn touches(&self) -> impl Iterator<Item = &Touch> {
+        self.touches.values()
+    }
+
+    /// The finger with this [`Touch::id`], if it is still down.
+    pub fn touch(&self, id: u64) -> Option<&Touch> {
+        self.touches.get(&id)
+    }
+
+    /// Fingers that went down this frame, in event order. A tap that starts and ends within
+    /// one frame shows up here and in [`Input::touches_ended`], but not in [`Input::touches`].
+    pub fn touches_started(&self) -> &[Touch] {
+        &self.touches_started
+    }
+
+    /// Fingers that lifted this frame, in event order. Touches the platform cancels (e.g. the
+    /// browser took over the gesture, or the window lost focus) vanish from
+    /// [`Input::touches`] without appearing here, so a cancelled touch never counts as a tap.
+    pub fn touches_ended(&self) -> &[Touch] {
+        &self.touches_ended
+    }
+
+    /// Any finger went down this frame.
+    pub fn any_touch_pressed(&self) -> bool {
+        !self.touches_started.is_empty()
     }
 
     pub fn mouse_held(&self, b: MouseButton) -> bool {
@@ -336,11 +398,50 @@ impl Input {
                     self.scroll.1 += p.y as f32;
                 }
             },
+            WindowEvent::Touch(t) => {
+                let pos = (t.location.x as f32, t.location.y as f32);
+                self.handle_touch(t.id, t.phase, pos);
+            }
             WindowEvent::Focused(false) => {
                 self.keys_held.clear();
                 self.mouse_held.clear();
+                self.touches.clear();
             }
             _ => {}
+        }
+    }
+
+    fn handle_touch(&mut self, id: u64, phase: winit::event::TouchPhase, pos: (f32, f32)) {
+        use winit::event::TouchPhase;
+        match phase {
+            TouchPhase::Started => {
+                let touch = Touch {
+                    id,
+                    pos,
+                    start_pos: pos,
+                    delta: (0.0, 0.0),
+                };
+                self.touches.insert(id, touch);
+                self.touches_started.push(touch);
+            }
+            TouchPhase::Moved => {
+                if let Some(touch) = self.touches.get_mut(&id) {
+                    touch.delta.0 += pos.0 - touch.pos.0;
+                    touch.delta.1 += pos.1 - touch.pos.1;
+                    touch.pos = pos;
+                }
+            }
+            TouchPhase::Ended => {
+                if let Some(mut touch) = self.touches.remove(&id) {
+                    touch.delta.0 += pos.0 - touch.pos.0;
+                    touch.delta.1 += pos.1 - touch.pos.1;
+                    touch.pos = pos;
+                    self.touches_ended.push(touch);
+                }
+            }
+            TouchPhase::Cancelled => {
+                self.touches.remove(&id);
+            }
         }
     }
 
@@ -352,6 +453,11 @@ impl Input {
         self.mouse_released.clear();
         self.mouse_delta = (0.0, 0.0);
         self.scroll = (0.0, 0.0);
+        self.touches_started.clear();
+        self.touches_ended.clear();
+        for touch in self.touches.values_mut() {
+            touch.delta = (0.0, 0.0);
+        }
         for pad in self.gamepads.values_mut() {
             pad.pressed.clear();
             pad.released.clear();
@@ -424,5 +530,101 @@ mod tests {
         input.mouse_pressed.insert(MouseButton::Left);
         input.end_frame();
         assert!(!input.any_pressed());
+    }
+
+    fn touch(input: &mut Input, id: u64, phase: winit::event::TouchPhase, x: f64, y: f64) {
+        input.handle_window_event(&winit::event::WindowEvent::Touch(winit::event::Touch {
+            device_id: winit::event::DeviceId::dummy(),
+            phase,
+            location: winit::dpi::PhysicalPosition::new(x, y),
+            force: None,
+            id,
+        }));
+    }
+
+    #[test]
+    fn a_touch_goes_down_moves_and_lifts() {
+        use winit::event::TouchPhase::*;
+        let mut input = Input::default();
+
+        touch(&mut input, 7, Started, 10.0, 20.0);
+        assert!(input.any_touch_pressed());
+        assert!(input.any_pressed());
+        assert_eq!(input.touches_started().len(), 1);
+        assert_eq!(input.touch(7).unwrap().pos(), (10.0, 20.0));
+        input.end_frame();
+        assert!(!input.any_pressed());
+        assert_eq!(input.touches().count(), 1);
+
+        touch(&mut input, 7, Moved, 15.0, 20.0);
+        touch(&mut input, 7, Moved, 18.0, 24.0);
+        let t = *input.touch(7).unwrap();
+        assert_eq!(t.pos(), (18.0, 24.0));
+        assert_eq!(t.start_pos(), (10.0, 20.0));
+        assert_eq!(t.delta(), (8.0, 4.0));
+        input.end_frame();
+        assert_eq!(input.touch(7).unwrap().delta(), (0.0, 0.0));
+
+        touch(&mut input, 7, Ended, 20.0, 24.0);
+        assert_eq!(input.touches().count(), 0);
+        let ended = input.touches_ended();
+        assert_eq!(ended.len(), 1);
+        assert_eq!(ended[0].pos(), (20.0, 24.0));
+        assert_eq!(ended[0].start_pos(), (10.0, 20.0));
+        input.end_frame();
+        assert!(input.touches_ended().is_empty());
+    }
+
+    #[test]
+    fn a_tap_within_one_frame_is_started_and_ended() {
+        use winit::event::TouchPhase::*;
+        let mut input = Input::default();
+        touch(&mut input, 1, Started, 5.0, 5.0);
+        touch(&mut input, 1, Ended, 5.0, 5.0);
+        assert!(input.any_touch_pressed());
+        assert_eq!(input.touches_started().len(), 1);
+        assert_eq!(input.touches_ended().len(), 1);
+        assert_eq!(input.touches().count(), 0);
+    }
+
+    #[test]
+    fn fingers_are_tracked_separately() {
+        use winit::event::TouchPhase::*;
+        let mut input = Input::default();
+        touch(&mut input, 1, Started, 0.0, 0.0);
+        touch(&mut input, 2, Started, 100.0, 0.0);
+        touch(&mut input, 2, Moved, 110.0, 0.0);
+        assert_eq!(input.touches().count(), 2);
+        assert_eq!(input.touch(1).unwrap().pos(), (0.0, 0.0));
+        assert_eq!(input.touch(2).unwrap().pos(), (110.0, 0.0));
+    }
+
+    #[test]
+    fn a_cancelled_touch_vanishes_without_ending() {
+        use winit::event::TouchPhase::*;
+        let mut input = Input::default();
+        touch(&mut input, 3, Started, 0.0, 0.0);
+        input.end_frame();
+        touch(&mut input, 3, Cancelled, 0.0, 0.0);
+        assert_eq!(input.touches().count(), 0);
+        assert!(input.touches_ended().is_empty());
+    }
+
+    #[test]
+    fn losing_focus_drops_touches() {
+        let mut input = Input::default();
+        touch(&mut input, 4, winit::event::TouchPhase::Started, 0.0, 0.0);
+        input.handle_window_event(&winit::event::WindowEvent::Focused(false));
+        assert_eq!(input.touches().count(), 0);
+    }
+
+    #[test]
+    fn moves_and_ends_for_unknown_fingers_are_ignored() {
+        use winit::event::TouchPhase::*;
+        let mut input = Input::default();
+        touch(&mut input, 9, Moved, 1.0, 1.0);
+        touch(&mut input, 9, Ended, 1.0, 1.0);
+        assert_eq!(input.touches().count(), 0);
+        assert!(input.touches_ended().is_empty());
     }
 }

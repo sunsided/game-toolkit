@@ -16,6 +16,7 @@ A window opens with a ball bouncing around (spinning with its speed), and quits 
 rustup target add wasm32-unknown-unknown
 cargo install trunk --locked
 task web                         # http://localhost:8080, rebuilds on save
+task web:lan                     # same, but open it on a phone (prints LAN URLs)
 PROFILE=release task web:build   # dist/ - zip it and upload to itch.io as an HTML game
 ```
 

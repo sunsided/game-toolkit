@@ -65,6 +65,17 @@ tasks:
     cmds:
       - trunk serve {{.PROFILE_FLAG}} {{.CLI_ARGS}}
 
+  web:lan:
+    desc: Like web, but reachable from phones on the same network (trunk prints the LAN URLs)
+    summary: |
+      Serves on all interfaces, so anyone on the network can load the page. Plain http:
+      browsers only offer WebGPU on https or localhost, so remote devices get the WebGL2
+      fallback. Pass --tls-cert-path/--tls-key-path after -- to test WebGPU.
+    preconditions: *web-preconditions
+    deps: [assets:manifest]
+    cmds:
+      - trunk serve --address 0.0.0.0 {{.PROFILE_FLAG}} {{.CLI_ARGS}}
+
   web:build:
     desc: Build for the browser into dist/ (PROFILE=release, then zip dist/ for itch.io)
     preconditions: *web-preconditions

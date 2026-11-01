@@ -224,6 +224,13 @@ tasks:
       - task: run
         vars: {EXAMPLE: ex_14_framebuffer}
 
+  example:touch:
+    desc: Run the touch-input example (needs a touchscreen; best on a phone via web:lan)
+    aliases: [run:touch]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_15_touch}
+
   web:
     desc: 'Serve a crate in the browser with live rebuild (WEB_DIR=examples/13_web), http://localhost:8080'
     aliases: [example:web, run:web]
@@ -235,6 +242,17 @@ tasks:
     dir: '{{.WEB_DIR}}'
     cmds:
       - trunk serve {{.PROFILE_FLAG}} {{.CLI_ARGS}}
+
+  web:lan:
+    desc: 'Like web, but reachable from other devices on the network (phones); trunk prints the LAN URLs'
+    summary: |
+      Serves on all interfaces, so anyone on the network can load the page. Plain http:
+      browsers only offer WebGPU on https or localhost, so remote devices get the WebGL2
+      fallback. Pass --tls-cert-path/--tls-key-path after -- to test WebGPU.
+    preconditions: *web-preconditions
+    dir: '{{.WEB_DIR}}'
+    cmds:
+      - trunk serve --address 0.0.0.0 {{.PROFILE_FLAG}} {{.CLI_ARGS}}
 
   web:build:
     desc: 'Build a crate for the browser into <WEB_DIR>/dist (PROFILE=release for an upload-ready build)'

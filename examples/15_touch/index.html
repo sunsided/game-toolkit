@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- No pinch-zoom: on a phone every gesture should reach the game. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>15_touch - game-toolkit</title>
+    <!-- trunk: build the crate's binary to wasm. No assets, so no copy-dir. -->
+    <link data-trunk rel="rust" data-bin="15_touch" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #141419; }
+      /* Fill the viewport (!important beats the size winit sets inline), hand every touch to
+         the game instead of scrolling or zooming, and hide the focus ring. */
+      canvas {
+        display: block;
+        width: 100vw !important;
+        height: 100dvh !important;
+        outline: none;
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game" tabindex="0"></canvas>
+  </body>
+</html>

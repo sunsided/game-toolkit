@@ -162,6 +162,7 @@ Run any example with `cargo run -p <package>`.
 | `12_vector` | `ex_12_vector` | Vector graphics (filled circles, stroked path) via the optional vello backend. |
 | `13_web` | `ex_13_web` | Same code natively and in the browser: sprite, text, sound on click, gamepad. `task web`. |
 | `14_framebuffer` | `ex_14_framebuffer` | A CPU-rendered plasma uploaded every frame with `update_texture_rgba`. |
+| `15_touch` | `ex_15_touch` | Every finger as a ring, taps vs. swipes, counters. Best on a phone: `task web:lan WEB_DIR=examples/15_touch`. |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
 
 ## Audio
@@ -290,6 +291,7 @@ gamepads through the Gamepad API. [trunk](https://trunkrs.dev) does the bundling
 rustup target add wasm32-unknown-unknown
 cargo install trunk --locked
 task web                              # serve examples/13_web at http://localhost:8080
+task web:lan                          # same, reachable from phones on your network
 PROFILE=release task web:build        # dist/ ready to upload (itch.io, GitHub Pages)
 ```
 
@@ -340,6 +342,7 @@ task               # list tasks
 task ci            # fmt check + clippy + tests
 task run:3d        # run an example (see task --list for example:* shortcuts)
 task web           # serve examples/13_web in the browser (WEB_DIR=... for another crate)
+task web:lan       # same, on all interfaces, to open it on a phone (trunk prints the LAN URLs)
 task check:wasm    # clippy for wasm32-unknown-unknown (part of task check)
 task atlas -- --input sprites/ --output a.png --metadata a.json
 task publish:dry   # trial publish all crates in order (task publish releases for real)
