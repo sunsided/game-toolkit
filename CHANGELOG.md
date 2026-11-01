@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- "Press any key" queries on `Input`: `any_pressed` (any non-modifier key, mouse button or
+  gamepad button this frame), `any_key_pressed`, `any_mouse_pressed`, and `keys_pressed()`,
+  an iterator over every key that went down this frame; plus `Gamepad::any_button_pressed`.
+  Modifier keys alone don't count as "any key", so holding Shift or Alt-Tabbing away doesn't
+  skip a screen (#67).
+
 ## [0.6.1] - 2026-10-31
 
 ### Added
