@@ -235,6 +235,9 @@ tasks:
     desc: 'Serve a crate in the browser with live rebuild (WEB_DIR=examples/13_web), http://localhost:8080'
     aliases: [example:web, run:web]
     preconditions: &web-preconditions
+      # First: in a missing dir every later check fails with a misleading message.
+      - sh: test -d "{{.ROOT_DIR}}/{{.WEB_DIR}}"
+        msg: "WEB_DIR={{.WEB_DIR}} is not a directory (typo or stray character?)"
       - sh: command -v trunk
         msg: "trunk not found — run: cargo install trunk --locked"
       - sh: rustup target list --installed | grep -qx wasm32-unknown-unknown
