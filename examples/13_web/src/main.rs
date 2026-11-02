@@ -24,9 +24,12 @@ impl Game for Web {
     fn init(ctx: &mut Context) -> Result<Self> {
         let tex = ctx.load_texture("sprite.png")?;
         let blip = ctx.load_sound("blip.wav")?;
+        // synthie scales each of its 4 channels by 1/4 to leave headroom, and this song uses
+        // only two, so it peaks near 0.5 at full volume: 0.9 keeps it below the blip without
+        // burying it. A volume above 1.0 is fine for a sparse song.
         let music = ctx.audio.as_mut().and_then(|audio| {
             audio
-                .play_synth(song(), PlayOptions::looped().volume(0.4).deferred())
+                .play_synth(song(), PlayOptions::looped().volume(0.9).deferred())
                 .inspect_err(|e| log::warn!("music: {e}"))
                 .ok()
         });
