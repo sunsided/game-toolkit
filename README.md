@@ -166,15 +166,6 @@ Run any example with `cargo run -p <package>`.
 | `15_touch` | `ex_15_touch` | Every finger as a ring, taps vs. swipes, counters, touch-as-mouse toggle. Best on a phone: `task web:lan WEB_DIR=examples/15_touch`. |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
 
-### Made with game-toolkit
-
-- [**Cookie D'oh!**](https://github.com/sunsided/cookie-doh) ([play in the browser](https://sunsided.github.io/cookie-doh/)):
-  a C64/Amiga-era arcade game about accepting every cookie the Internet throws at you. A complete
-  game on the toolkit, native and web from the same code, with keyboard, gamepad and touch.
-- [**Cheesed!**](https://github.com/sunsided/cheesed) ([play in the browser](https://sunsided.github.io/cheesed/)):
-  a thrilling action adventure in DOS-era dress. The Mouse. The Cheese. The Destiny. Native and
-  web from the same code, with procedural music from title-screen metal to a music-box minuet.
-
 ## Audio
 
 `ctx.audio` is an `Option<Audio>` (`None` when there is no output device; the game runs muted).
@@ -406,5 +397,14 @@ open workstreams live in the [toolkit epic](https://github.com/sunsided/game-too
 Licensed under the European Union Public Licence v. 1.2 (EUPL-1.2). See
 [LICENSE](https://github.com/sunsided/game-toolkit/blob/main/LICENSE), or the
 [official text](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
+
+## Made with game-toolkit
+
+- [**Cookie D'oh!**](https://github.com/sunsided/cookie-doh) ([play in the browser](https://sunsided.github.io/cookie-doh/)):
+  a C64/Amiga-era arcade game about accepting every cookie the Internet throws at you. A complete
+  game on the toolkit, native and web from the same code, with keyboard, gamepad and touch.
+- [**Cheesed!**](https://github.com/sunsided/cheesed) ([play in the browser](https://sunsided.github.io/cheesed/)):
+  a thrilling action adventure in DOS-era dress. The Mouse. The Cheese. The Destiny. Native and
+  web from the same code, with procedural music from title-screen metal to a music-box minuet.
 
 [synthie]: https://github.com/sunsided/synth
