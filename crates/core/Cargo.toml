@@ -24,9 +24,10 @@ game-toolkit-assets = { workspace = true }
 pollster      = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys               = { workspace = true }
 wasm-bindgen         = { workspace = true }
 wasm-bindgen-futures = { workspace = true }
-web-sys              = { workspace = true, features = ["console", "Document", "Element", "HtmlCanvasElement", "MutationObserver", "MutationObserverInit", "Node", "Window"] }
+web-sys              = { workspace = true, features = ["AudioContext", "AudioContextState", "console", "Document", "Element", "HtmlCanvasElement", "MutationObserver", "MutationObserverInit", "Navigator", "Node", "UserActivation", "Window"] }
 
 [lints]
 workspace = true

@@ -26,7 +26,8 @@
 //! On the web, browsers keep an `AudioContext` suspended until the first user gesture, and kira
 //! offers no way to resume it. [`Audio`] therefore opens the backend lazily there: sounds can be
 //! loaded right away, but playback only starts once [`Audio::start`] has run (the toolkit's core
-//! calls it on the first key press, click or touch). Until then plays fail with
+//! calls it on the first key press, click or touch, or before `Game::init` if the page already
+//! had a gesture and the browser lets audio start). Until then plays fail with
 //! [`AudioError::NotStarted`], unless they were [`PlayOptions::deferred`], which queues them.
 //!
 //! [`Audio::suspend`] pauses everything at once. On the web, the toolkit's core also

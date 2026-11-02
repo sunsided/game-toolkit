@@ -1,4 +1,5 @@
-//! Browser glue: canvas attachment and detach watching, console logging and panic reporting.
+//! Browser glue: canvas attachment and detach watching, the autoplay probe, console logging and
+//! panic reporting.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -25,6 +26,36 @@ pub(crate) fn canvas_attributes(
         .dyn_into::<web_sys::HtmlCanvasElement>()
         .map_err(|_| anyhow!("element {id:?} is not a <canvas>"))?;
     Ok(attrs.with_canvas(Some(canvas)))
+}
+
+/// Whether the browser would let audio start right now, without another user gesture: the
+/// page already had one (the player clicked a link on the host site to get to the game), so
+/// the toolkit can open the audio output at startup instead of waiting for a click on the
+/// canvas.
+///
+/// Asks a throwaway `AudioContext`, which starts `running` only when autoplay is allowed, and
+/// closes it again. It never connects a node, so nothing hears it. Where the browser tracks
+/// user activation (`navigator.userActivation`), the probe only runs after a gesture: before
+/// one, the answer is almost always no, and Chrome logs a warning for every context created
+/// then.
+pub(crate) fn audio_allowed() -> bool {
+    let Some(window) = web_sys::window() else {
+        return false;
+    };
+    let navigator = window.navigator();
+    // Older Safari has no `userActivation`; probe there without the shortcut.
+    let activation = js_sys::Reflect::get(&navigator, &"userActivation".into())
+        .ok()
+        .and_then(|v| v.dyn_into::<web_sys::UserActivation>().ok());
+    if activation.is_some_and(|a| !a.has_been_active()) {
+        return false;
+    }
+    let Ok(probe) = web_sys::AudioContext::new() else {
+        return false;
+    };
+    let running = probe.state() == web_sys::AudioContextState::Running;
+    let _ = probe.close();
+    running
 }
 
 /// Route panics and `log` records to the browser console. Leaves an already-installed logger

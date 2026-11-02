@@ -14,6 +14,11 @@ All notable changes to this project are documented here. The format is based on
   matters because the browser sends none to a detached canvas. Games hear about it as
   `GameEvent::CanvasAttached(bool)` on the next frame and through `Context::canvas_attached()`
   (#81).
+- Web: audio starts at startup, before `Game::init`, when the page already had a user gesture
+  and the browser allows it (the player clicked through to the game on the host site), instead
+  of waiting for a click on the canvas. A throwaway `AudioContext` probes whether autoplay is
+  allowed; where `navigator.userActivation` exists, only after a gesture. `Audio::is_started()`
+  tells the game, e.g. to skip a "click to start" screen (#82).
 - `Audio::suspend` / `Audio::resume` / `Audio::is_suspended` pause and continue everything that
   plays, on every target. Independent of the detach handling: reattaching the canvas doesn't
   undo a game's own suspend (#81).
