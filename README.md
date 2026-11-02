@@ -12,7 +12,8 @@ Both go into the same frame, so a 3D scene gets a 2D HUD on top for free. Each s
 its own crate, so a jam pulls only what it uses, and there are starter templates for both.
 
 Built on `wgpu`, `winit` 0.30, `kira`, `glyphon` (cosmic-text), `image`, and `bytemuck`,
-with optional `egui` tooling overlays and Aseprite asset loading.
+with optional `egui` tooling overlays, Aseprite asset loading and [synthie] chiptune music
+and effects.
 
 The **[guide](https://docs.rs/game-toolkit/latest/game_toolkit/guide/)** covers the whole API on
 one page: the game loop, `Context`, drawing and draw order, input, audio, configuration,
@@ -131,7 +132,7 @@ template-specific commands and conventions.
 | `game-toolkit-core` | App loop on winit 0.30 `ApplicationHandler`, the `Game` trait, `Context`, time, optional fixed timestep, and a deterministic seedable RNG (`ctx.rng`). |
 | `game-toolkit-gfx` | wgpu init + surface management, sprite batcher, SDF circle/ring primitives, glyphon text, atlas tilemap, the `Painter` API. |
 | `game-toolkit-input` | Keyboard, mouse and gamepads (via gilrs) with held / just-pressed / just-released semantics, hot-plug, and rumble. |
-| `game-toolkit-audio` | Sound loading + playback on `kira`; degrades gracefully to muted when no device is available. Optional chiptune synthesis (`synth` feature, via `synthie`). |
+| `game-toolkit-audio` | Sound loading + playback on `kira`; degrades gracefully to muted when no device is available. Optional chiptune music and effects (`synth` feature, via [synthie]). |
 | `game-toolkit-assets` | Asset path resolution, in-memory/preloaded assets (web), optional hot-reload watcher (`notify`). |
 | `game-toolkit-aseprite` | Load native `.aseprite` files and exported PNG + JSON sheets into a GPU-ready `SpriteSheet` with animation playback. |
 | `game-toolkit-ecs` | Small glue (component data, command queue) for the `sillyecs` compile-time archetype ECS. |
@@ -154,13 +155,13 @@ Run any example with `cargo run -p <package>`.
 | `05_tilemap` | `ex_05_tilemap` | Instanced atlas tilemap. |
 | `06_egui` | `ex_06_egui` | egui debug overlay (uses the `ui` feature). |
 | `07_3d` | `ex_07_3d` | Depth-tested perspective cubes (instanced meshes) with a 2D HUD on top. |
-| `07_audio` | `ex_07_audio` | Play a WAV (Space), synthesized retro effects (1/2/3) and a generated tone stream (4); runs muted with no device. |
+| `07_audio` | `ex_07_audio` | Play a WAV (Space), synthesized retro effects (1/2/3), a jingle (5), a looping synth song (M, C for a live crash) and a generated tone stream (4); runs muted with no device. |
 | `08_hot_reload` | `ex_08_hot_reload` | Edit `assets/reload_me.png` while it runs and watch the texture update live. |
 | `09_aseprite` | `ex_09_aseprite` | Load a native `.aseprite`, pack its frames into an atlas, and play a tagged animation. |
 | `10_gamepad` | `ex_10_gamepad` | Live gamepad overlay: sticks, buttons, stick-clicks, and rumble on A. |
 | `11_ecs` | `ex_11_ecs` | Bouncing particles driven by the `sillyecs` archetype ECS (build.rs codegen). |
 | `12_vector` | `ex_12_vector` | Vector graphics (filled circles, stroked path) via the optional vello backend. |
-| `13_web` | `ex_13_web` | Same code natively and in the browser: sprite, text, sound on click, gamepad. `task web`. |
+| `13_web` | `ex_13_web` | Same code natively and in the browser: sprite, text, sound on click, synth music, gamepad. `task web`. |
 | `14_framebuffer` | `ex_14_framebuffer` | A CPU-rendered plasma uploaded every frame with `update_texture_rgba`. |
 | `15_touch` | `ex_15_touch` | Every finger as a ring, taps vs. swipes, counters, touch-as-mouse toggle. Best on a phone: `task web:lan WEB_DIR=examples/15_touch`. |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
@@ -190,7 +191,7 @@ if let (Some(audio), Some(id)) = (&mut ctx.audio, music) {
 
 Plain `audio.play(id)` plays once. On the web it fails with `AudioError::NotStarted` until the
 player's first key press, click or touch, so log or ignore its error rather than `?`-ing it in
-`update`. `examples/07_audio` shows one-shots, synthesized effects, a looping track and a stream.
+`update`. `examples/07_audio` shows one-shots, synthesized effects, synth music and a stream.
 
 Audio produced while it plays (a running synth, an emulated sound chip) goes through
 `play_stream`: the source is any `FnMut(&mut [f32]) + Send` (or an `AudioStream`), called on the
@@ -210,6 +211,39 @@ let tone = audio.play_stream(
 )?;
 tone.set_volume(0.5);                                // pause, resume, stop
 ```
+
+### Chiptune music and effects (`synth` feature)
+
+The optional `synth` feature plays music and effects without any audio files, on [synthie],
+a SID-flavoured chiptune synthesizer (oscillators, filters, envelopes, arpeggiator, drum
+machine, effects). It is off by default; turn it on with
+`cargo add game-toolkit --features synth` (or add `"synth"` to the dependency's `features`).
+
+Music is written in tracker notation, one lane per synth channel and one cell per row, and
+played live with `play_synth`. It's sequenced sample-accurately on the audio thread and mixed by
+kira like every other sound, so it works on the web too:
+
+```rust
+use synth::{ChannelNo, DrumHit, Song, Tempo, preset};
+
+let song = Song::new(Tempo::bpm(128.0, 2))           // one row per eighth note
+    .patch(preset("PWM Lead").unwrap())              // @0
+    .patch(preset("C64 Bass").unwrap())              // @1
+    .lane(ChannelNo(0), "A4@0 . C5 . E5 . D5 C5 | E5 . . . - . . .")?
+    .lane(ChannelNo(1), "A2@1 A3 A2 A3 A2 A3 A2 A3 | E2 E3 E2 E3 E2 E3 E2 -")?
+    .lane(ChannelNo(3), "k+c h s h k k s h | k h s h k s s s")?;
+let music = audio.play_synth(song, PlayOptions::looped().volume(0.4).deferred())?;
+music.fade_volume(0.1, Duration::from_millis(300)); // duck; pause, resume, stop
+let _ = music.drum(DrumHit::Crash);                  // live events on top of the song
+```
+
+Keep the returned `SynthHandle`: dropping its last clone stops the music. A song played without
+`looped` ends by itself once its tails have rung out.
+
+Effects and jingles render to mono PCM once with `Synth` and play with `play_samples`:
+`blip` / `coin` / `thud`, a single note (`render`), timed overlapping notes and drum hits
+(`render_phrase`), or one pass of a `Song` (`render_song`). See the synthie
+[pattern notation](https://docs.rs/synthie/latest/synthie/pattern/) for every cell type.
 
 ## Aseprite
 
@@ -360,7 +394,7 @@ The generated jam templates ship their own `Taskfile.yaml` too.
 
 Published on [crates.io](https://crates.io/crates/game-toolkit). The 2D runtime, input
 (keyboard / mouse / gamepad), audio, assets, text, tilemap, egui overlay, Aseprite loading,
-optional depth/MSAA, the 3D mesh path, a deterministic seedable RNG, browser (wasm32) builds, ECS glue, the atlas-packer CLI, and
+optional depth/MSAA, the 3D mesh path, a deterministic seedable RNG, browser (wasm32) builds, ECS glue, synthie chiptune music, the atlas-packer CLI, and
 `cargo-generate` jam templates are all in place. Still pre-1.0, so the API may shift between minor versions; roadmap and
 open workstreams live in the [toolkit epic](https://github.com/sunsided/game-toolkit/issues/15).
 
@@ -369,3 +403,5 @@ open workstreams live in the [toolkit epic](https://github.com/sunsided/game-too
 Licensed under the European Union Public Licence v. 1.2 (EUPL-1.2). See
 [LICENSE](https://github.com/sunsided/game-toolkit/blob/main/LICENSE), or the
 [official text](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
+
+[synthie]: https://github.com/sunsided/synth
