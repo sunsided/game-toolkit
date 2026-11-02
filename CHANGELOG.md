@@ -6,6 +6,34 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- Live chiptune music with the `synth` feature: `Audio::play_synth(song, PlayOptions)` plays a
+  synthie `Song` (lanes of tracker notation at a tempo) through kira, sequenced
+  sample-accurately on the audio thread, natively and on the web. `play_synth_sound` takes a
+  hand-built `SynthSoundData` (custom sequencer, channel count). `PlayOptions` decide looping,
+  volume and deferred start like every other play call; a song played once ends by itself after
+  its tails (#74).
+- `SynthHandle`: volume and fades, pause / resume / stop, and live events (`send`, `drum`,
+  `note_on` / `note_off`). A deferred synth queues all of it until audio starts. Dropping the
+  last clone stops the synth (#74).
+- `Synth::render_phrase` renders timed events (overlapping notes, drum hits) sample-accurately
+  into one PCM buffer, and `Synth::render_song` renders one pass of a `Song`, for jingles (#75).
+- A public `synth` module (in the prelude) re-exporting what writing a song needs (`Song`,
+  `Tempo`, `ChannelNo`, `DrumHit`, `AudioEvent`, ...) plus `preset(name)` for the built-in
+  patches.
+- `examples/07_audio` plays a synth song (C for a live crash) and a `render_phrase` jingle (5);
+  `examples/13_web` plays deferred synth music in the browser (M pauses).
+- The guide and README document the notation and both paths; the README links Cheesed! as a
+  game made with the toolkit.
+
+### Changed
+
+- **Breaking:** synthie, re-exported as `game_toolkit::prelude::synthie` with the `synth`
+  feature, is now 0.7 (was 0.6). Code naming synthie types through the re-export may need
+  updating.
+- The `synth` feature now enables synthie's `kira` and `arp` features.
+
 ## [0.7.0] - 2026-11-01
 
 ### Added
