@@ -1383,6 +1383,7 @@ dependencies = [
  "game-toolkit-audio",
  "game-toolkit-gfx",
  "game-toolkit-input",
+ "js-sys",
  "log",
  "pollster",
  "wasm-bindgen",

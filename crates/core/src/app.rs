@@ -288,6 +288,13 @@ impl<G: Game> AppRunner<G> {
         // so it sees the true surface size.
         let size = ctx.window.inner_size();
         ctx.gfx.resize(size.width, size.height);
+        // If the page already had a user gesture, audio may start now rather than on the first
+        // click on the canvas: `G::init` then sees `is_started()` and music plays at once.
+        #[cfg(target_arch = "wasm32")]
+        if crate::web::audio_allowed() {
+            log::info!("audio allowed without a gesture, starting it now");
+            ctx.start_audio();
+        }
         let game = match G::init(&mut ctx) {
             Ok(g) => g,
             Err(e) => {

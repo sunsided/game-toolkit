@@ -165,8 +165,9 @@ impl Context {
         audio.load_sound_bytes(bytes).map(Some)
     }
 
-    /// Open the audio device on the first user gesture. Browsers keep audio suspended until
-    /// then; natively the device is already open and this is a no-op.
+    /// Open the audio device on the first user gesture, or at startup on the web if the page
+    /// already had one. Browsers keep audio suspended until then; natively the device is
+    /// already open and this is a no-op.
     pub(crate) fn start_audio(&mut self) {
         if let Some(audio) = self.audio.as_mut()
             && !audio.is_started()
