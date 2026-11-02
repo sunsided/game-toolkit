@@ -35,6 +35,14 @@ All notable changes to this project are documented here. The format is based on
   setup as kira's but with a stream the toolkit can suspend. All sounds now play through a sub
   track (the bus `Audio::suspend` pauses) instead of directly on the main track.
 
+### Known issues
+
+- Web: when the audio output can't be opened (e.g. a headless browser with no output device,
+  which reports a destination with 0 channels), the game continues muted as before, but cpal
+  leaves the `AudioContext` it created for the failed stream running. Fixed upstream in
+  [RustAudio/cpal#1420](https://github.com/RustAudio/cpal/pull/1420); it reaches the toolkit
+  once kira moves to a cpal release that includes it.
+
 ## [0.9.0] - 2026-11-02
 
 ### Added
