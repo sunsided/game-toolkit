@@ -45,7 +45,7 @@ pub mod prelude {
     };
 
     #[cfg(feature = "synth")]
-    pub use game_toolkit_audio::{Synth, synthie};
+    pub use game_toolkit_audio::{Synth, SynthHandle, synth, synthie};
 
     #[cfg(feature = "ecs")]
     pub use game_toolkit_ecs::{self, ChannelQueue, Vec2};

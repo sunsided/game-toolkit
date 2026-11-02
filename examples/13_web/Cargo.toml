@@ -11,7 +11,7 @@ name = "13_web"
 path = "src/main.rs"
 
 [dependencies]
-game-toolkit = { workspace = true }
+game-toolkit = { workspace = true, features = ["synth"] }
 log          = { workspace = true }
 
 # On the web the toolkit logs to the browser console itself.
