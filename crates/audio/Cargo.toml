@@ -17,7 +17,7 @@ synthie = { workspace = true, optional = true }
 
 [features]
 # Chiptune/retro sound synthesis via the `synthie` crate.
-synth = ["dep:synthie"]
+synth = ["dep:synthie", "synthie/kira", "synthie/arp"]
 
 [lints]
 workspace = true

@@ -1,12 +1,13 @@
 //! Runs natively *and* in the browser from the same code: a sprite, text, a sound on click or
-//! Space, and the first gamepad's left stick. Build for the web with
+//! Space, looping synth music (M to pause), and the first gamepad's left stick. Build for the web with
 //! `task web EXAMPLE=13_web` (trunk) and open http://localhost:8080.
 //!
 //! What's different on the web, and how this example handles it:
 //! - Assets are fetched before `init`, from the list in `assets/manifest.txt`, so the
 //!   synchronous `ctx.load_texture` / `ctx.load_sound` calls work unchanged.
 //! - Browsers start audio only after a user gesture; the toolkit opens the device on the first
-//!   key press, click or touch, so the first click both unlocks audio and plays the blip.
+//!   key press, click or touch, so the first click both unlocks audio and plays the blip. The
+//!   music is started in `init` with `PlayOptions::deferred`, so it waits for that click.
 //! - Gamepads show up only after a button press (a browser privacy rule).
 
 use game_toolkit::prelude::*;
@@ -14,6 +15,7 @@ use game_toolkit::prelude::*;
 struct Web {
     tex: TextureId,
     blip: Option<SoundId>,
+    music: Option<SynthHandle>,
     pos: [f32; 2],
     clicks: u32,
 }
@@ -22,10 +24,17 @@ impl Game for Web {
     fn init(ctx: &mut Context) -> Result<Self> {
         let tex = ctx.load_texture("sprite.png")?;
         let blip = ctx.load_sound("blip.wav")?;
+        let music = ctx.audio.as_mut().and_then(|audio| {
+            audio
+                .play_synth(song(), PlayOptions::looped().volume(0.4).deferred())
+                .inspect_err(|e| log::warn!("music: {e}"))
+                .ok()
+        });
         let (w, h) = ctx.gfx.size();
         Ok(Self {
             tex,
             blip,
+            music,
             pos: [w as f32 * 0.5, h as f32 * 0.5],
             clicks: 0,
         })
@@ -41,6 +50,15 @@ impl Game for Web {
                 && let Err(e) = audio.play(id)
             {
                 log::warn!("play: {e}");
+            }
+        }
+        if ctx.input.key_pressed(Key::KeyM)
+            && let Some(music) = &self.music
+        {
+            if music.is_paused() {
+                music.resume();
+            } else {
+                music.pause();
             }
         }
         let mut dir = [0.0f32, 0.0f32];
@@ -95,7 +113,7 @@ impl Game for Web {
         );
         p.text(
             [16.0, 46.0],
-            "arrows / left stick move, click or Space plays a blip",
+            "arrows / left stick move, click or Space plays a blip, M pauses the music",
             18.0,
             fg,
         );
@@ -111,6 +129,20 @@ impl Game for Web {
     }
 }
 
+/// Two bars of bass, hats and a backbeat at 110 bpm, one row per eighth note.
+fn song() -> synth::Song {
+    use synth::{ChannelNo, Song, Tempo, preset};
+
+    Song::new(Tempo::bpm(110.0, 2))
+        .patch(preset("C64 Bass").unwrap_or_default())
+        .lane(
+            ChannelNo(0),
+            "D2@0 D3 D2 D3 F2 F3 G2 G3 | D2 D3 D2 D3 C2 C3 A1 -",
+        )
+        .and_then(|s| s.lane(ChannelNo(3), "k h s h k k s h | k h s h k h s o"))
+        .expect("the song's notation is valid")
+}
+
 fn main() -> Result<()> {
     #[cfg(not(target_arch = "wasm32"))]
     env_logger::init();
@@ -124,4 +156,12 @@ fn main() -> Result<()> {
         canvas_id: Some("game".into()),
         ..Default::default()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_song_parses() {
+        assert_eq!(super::song().len(), 16);
+    }
 }

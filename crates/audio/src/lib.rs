@@ -17,7 +17,9 @@
 //! ```
 //!
 //! Audio generated while it plays (a synthesizer, an emulated sound chip) goes through
-//! [`Audio::play_stream`]. Mixer tracks, spatial audio and file streaming are not wrapped;
+//! [`Audio::play_stream`]. With the `synth` feature, [`Audio::play_synth`] plays chiptune
+//! music written in tracker notation live on the built-in synth, and [`Synth`] renders effects
+//! and jingles to PCM (see [`synth`]). Mixer tracks, spatial audio and file streaming are not wrapped;
 //! [`kira`] is re-exported for anything beyond this API, and [`SoundHandle::with_kira`]
 //! reaches the underlying handle.
 //!
@@ -47,7 +49,13 @@ use stream::StreamData;
 pub use stream::{AudioStream, StreamHandle};
 
 #[cfg(feature = "synth")]
-mod synth;
+mod music;
+#[cfg(feature = "synth")]
+use music::PreparedSynth;
+#[cfg(feature = "synth")]
+pub use music::SynthHandle;
+#[cfg(feature = "synth")]
+pub mod synth;
 #[cfg(feature = "synth")]
 pub use synth::Synth;
 #[cfg(feature = "synth")]
@@ -139,6 +147,9 @@ pub struct Audio {
     queued: Vec<(StaticSoundData, SoundHandle)>,
     /// [`PlayOptions::deferred`] streams waiting for [`Audio::start`].
     queued_streams: Vec<StreamData>,
+    /// [`PlayOptions::deferred`] synths waiting for [`Audio::start`].
+    #[cfg(feature = "synth")]
+    queued_synths: Vec<PreparedSynth>,
 }
 
 impl Audio {
@@ -152,6 +163,8 @@ impl Audio {
             master_volume: Decibels::IDENTITY,
             queued: Vec::new(),
             queued_streams: Vec::new(),
+            #[cfg(feature = "synth")]
+            queued_synths: Vec::new(),
         };
         if !cfg!(target_arch = "wasm32") {
             audio.start()?;
@@ -178,6 +191,12 @@ impl Audio {
         for data in std::mem::take(&mut self.queued_streams) {
             if !data.handle().is_finished() {
                 self.start_stream(data);
+            }
+        }
+        #[cfg(feature = "synth")]
+        for prepared in std::mem::take(&mut self.queued_synths) {
+            if !prepared.handle().is_finished() {
+                self.start_synth(prepared);
             }
         }
         Ok(())
@@ -369,6 +388,85 @@ impl Audio {
             Ok(()) => handle.mark_started(),
             Err(e) => {
                 log::warn!("stream failed to start: {e}");
+                handle.stop();
+            }
+        }
+    }
+
+    /// Play a [`synth::Song`] live on the synth, for music: the song is sequenced
+    /// sample-accurately on the audio thread, so tempo and drums stay tight whatever the
+    /// frame rate. The returned [`SynthHandle`] controls volume (ducking), pause and stop, and
+    /// sends live [`synth::AudioEvent`]s.
+    ///
+    /// [`PlayOptions`] apply as for other sounds: [`PlayOptions::looped`] loops the song,
+    /// otherwise it plays once (whatever the song's own [`synth::Song::looped`] says), and
+    /// `volume` and `deferred` work as usual. Dropping the last handle stops the synth; a song
+    /// that played once keeps its (silent) synth until then.
+    /// Fails like [`Audio::play`] before audio has started.
+    ///
+    /// ```no_run
+    /// # use game_toolkit_audio::{Audio, PlayOptions};
+    /// use game_toolkit_audio::synth::{ChannelNo, DrumHit, Song, Tempo, preset};
+    /// # fn demo(audio: &mut Audio) -> anyhow::Result<()> {
+    /// let song = Song::new(Tempo::bpm(140.0, 4))
+    ///     .patch(preset("C64 Bass").unwrap())
+    ///     .lane(ChannelNo(0), "E2@0 . E3 . E2 . E3 . G2 . G3 . A2 . A3 -")?
+    ///     .lane(ChannelNo(3), "k h s h k h s h k h s h k k s o")?;
+    /// let music = audio.play_synth(song, PlayOptions::looped().volume(0.4).deferred())?;
+    /// let _ = music.drum(DrumHit::Crash); // a live hit on a game event
+    /// music.fade_volume(0.1, std::time::Duration::from_millis(300)); // duck
+    /// # Ok(()) }
+    /// ```
+    #[cfg(feature = "synth")]
+    pub fn play_synth(
+        &mut self,
+        mut song: synth::Song,
+        options: PlayOptions,
+    ) -> Result<SynthHandle, AudioError> {
+        song.looped = options.looped;
+        let data =
+            synthie::kira::SynthSoundData::new().with_sequencer(synth::SongPlayer::new(song));
+        self.play_synth_sound(data, options)
+    }
+
+    /// [`Audio::play_synth`] for a synth set up by hand: start patches per channel, a custom
+    /// [`synthie::prelude::Sequencer`] instead of a song, another channel count, or none at
+    /// all to play it only from [`SynthHandle`] events. `options.looped` has no meaning here;
+    /// the sequencer decides.
+    #[cfg(feature = "synth")]
+    pub fn play_synth_sound<S, const N: usize>(
+        &mut self,
+        data: synthie::kira::SynthSoundData<S, N>,
+        options: PlayOptions,
+    ) -> Result<SynthHandle, AudioError>
+    where
+        S: synthie::prelude::Sequencer + Send + 'static,
+    {
+        let pending = self.manager.is_none();
+        if pending && !options.deferred {
+            return Err(AudioError::NotStarted);
+        }
+        let data = data.with_volume(amplitude_to_db(options.volume));
+        let prepared = PreparedSynth::new(data, pending);
+        let handle = prepared.handle().clone();
+        if pending {
+            self.queued_synths.push(prepared);
+        } else {
+            self.start_synth(prepared);
+        }
+        Ok(handle)
+    }
+
+    #[cfg(feature = "synth")]
+    fn start_synth(&mut self, prepared: PreparedSynth) {
+        let handle = prepared.handle().clone();
+        let Some(manager) = self.manager.as_mut() else {
+            return;
+        };
+        match manager.play(prepared) {
+            Ok(()) => handle.mark_started(),
+            Err(e) => {
+                log::warn!("synth failed to start: {e}");
                 handle.stop();
             }
         }

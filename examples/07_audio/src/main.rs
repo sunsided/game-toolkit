@@ -1,17 +1,20 @@
-//! Plays a loaded WAV (Space) and synthesized retro effects (1/2/3) through `game-toolkit-audio`,
-//! plus a looping "music" track (M to pause/resume, Up/Down for its volume) and a tone generated
-//! while it plays (4 to start/stop).
+//! Plays a loaded WAV (Space) and synthesized retro effects (1/2/3, a jingle on 5) through
+//! `game-toolkit-audio`, plus looping synth music (M to pause/resume, Up/Down for its volume,
+//! C for a live crash cymbal) and a tone generated while it plays (4 to start/stop).
 //!
 //! `ctx.audio` is an `Option<Audio>`: when the audio backend fails to initialize the
 //! toolkit keeps running muted rather than aborting. This example mirrors that contract -
 //! every audio call is guarded, so it still opens a window and runs with no audio device.
 //!
 //! The retro effects are rendered by `Synth` (the `synthie` chiptune engine) to PCM and
-//! played via `Audio::play_samples`, so no audio file is needed.
+//! played via `Audio::play_samples`, so no audio file is needed. The jingle on 5 is one
+//! `Synth::render_phrase`: overlapping notes and drum hits at times in seconds.
 //!
-//! Every play call returns a `SoundHandle` for that instance. The music is started in `init`
-//! with `PlayOptions::looped().deferred()`: on the web, where audio only starts after the first
-//! key press or click, the deferred play is queued and begins on that gesture instead of failing.
+//! The music is a `synth::Song` - lanes of tracker notation at a tempo - played live with
+//! `Audio::play_synth`, which sequences it sample-accurately on the audio thread and returns a
+//! `SynthHandle`. It is started in `init` with `PlayOptions::looped().deferred()`: on the web,
+//! where audio only starts after the first key press or click, the deferred play is queued and
+//! begins on that gesture instead of failing.
 //!
 //! The tone on 4 is an `Audio::play_stream`: a closure that computes samples on the audio
 //! thread as the mixer asks for them, the way a running synth or an emulated sound chip would.
@@ -22,7 +25,7 @@ struct AudioDemo {
     sound: Option<SoundId>,
     synth: Synth,
     plays: u32,
-    music: Option<SoundHandle>,
+    music: Option<SynthHandle>,
     music_volume: f32,
     tone: Option<StreamHandle>,
 }
@@ -41,15 +44,12 @@ impl Game for AudioDemo {
                 None
             }
         };
-        let mut synth = Synth::new(44_100);
-        let music_volume = 0.3;
-        // A synthesized arpeggio stands in for a music track; `play_with` works the same for
-        // a loaded `SoundId`.
+        let synth = Synth::new(44_100);
+        let music_volume = 0.5;
         let music = ctx.audio.as_mut().and_then(|audio| {
-            let pcm = arpeggio(&mut synth);
             let options = PlayOptions::looped().volume(music_volume).deferred();
             audio
-                .play_samples_with(&pcm, synth.sample_rate(), options)
+                .play_synth(song()?, options)
                 .inspect_err(|e| log::warn!("music failed to start: {e}"))
                 .ok()
         });
@@ -95,6 +95,10 @@ impl Game for AudioDemo {
                 self.music_volume = (self.music_volume + step).clamp(0.0, 1.0);
                 music.set_volume(self.music_volume);
             }
+            // A live event on top of the song: lands within one audio block.
+            if ctx.input.key_pressed(Key::KeyC) {
+                let _ = music.drum(synth::DrumHit::Crash);
+            }
         }
 
         // A generated tone, toggled on 4. Stopping fades it out; a stopped stream is gone,
@@ -121,6 +125,8 @@ impl Game for AudioDemo {
             Some(self.synth.coin())
         } else if ctx.input.key_pressed(Key::Digit3) {
             Some(self.synth.thud())
+        } else if ctx.input.key_pressed(Key::Digit5) {
+            Some(fanfare(&mut self.synth))
         } else {
             None
         };
@@ -138,9 +144,9 @@ impl Game for AudioDemo {
         let mut p = frame.painter(&mut ctx.gfx);
         p.clear([0.06, 0.07, 0.1, 1.0]);
         let status = if self.sound.is_some() {
-            "Space: WAV   1: blip   2: coin   3: thud   4: tone   (Esc to quit)"
+            "Space: WAV   1: blip   2: coin   3: thud   4: tone   5: jingle   (Esc to quit)"
         } else {
-            "No device - running muted. 1/2/3/4 synth, Space WAV (Esc to quit)"
+            "No device - running muted. 1-5 synth, Space WAV (Esc to quit)"
         };
         p.text([24.0, 24.0], status, 20.0, [0.9, 0.9, 0.95, 1.0]);
         p.text(
@@ -154,7 +160,7 @@ impl Game for AudioDemo {
             Some(m) if m.is_pending() => "music: waiting for a key press or click".to_string(),
             Some(m) if m.is_paused() => "music: paused (M)".to_string(),
             Some(_) => format!(
-                "music: playing at {:.0}% (M pause, Up/Down volume)",
+                "music: playing at {:.0}% (M pause, Up/Down volume, C crash)",
                 self.music_volume * 100.0
             ),
         };
@@ -185,13 +191,61 @@ fn warble(sample_rate: u32) -> impl AudioStream {
     }
 }
 
-/// Four rising notes, rendered back to back into one buffer to loop.
-fn arpeggio(synth: &mut Synth) -> Vec<f32> {
-    let params = synthie::prelude::SynthParams::default();
-    [57, 60, 64, 67]
-        .into_iter()
-        .flat_map(|note| synth.render(params.clone(), note, 0.18, 0.07))
-        .collect()
+/// Four bars in A minor at 128 bpm, one row per eighth note. Each lane is one synth channel;
+/// `@n` switches the channel to the song's patch `n`, `.` holds, `-` releases, and the drum
+/// lane's `k s h o c` are kick, snare, closed and open hi-hat, and crash.
+fn song() -> Option<synth::Song> {
+    use synth::{ChannelNo, Song, Tempo, preset};
+
+    let song = Song::new(Tempo::bpm(128.0, 2))
+        .patch(preset("PWM Lead")?)
+        .patch(preset("C64 Bass")?)
+        .lane(
+            ChannelNo(0),
+            "A4@0 . C5 . E5 . D5 C5 | B4 . G4 . B4 . D5 - |
+             A4 . C5 . E5 . A5 G5   | E5 . . . - . . .",
+        )
+        .and_then(|s| {
+            s.lane(
+                ChannelNo(1),
+                "A2@1 A3 A2 A3 A2 A3 A2 A3 | G2 G3 G2 G3 G2 G3 G2 G3 |
+                 F2 F3 F2 F3 F2 F3 F2 F3   | E2 E3 E2 E3 E2 E3 E2 -",
+            )
+        })
+        .and_then(|s| {
+            s.lane(
+                ChannelNo(3),
+                "k+c h s h k k s h | k h s h k k s o |
+                 k h s h k k s h   | k h s h k s s s",
+            )
+        });
+    song.inspect_err(|e| log::warn!("song: {e}")).ok()
+}
+
+/// A level-clear jingle: a rising arpeggio whose notes overlap, a kick under the first note and
+/// a crash under the last, all in one buffer.
+fn fanfare(synth: &mut Synth) -> Vec<f32> {
+    use synth::{AudioEvent, DrumHit, MidiNote};
+
+    let on = |t, n| (t, AudioEvent::NoteOn(MidiNote(n)));
+    let off = |t, n| (t, AudioEvent::NoteOff(MidiNote(n)));
+    let params = synth::preset("Plucky Pulse").unwrap_or_default();
+    synth.render_phrase(
+        &[
+            (0.0, AudioEvent::Drum(DrumHit::Kick)),
+            on(0.0, 72),
+            on(0.08, 76),
+            on(0.16, 79),
+            (0.24, AudioEvent::Drum(DrumHit::Crash)),
+            on(0.24, 84),
+            off(0.5, 72),
+            off(0.5, 76),
+            off(0.5, 79),
+            off(0.5, 84),
+        ],
+        params,
+        0.6,
+    )
 }
 
 fn main() -> Result<()> {
@@ -203,4 +257,18 @@ fn main() -> Result<()> {
         asset_root: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"),
         ..Default::default()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_song_parses_and_sounds() {
+        let song = song().expect("song parses");
+        assert_eq!(song.len(), 32);
+        let pcm = Synth::new(22_050).render_song(song, 0.2);
+        assert!(pcm.iter().any(|s| s.abs() > 0.1));
+        assert!(!fanfare(&mut Synth::new(22_050)).is_empty());
+    }
 }
