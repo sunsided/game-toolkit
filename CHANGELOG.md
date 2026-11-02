@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- Web: the audio stops while the host page has the game's canvas out of the document (an SPA
+  route change, a component unmounting). A `MutationObserver` suspends the `AudioContext` the
+  moment the canvas is detached and resumes it when it's back; no frame is needed, which
+  matters because the browser sends none to a detached canvas. Games hear about it as
+  `GameEvent::CanvasAttached(bool)` on the next frame and through `Context::canvas_attached()`
+  (#81).
+- `Audio::suspend` / `Audio::resume` / `Audio::is_suspended` pause and continue everything that
+  plays, on every target. Independent of the detach handling: reattaching the canvas doesn't
+  undo a game's own suspend (#81).
+
+### Changed
+
+- **Breaking:** `GameEvent` is now `#[non_exhaustive]` and has the new `CanvasAttached`
+  variant, so exhaustive matches on it need a wildcard arm.
+- On the web, `Audio` runs on the toolkit's own kira backend (`DetachHandle`), the same cpal
+  setup as kira's but with a stream the toolkit can suspend. All sounds now play through a sub
+  track (the bus `Audio::suspend` pauses) instead of directly on the main track.
+
 ## [0.9.0] - 2026-11-02
 
 ### Added
