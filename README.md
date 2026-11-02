@@ -171,6 +171,9 @@ Run any example with `cargo run -p <package>`.
 - [**Cookie D'oh!**](https://github.com/sunsided/cookie-doh) ([play in the browser](https://sunsided.github.io/cookie-doh/)):
   a C64/Amiga-era arcade game about accepting every cookie the Internet throws at you. A complete
   game on the toolkit, native and web from the same code, with keyboard, gamepad and touch.
+- [**Cheesed!**](https://github.com/sunsided/cheesed) ([play in the browser](https://sunsided.github.io/cheesed/)):
+  a thrilling action adventure in DOS-era dress. The Mouse. The Cheese. The Destiny. Native and
+  web from the same code, with procedural music from title-screen metal to a music-box minuet.
 
 ## Audio
 
