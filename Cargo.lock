@@ -3794,9 +3794,9 @@ dependencies = [
 
 [[package]]
 name = "synthie"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87373012f2f315dbc839b684f04103eab16c2971e4239810e3ea0a34e91dec44"
+checksum = "bcbc665a9e6e62965aa409fbff4ce18832af0436d1574ef13e336a14ba9795c2"
 dependencies = [
  "kira",
  "rtrb",

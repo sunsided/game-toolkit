@@ -15,11 +15,11 @@
 //! [`synthie`] itself:
 //!
 //! ```
-//! use game_toolkit_audio::synth::{ChannelNo, Song, Tempo, preset};
+//! use game_toolkit_audio::synth::{ChannelNo, Preset, Song, Tempo};
 //!
 //! // One row per eighth note at 132 bpm; lanes are whitespace-separated cells.
 //! let song = Song::new(Tempo::bpm(132.0, 2))
-//!     .patch(preset("C64 Bass").unwrap())
+//!     .patch(Preset::C64Bass.params())
 //!     .lane(ChannelNo(0), "E2@0 E2 G2 E2 | A2 . G2 -")?
 //!     .lane(ChannelNo(3), "k h s h | k k s h")?;
 //! assert_eq!(song.len(), 8);
@@ -33,20 +33,18 @@ use synthie::prelude::{SynthProcessor, VoiceNormalization};
 pub use synthie::kira::QueueFull;
 pub use synthie::params::{AudioEvent, ChannelNo, DrumHit, MidiNote, Patch, SynthParams};
 pub use synthie::pattern::{ParseError, Song, SongPlayer, Tempo};
-pub use synthie::presets::sid::default_patches;
+pub use synthie::presets::sid::{Preset, UnknownPreset, default_patches};
 pub use synthie::{presets, songs};
 
 /// Synthesis channels of a [`Synth`]; channels in a phrase or song must be below this.
 const CHANNELS: usize = 8;
 
-/// The parameters of the built-in preset called `name` (e.g. `"C64 Bass"`, `"Arp Lead"`,
-/// `"PWM Lead"`, `"Tri Pad"`; see [`default_patches`] for all of them), or `None` if there
-/// is no such preset.
+/// The parameters of the built-in preset with the display name `name` (e.g. `"C64 Bass"`,
+/// see [`Preset::name`]), or `None` for an unknown name. Meant for names that come from data,
+/// such as a config file or a UI; in code, use the typed [`Preset`]
+/// (`Preset::C64Bass.params()`), which can't be misspelled.
 pub fn preset(name: &str) -> Option<SynthParams> {
-    default_patches()
-        .into_iter()
-        .find(|p| p.name == name)
-        .map(|p| p.params)
+    name.parse::<Preset>().ok().map(Preset::params)
 }
 
 /// A small chiptune synth that renders to mono PCM buffers, played with
@@ -373,7 +371,11 @@ mod tests {
 
     #[test]
     fn presets_are_found_by_name() {
-        assert!(preset("C64 Bass").is_some());
+        assert_eq!(preset("C64 Bass"), Some(Preset::C64Bass.params()));
+        assert!(preset("c64 bass").is_none());
         assert!(preset("no such preset").is_none());
+        for &p in Preset::ALL {
+            assert_eq!(preset(p.name()), Some(p.params()), "{p:?}");
+        }
     }
 }

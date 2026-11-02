@@ -407,10 +407,10 @@ impl Audio {
     ///
     /// ```no_run
     /// # use game_toolkit_audio::{Audio, PlayOptions};
-    /// use game_toolkit_audio::synth::{ChannelNo, DrumHit, Song, Tempo, preset};
+    /// use game_toolkit_audio::synth::{ChannelNo, DrumHit, Preset, Song, Tempo};
     /// # fn demo(audio: &mut Audio) -> anyhow::Result<()> {
     /// let song = Song::new(Tempo::bpm(140.0, 4))
-    ///     .patch(preset("C64 Bass").unwrap())
+    ///     .patch(Preset::C64Bass.params())
     ///     .lane(ChannelNo(0), "E2@0 . E3 . E2 . E3 . G2 . G3 . A2 . A3 -")?
     ///     .lane(ChannelNo(3), "k h s h k h s h k h s h k k s o")?;
     /// let music = audio.play_synth(song, PlayOptions::looped().volume(0.4).deferred())?;
