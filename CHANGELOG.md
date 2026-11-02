@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `synth::Preset`, synthie's typed preset bank (re-exported with `UnknownPreset`), with six new
+  patches: Drive Guitar, Rock Lead, Music Box, Tri Bass, Brass and Echo Lead. The guide,
+  README and examples now use `Preset::PwmLead.params()` instead of
+  `preset("PWM Lead").unwrap()` (#79).
+- Chord cells in the song notation (`E2+B2+E3`, `E2^07c!`), from synthie 0.8.
+
+### Changed
+
+- **Breaking:** the `synthie` re-export is now 0.8 (was 0.7). Among other changes,
+  `synthie::pattern::Action` has a new `Chord` variant, so exhaustive matches on it need an arm.
+- `synth::preset(name)` parses the name through `Preset::from_str` instead of building the
+  whole bank per call. It is meant for names from data (config files, a UI) and still returns
+  `None` for unknown names.
+
 ## [0.8.0] - 2026-11-02
 
 ### Added

@@ -218,11 +218,11 @@ played live with `play_synth`. It's sequenced sample-accurately on the audio thr
 kira like every other sound, so it works on the web too:
 
 ```rust
-use synth::{ChannelNo, DrumHit, Song, Tempo, preset};
+use synth::{ChannelNo, DrumHit, Preset, Song, Tempo};
 
 let song = Song::new(Tempo::bpm(128.0, 2))           // one row per eighth note
-    .patch(preset("PWM Lead").unwrap())              // @0
-    .patch(preset("C64 Bass").unwrap())              // @1
+    .patch(Preset::PwmLead.params())                 // @0
+    .patch(Preset::C64Bass.params())                 // @1
     .lane(ChannelNo(0), "A4@0 . C5 . E5 . D5 C5 | E5 . . . - . . .")?
     .lane(ChannelNo(1), "A2@1 A3 A2 A3 A2 A3 A2 A3 | E2 E3 E2 E3 E2 E3 E2 -")?
     .lane(ChannelNo(3), "k+c h s h k k s h | k h s h k s s s")?;

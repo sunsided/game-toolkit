@@ -155,18 +155,21 @@ before that `play` fails with `AudioError::NotStarted` (check `audio.is_started(
 
 No audio files needed: write music in tracker notation and play it live on the built-in synth
 (synthie), sequenced sample-accurately on the audio thread. Each lane is one synth channel and one
-cell per row: a note (`C4`, `F#3`, `Bb2`), `.` hold, `-` release, `@n` switch to the song's
-patch `n`, drums `k` `s` `h` `o` `c` `x` (kick, snare, closed / open hat, crash, clap), `k+c`
-together, `|` a bar line for readability. Presets: `"C64 Bass"`, `"Arp Lead"`, `"Plucky Pulse"`,
-`"PWM Lead"`, `"Metal Pulse"`, `"Noise Snare"`, `"Slide Bass"`, `"Tri Pad"`.
+cell per row: a note (`C4`, `F#3`, `Bb2`), a chord (`E2+B2+E3`, or `E2^07c!` as hex semitone
+offsets: a power chord), `.` hold, `-` release, `@n` switch to the song's patch `n`, drums `k`
+`s` `h` `o` `c` `x` (kick, snare, closed / open hat, crash, clap), `k+c` together, `|` a bar
+line for readability. Patches come from the typed `Preset` bank: `C64Bass`, `ArpLead`,
+`PluckyPulse`, `PwmLead`, `MetalPulse`, `NoiseSnare`, `SlideBass`, `TriPad`, `DriveGuitar`,
+`RockLead`, `MusicBox`, `TriBass`, `Brass`, `EchoLead` (`Preset::ALL`; `preset(name)` looks one
+up by display name, e.g. from a config file).
 
 ```rust,ignore
-use synth::{ChannelNo, DrumHit, Song, Tempo, preset};
+use synth::{ChannelNo, DrumHit, Preset, Song, Tempo};
 
 // In init. Tempo::bpm(bpm, rows_per_beat): 2 = one row per eighth note.
 let song = Song::new(Tempo::bpm(128.0, 2))
-    .patch(preset("PWM Lead").unwrap())                        // @0
-    .patch(preset("C64 Bass").unwrap())                        // @1
+    .patch(Preset::PwmLead.params())                           // @0
+    .patch(Preset::C64Bass.params())                           // @1
     .lane(ChannelNo(0), "A4@0 . C5 . E5 . D5 C5 | E5 . . . - . . .")?
     .lane(ChannelNo(1), "A2@1 A3 A2 A3 A2 A3 A2 A3 | E2 E3 E2 E3 E2 E3 E2 -")?
     .lane(ChannelNo(3), "k+c h s h k k s h | k h s h k s s s")?;
@@ -186,7 +189,7 @@ use synth::{AudioEvent, MidiNote, SynthParams};
 
 let mut sfx = Synth::new(44_100);
 let coin = sfx.coin();                                   // also blip(), thud()
-let zap = sfx.render(preset("Metal Pulse").unwrap(), 84, 0.05, 0.2); // note, hold s, release s
+let zap = sfx.render(Preset::MetalPulse.params(), 84, 0.05, 0.2); // note, hold s, release s
 let jingle = sfx.render_phrase(&[                         // (seconds, event); notes overlap
     (0.00, AudioEvent::NoteOn(MidiNote(72))),
     (0.08, AudioEvent::NoteOn(MidiNote(76))),
@@ -267,7 +270,7 @@ All optional features and what they add to the prelude:
 | `ui` | `Ui`, `egui` | egui debug overlays |
 | `aseprite` | `SpriteSheet`, `AnimationPlayer`, `Animation`, `Direction`, `FrameRect`, `LoadAseprite` (`ctx.load_aseprite(p)`) | load `.aseprite` / exported sheets + play tagged animations |
 | `ecs` | `ChannelQueue`, `Vec2` (sillyecs glue) | archetype ECS |
-| `synth` | `Synth`, `SynthHandle`, `synth` (`Song`, `Tempo`, `preset`, ...), `synthie` | chiptune music (`audio.play_synth`) and effects |
+| `synth` | `Synth`, `SynthHandle`, `synth` (`Song`, `Tempo`, `Preset`, ...), `synthie` | chiptune music (`audio.play_synth`) and effects |
 | `vector` | `vello` | high-quality 2D vector graphics (WebGPU only: skipped on WebGL2) |
 
 Enable in `Cargo.toml`: `game-toolkit = { ..., features = ["ui", "aseprite"] }`.

@@ -131,10 +131,10 @@ impl Game for Web {
 
 /// Two bars of bass, hats and a backbeat at 110 bpm, one row per eighth note.
 fn song() -> synth::Song {
-    use synth::{ChannelNo, Song, Tempo, preset};
+    use synth::{ChannelNo, Preset, Song, Tempo};
 
     Song::new(Tempo::bpm(110.0, 2))
-        .patch(preset("C64 Bass").unwrap_or_default())
+        .patch(Preset::C64Bass.params())
         .lane(
             ChannelNo(0),
             "D2@0 D3 D2 D3 F2 F3 G2 G3 | D2 D3 D2 D3 C2 C3 A1 -",

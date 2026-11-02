@@ -195,11 +195,11 @@ fn warble(sample_rate: u32) -> impl AudioStream {
 /// `@n` switches the channel to the song's patch `n`, `.` holds, `-` releases, and the drum
 /// lane's `k s h o c` are kick, snare, closed and open hi-hat, and crash.
 fn song() -> Option<synth::Song> {
-    use synth::{ChannelNo, Song, Tempo, preset};
+    use synth::{ChannelNo, Preset, Song, Tempo};
 
     let song = Song::new(Tempo::bpm(128.0, 2))
-        .patch(preset("PWM Lead")?)
-        .patch(preset("C64 Bass")?)
+        .patch(Preset::PwmLead.params())
+        .patch(Preset::C64Bass.params())
         .lane(
             ChannelNo(0),
             "A4@0 . C5 . E5 . D5 C5 | B4 . G4 . B4 . D5 - |
@@ -229,7 +229,7 @@ fn fanfare(synth: &mut Synth) -> Vec<f32> {
 
     let on = |t, n| (t, AudioEvent::NoteOn(MidiNote(n)));
     let off = |t, n| (t, AudioEvent::NoteOff(MidiNote(n)));
-    let params = synth::preset("Plucky Pulse").unwrap_or_default();
+    let params = synth::Preset::PluckyPulse.params();
     synth.render_phrase(
         &[
             (0.0, AudioEvent::Drum(DrumHit::Kick)),
