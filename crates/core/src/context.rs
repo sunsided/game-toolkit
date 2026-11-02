@@ -11,10 +11,21 @@ use crate::Rng;
 use crate::app::AppConfig;
 use crate::time::Time;
 
+#[non_exhaustive]
 pub enum GameEvent {
-    Resized { width: u32, height: u32 },
+    Resized {
+        width: u32,
+        height: u32,
+    },
     FocusChanged(bool),
     CloseRequested,
+    /// Web only: the host page took the game's canvas out of the document (`false`: an SPA
+    /// route change, a component unmounting) or put it back (`true`). The browser sends no
+    /// frames to a detached canvas, so both arrive together, on the first frame after it
+    /// returns; the audio output is already suspended in between (see
+    /// [`Audio::suspend`](game_toolkit_audio::Audio::suspend) to keep it paused, e.g. behind a
+    /// pause menu). Also see [`Context::canvas_attached`].
+    CanvasAttached(bool),
 }
 
 pub struct Context {
@@ -26,6 +37,7 @@ pub struct Context {
     pub rng: Rng,
     pub window: Arc<Window>,
     pub(crate) quit_requested: bool,
+    pub(crate) canvas_attached: bool,
 }
 
 /// The asynchronous half of context setup: GPU init and (on the web) asset preloading.
@@ -113,11 +125,18 @@ impl Context {
             rng: Rng::new(config.random_seed),
             window,
             quit_requested: false,
+            canvas_attached: true,
         }
     }
 
     pub fn quit(&mut self) {
         self.quit_requested = true;
+    }
+
+    /// Whether the game's canvas is in the page, as of the last [`GameEvent::CanvasAttached`].
+    /// Always `true` natively.
+    pub fn canvas_attached(&self) -> bool {
+        self.canvas_attached
     }
 
     /// Load a PNG from the asset root. Works on every platform: natively it reads the file and

@@ -133,6 +133,9 @@ struct AppRunner<G: Game> {
 struct RunState<G: Game> {
     ctx: Context,
     game: G,
+    /// Suspends audio while the canvas is out of the page; `None` if it couldn't be set up.
+    #[cfg(target_arch = "wasm32")]
+    canvas_watch: Option<crate::web::CanvasWatch>,
 }
 
 impl<G: Game> ApplicationHandler<InitDone> for AppRunner<G> {
@@ -294,7 +297,22 @@ impl<G: Game> AppRunner<G> {
             }
         };
         ctx.window.request_redraw();
-        self.state = Some(RunState { ctx, game });
+        #[cfg(target_arch = "wasm32")]
+        let canvas_watch = {
+            let audio = ctx
+                .audio
+                .as_ref()
+                .map(game_toolkit_audio::Audio::detach_handle);
+            crate::web::CanvasWatch::new(&ctx.window, audio)
+                .inspect_err(|e| log::warn!("not watching the canvas for detach: {e:?}"))
+                .ok()
+        };
+        self.state = Some(RunState {
+            ctx,
+            game,
+            #[cfg(target_arch = "wasm32")]
+            canvas_watch,
+        });
     }
 
     fn frame(&mut self, event_loop: &ActiveEventLoop) {
@@ -303,6 +321,19 @@ impl<G: Game> AppRunner<G> {
         };
         state.ctx.time.tick();
         state.ctx.input.poll_gamepads();
+        #[cfg(target_arch = "wasm32")]
+        if let Some(watch) = &state.canvas_watch {
+            for attached in watch.take_changes() {
+                if attached {
+                    // Don't replay the time the canvas spent out of the page.
+                    self.accumulator = Duration::ZERO;
+                }
+                state.ctx.canvas_attached = attached;
+                state
+                    .game
+                    .event(&mut state.ctx, &GameEvent::CanvasAttached(attached));
+            }
+        }
 
         let delta = match self.config.max_frame_time {
             Duration::ZERO => state.ctx.time.delta,

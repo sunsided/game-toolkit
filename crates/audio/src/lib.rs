@@ -28,6 +28,10 @@
 //! loaded right away, but playback only starts once [`Audio::start`] has run (the toolkit's core
 //! calls it on the first key press, click or touch). Until then plays fail with
 //! [`AudioError::NotStarted`], unless they were [`PlayOptions::deferred`], which queues them.
+//!
+//! [`Audio::suspend`] pauses everything at once. On the web, the toolkit's core also
+//! suspends the `AudioContext` while the game's canvas is detached from the page (see
+//! `DetachHandle`), since the game gets no frames then to do it itself.
 
 #![forbid(unsafe_code)]
 
@@ -38,7 +42,8 @@ use std::sync::Arc;
 
 use anyhow::{Result, anyhow};
 use kira::sound::static_sound::{StaticSoundData, StaticSoundSettings};
-use kira::{AudioManager, AudioManagerSettings, Decibels, DefaultBackend, Frame, Tween};
+use kira::track::{TrackBuilder, TrackHandle};
+use kira::{AudioManager, AudioManagerSettings, Decibels, Frame, Tween};
 
 mod handle;
 use handle::Slot;
@@ -47,6 +52,16 @@ mod stream;
 pub use kira;
 use stream::StreamData;
 pub use stream::{AudioStream, StreamHandle};
+
+#[cfg(target_arch = "wasm32")]
+mod web;
+#[cfg(target_arch = "wasm32")]
+pub use web::DetachHandle;
+
+#[cfg(target_arch = "wasm32")]
+type Backend = web::WebBackend;
+#[cfg(not(target_arch = "wasm32"))]
+type Backend = kira::DefaultBackend;
 
 #[cfg(feature = "synth")]
 mod music;
@@ -137,8 +152,20 @@ impl PlayOptions {
     }
 }
 
+/// The open output: kira's manager and the bus every sound plays on.
+struct Manager {
+    kira: AudioManager<Backend>,
+    /// A sub track between the sounds and the main track, so [`Audio::suspend`] can pause
+    /// them all at once (kira's main track can't pause).
+    bus: TrackHandle,
+}
+
 pub struct Audio {
-    manager: Option<AudioManager<DefaultBackend>>,
+    manager: Option<Manager>,
+    /// Set by [`Audio::suspend`]; applied to the bus once audio starts.
+    suspended: bool,
+    #[cfg(target_arch = "wasm32")]
+    detach: DetachHandle,
     sounds: HashMap<SoundId, StaticSoundData>,
     next_id: u32,
     /// Main-track gain, remembered so a volume set before [`Audio::start`] still applies.
@@ -158,6 +185,9 @@ impl Audio {
     pub fn new() -> Result<Self> {
         let mut audio = Self {
             manager: None,
+            suspended: false,
+            #[cfg(target_arch = "wasm32")]
+            detach: DetachHandle::default(),
             sounds: HashMap::new(),
             next_id: 1,
             master_volume: Decibels::IDENTITY,
@@ -179,12 +209,23 @@ impl Audio {
         if self.manager.is_some() {
             return Ok(());
         }
-        let mut manager = AudioManager::<DefaultBackend>::new(AudioManagerSettings::default())
+        #[cfg_attr(not(target_arch = "wasm32"), allow(unused_mut))]
+        let mut settings = AudioManagerSettings::<Backend>::default();
+        #[cfg(target_arch = "wasm32")]
+        {
+            settings.backend_settings = self.detach.clone();
+        }
+        let mut kira = AudioManager::<Backend>::new(settings)
             .map_err(|e| anyhow!("kira AudioManager init: {e}"))?;
-        manager
-            .main_track()
+        kira.main_track()
             .set_volume(self.master_volume, Tween::default());
-        self.manager = Some(manager);
+        let mut bus = kira
+            .add_sub_track(TrackBuilder::new())
+            .map_err(|e| anyhow!("kira bus track: {e}"))?;
+        if self.suspended {
+            bus.pause(Tween::default());
+        }
+        self.manager = Some(Manager { kira, bus });
         for (data, handle) in std::mem::take(&mut self.queued) {
             self.start_queued(data, &handle);
         }
@@ -341,6 +382,7 @@ impl Audio {
         self.manager
             .as_mut()
             .ok_or(AudioError::NotStarted)?
+            .bus
             .play(data)
             .map_err(|e| AudioError::Backend(e.to_string()))
     }
@@ -384,7 +426,7 @@ impl Audio {
         let Some(manager) = self.manager.as_mut() else {
             return;
         };
-        match manager.play(data) {
+        match manager.bus.play(data) {
             Ok(()) => handle.mark_started(),
             Err(e) => {
                 log::warn!("stream failed to start: {e}");
@@ -464,7 +506,7 @@ impl Audio {
         let Some(manager) = self.manager.as_mut() else {
             return;
         };
-        match manager.play(prepared) {
+        match manager.bus.play(prepared) {
             Ok(()) => handle.mark_started(),
             Err(e) => {
                 log::warn!("synth failed to start: {e}");
@@ -479,9 +521,52 @@ impl Audio {
         self.master_volume = amplitude_to_db(volume);
         if let Some(manager) = self.manager.as_mut() {
             manager
+                .kira
                 .main_track()
                 .set_volume(self.master_volume, Tween::default());
         }
+    }
+
+    /// Pause everything that's playing (sounds, streams, synths) until [`Audio::resume`],
+    /// e.g. for a pause menu or when the host page hides the game. Sounds started while
+    /// suspended wait too. Works before audio has started: it then starts suspended.
+    ///
+    /// Independent of the per-sound [`SoundHandle::pause`], and of the toolkit suspending the
+    /// web output while the canvas is detached from the page (`DetachHandle`, web only):
+    /// reattaching the canvas doesn't undo a suspend.
+    pub fn suspend(&mut self) {
+        self.set_suspended(true);
+    }
+
+    /// Undo [`Audio::suspend`]: everything it paused continues where it left off.
+    pub fn resume(&mut self) {
+        self.set_suspended(false);
+    }
+
+    /// Whether [`Audio::suspend`] is in effect.
+    pub fn is_suspended(&self) -> bool {
+        self.suspended
+    }
+
+    fn set_suspended(&mut self, suspended: bool) {
+        if self.suspended == suspended {
+            return;
+        }
+        self.suspended = suspended;
+        if let Some(manager) = self.manager.as_mut() {
+            if suspended {
+                manager.bus.pause(Tween::default());
+            } else {
+                manager.bus.resume(Tween::default());
+            }
+        }
+    }
+
+    /// Web only: the handle that suspends the output while the game's canvas is detached
+    /// from the page. The toolkit's core drives it; see [`DetachHandle`].
+    #[cfg(target_arch = "wasm32")]
+    pub fn detach_handle(&self) -> DetachHandle {
+        self.detach.clone()
     }
 }
 
@@ -511,5 +596,28 @@ mod tests {
         assert!(o.looped && o.deferred);
         assert_eq!(o.volume, 0.25);
         assert_eq!(PlayOptions::default().volume, 1.0);
+    }
+
+    #[test]
+    fn suspend_before_start_is_remembered() {
+        let mut audio = Audio {
+            manager: None,
+            suspended: false,
+            #[cfg(target_arch = "wasm32")]
+            detach: DetachHandle::default(),
+            sounds: HashMap::new(),
+            next_id: 1,
+            master_volume: Decibels::IDENTITY,
+            queued: Vec::new(),
+            queued_streams: Vec::new(),
+            #[cfg(feature = "synth")]
+            queued_synths: Vec::new(),
+        };
+        assert!(!audio.is_suspended());
+        audio.suspend();
+        audio.suspend();
+        assert!(audio.is_suspended());
+        audio.resume();
+        assert!(!audio.is_suspended());
     }
 }

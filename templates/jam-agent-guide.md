@@ -29,7 +29,7 @@ impl Game for MyGame {
     fn render(&mut self, ctx: &mut Context, frame: &mut Frame) { /* draw */ }
 
     // Optional hooks (default no-ops):
-    fn event(&mut self, ctx: &mut Context, e: &GameEvent) {}        // Resized / FocusChanged / CloseRequested
+    fn event(&mut self, ctx: &mut Context, e: &GameEvent) {}        // Resized / FocusChanged / CloseRequested / CanvasAttached (web)
     fn raw_window_event(&mut self, ctx: &mut Context, e: &winit::event::WindowEvent) -> bool { false } // return true = consumed (egui)
     fn shutdown(&mut self, ctx: &mut Context) {}
 }
@@ -163,6 +163,11 @@ Keep the `SoundHandle` to control the sound later; dropping it lets the sound pl
 In the browser, audio starts on the player's first key press / click / touch (a browser rule);
 before that `play` fails with `AudioError::NotStarted` (check `audio.is_started()`), so don't
 `?` it in `update` - log or ignore it, or use `PlayOptions::deferred` for music.
+
+`audio.suspend()` / `audio.resume()` pause and continue everything at once (a pause menu). On
+the web, if the host page takes the canvas out of the document, the toolkit suspends the audio
+by itself and sends `GameEvent::CanvasAttached(false)` / `(true)` on the first frame after the
+canvas is back - pause gameplay there if you want to.
 
 ### Chiptune music and effects (`synth` feature)
 

@@ -1,9 +1,14 @@
-//! Browser glue: canvas attachment, console logging and panic reporting.
+//! Browser glue: canvas attachment and detach watching, console logging and panic reporting.
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use anyhow::{Result, anyhow};
+use game_toolkit_audio::DetachHandle;
 use wasm_bindgen::JsCast;
-use winit::platform::web::WindowAttributesExtWebSys;
-use winit::window::WindowAttributes;
+use wasm_bindgen::closure::Closure;
+use winit::platform::web::{WindowAttributesExtWebSys, WindowExtWebSys};
+use winit::window::{Window, WindowAttributes};
 
 /// Render into the canvas with `canvas_id`, or append a fresh canvas to `<body>`.
 pub(crate) fn canvas_attributes(
@@ -63,4 +68,79 @@ impl log::Log for ConsoleLogger {
     }
 
     fn flush(&self) {}
+}
+
+/// Watches the game's canvas being taken out of the page and put back (an SPA route change,
+/// a component unmounting). The browser delivers no frames to a detached canvas, so this
+/// can't wait for one: a `MutationObserver` on the document suspends the audio output from
+/// the DOM callback itself, and queues the change for the game's next frame.
+pub(crate) struct CanvasWatch {
+    observer: web_sys::MutationObserver,
+    _callback: Closure<dyn FnMut()>,
+    state: Rc<RefCell<WatchState>>,
+}
+
+struct WatchState {
+    attached: bool,
+    /// Attachment changes not yet delivered to the game, oldest first.
+    changes: Vec<bool>,
+}
+
+impl CanvasWatch {
+    /// Start watching `window`'s canvas. `audio` is suspended while the canvas is detached.
+    pub(crate) fn new(window: &Window, audio: Option<DetachHandle>) -> Result<Self> {
+        // Hold on to the element itself: once detached, `getElementById` can't find it.
+        let canvas = window
+            .canvas()
+            .ok_or_else(|| anyhow!("window has no canvas"))?;
+        let document = web_sys::window()
+            .and_then(|w| w.document())
+            .ok_or_else(|| anyhow!("no document"))?;
+        let state = Rc::new(RefCell::new(WatchState {
+            attached: canvas.is_connected(),
+            changes: Vec::new(),
+        }));
+        if let Some(audio) = &audio {
+            audio.set_detached(!state.borrow().attached);
+        }
+        let callback = Closure::<dyn FnMut()>::new({
+            let state = state.clone();
+            move || {
+                let attached = canvas.is_connected();
+                let mut state = state.borrow_mut();
+                if state.attached == attached {
+                    return;
+                }
+                state.attached = attached;
+                state.changes.push(attached);
+                if let Some(audio) = &audio {
+                    audio.set_detached(!attached);
+                }
+            }
+        });
+        let observer = web_sys::MutationObserver::new(callback.as_ref().unchecked_ref())
+            .map_err(|e| anyhow!("MutationObserver: {e:?}"))?;
+        let init = web_sys::MutationObserverInit::new();
+        init.set_child_list(true);
+        init.set_subtree(true);
+        observer
+            .observe_with_options(&document, &init)
+            .map_err(|e| anyhow!("MutationObserver.observe: {e:?}"))?;
+        Ok(Self {
+            observer,
+            _callback: callback,
+            state,
+        })
+    }
+
+    /// Attachment changes since the last call, oldest first (`true`: put back in the page).
+    pub(crate) fn take_changes(&self) -> Vec<bool> {
+        std::mem::take(&mut self.state.borrow_mut().changes)
+    }
+}
+
+impl Drop for CanvasWatch {
+    fn drop(&mut self) {
+        self.observer.disconnect();
+    }
 }
