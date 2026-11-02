@@ -400,8 +400,9 @@ impl Audio {
     ///
     /// [`PlayOptions`] apply as for other sounds: [`PlayOptions::looped`] loops the song,
     /// otherwise it plays once (whatever the song's own [`synth::Song::looped`] says), and
-    /// `volume` and `deferred` work as usual. Dropping the last handle stops the synth; a song
-    /// that played once keeps its (silent) synth until then.
+    /// `volume` and `deferred` work as usual. A song that plays once ends by itself
+    /// after its release and effect tails ([`SynthHandle::is_finished`] turns `true`); a
+    /// looping one plays until stopped. Dropping the last handle stops the synth either way.
     /// Fails like [`Audio::play`] before audio has started.
     ///
     /// ```no_run

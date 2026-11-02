@@ -18,8 +18,8 @@ use crate::synth::{AudioEvent, ChannelNo, DrumHit, MidiNote, QueueFull};
 /// patch change for the boss fight).
 ///
 /// Clones refer to the same synth. Unlike a [`crate::SoundHandle`], **dropping the last clone
-/// stops the synth**: music never ends on its own, so it lives as long as the game keeps a
-/// handle to it.
+/// stops the synth**: looping music never ends on its own, so it lives as long as the game
+/// keeps a handle to it. A song played once ends by itself after its tails.
 ///
 /// A synth started with [`crate::PlayOptions::deferred`] before audio is available (on the
 /// web, before the first user gesture) is *pending*; everything done to the handle meanwhile,
@@ -133,7 +133,7 @@ impl SynthHandle {
         self.inner.pending.load(Ordering::Relaxed) && !self.is_finished()
     }
 
-    /// Whether the synth was stopped.
+    /// Whether the synth was stopped, or played a one-shot song to the end.
     pub fn is_finished(&self) -> bool {
         self.inner.stopped.load(Ordering::Relaxed) || self.lock().state() == PlaybackState::Stopped
     }
@@ -224,6 +224,30 @@ mod tests {
         handle.resume();
         process(&mut manager);
         assert!(handle.is_playing());
+    }
+
+    #[test]
+    fn a_one_shot_song_finishes_by_itself() {
+        use crate::synth::{Song, SongPlayer, Tempo};
+
+        let song = Song::new(Tempo::rows_per_minute(1_200.0))
+            .one_shot()
+            .lane(ChannelNo(0), "C4 . - .")
+            .unwrap();
+        let data = SynthSoundData::new().with_sequencer(SongPlayer::new(song));
+        let prepared = PreparedSynth::new(data, false);
+        let handle = prepared.handle().clone();
+        let mut manager = manager();
+        manager.play(prepared).unwrap();
+        process(&mut manager);
+        assert!(handle.is_playing());
+        for _ in 0..1_000 {
+            if handle.is_finished() {
+                break;
+            }
+            process(&mut manager);
+        }
+        assert!(handle.is_finished() && !handle.is_playing());
     }
 
     #[test]
