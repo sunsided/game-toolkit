@@ -38,6 +38,9 @@ pub struct Context {
     pub window: Arc<Window>,
     pub(crate) quit_requested: bool,
     pub(crate) canvas_attached: bool,
+    /// Waiting for the browser to say whether audio may start without a gesture.
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) autoplay: Option<crate::web::AutoplayProbe>,
 }
 
 /// The asynchronous half of context setup: GPU init and (on the web) asset preloading.
@@ -126,6 +129,8 @@ impl Context {
             window,
             quit_requested: false,
             canvas_attached: true,
+            #[cfg(target_arch = "wasm32")]
+            autoplay: None,
         }
     }
 
@@ -175,6 +180,51 @@ impl Context {
         {
             log::warn!("audio start failed, continuing muted: {e}");
             self.audio = None;
+        }
+    }
+
+    /// Start audio as soon as the browser allows it without another user gesture, e.g. when
+    /// the host page tells the game the player is back after interacting with the page. The
+    /// toolkit does this by itself at startup; call it again when a gesture may have happened
+    /// on the page since (outside the canvas, so the toolkit didn't see it).
+    ///
+    /// On the web it asks the browser and, if the answer is yes, starts the audio right away
+    /// or within about 1.5 s (Firefox and WebKit take a moment to say so). Otherwise audio
+    /// keeps waiting for the first key press, click or touch on the canvas. Natively the
+    /// device is open from the start and this does nothing.
+    pub fn start_audio_if_allowed(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        if self.audio.as_ref().is_some_and(|a| !a.is_started()) && self.autoplay.is_none() {
+            self.autoplay = crate::web::AutoplayProbe::start();
+            self.poll_autoplay();
+        }
+    }
+
+    /// Act on the autoplay probe's answer, if there is one yet.
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn poll_autoplay(&mut self) {
+        use crate::web::Autoplay;
+        let Some(probe) = &self.autoplay else {
+            return;
+        };
+        // A gesture on the canvas may have started the audio in the meantime.
+        let started = self
+            .audio
+            .as_ref()
+            .is_none_or(game_toolkit_audio::Audio::is_started);
+        let answer = if started {
+            Autoplay::Denied
+        } else {
+            probe.poll()
+        };
+        match answer {
+            Autoplay::Pending => {}
+            Autoplay::Denied => self.autoplay = None,
+            Autoplay::Allowed => {
+                self.autoplay = None;
+                log::info!("audio allowed without a gesture, starting it now");
+                self.start_audio();
+            }
         }
     }
 }

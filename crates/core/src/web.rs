@@ -28,34 +28,73 @@ pub(crate) fn canvas_attributes(
     Ok(attrs.with_canvas(Some(canvas)))
 }
 
-/// Whether the browser would let audio start right now, without another user gesture: the
-/// page already had one (the player clicked a link on the host site to get to the game), so
-/// the toolkit can open the audio output at startup instead of waiting for a click on the
-/// canvas.
+/// How long a probe may stay `suspended` before the answer counts as no. A fresh context
+/// reports `suspended` at first in Firefox and WebKit even where autoplay is allowed, and
+/// turns `running` about 300 ms later; Chromium is `running` at once.
+const AUTOPLAY_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(1500);
+
+/// What an [`AutoplayProbe`] found out so far.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Autoplay {
+    /// Audio may start now, without another gesture.
+    Allowed,
+    /// The browser wants a gesture first.
+    Denied,
+    /// No answer yet; poll again next frame.
+    Pending,
+}
+
+/// Asks the browser whether audio may start without another user gesture: the page already
+/// had one (the player clicked a link on the host site to get to the game), so the toolkit can
+/// open the audio output without waiting for a click on the canvas.
 ///
-/// Asks a throwaway `AudioContext`, which starts `running` only when autoplay is allowed, and
-/// closes it again. It never connects a node, so nothing hears it. Where the browser tracks
-/// user activation (`navigator.userActivation`), the probe only runs after a gesture: before
-/// one, the answer is almost always no, and Chrome logs a warning for every context created
-/// then.
-pub(crate) fn audio_allowed() -> bool {
-    let Some(window) = web_sys::window() else {
-        return false;
-    };
-    let navigator = window.navigator();
-    // Older Safari has no `userActivation`; probe there without the shortcut.
-    let activation = js_sys::Reflect::get(&navigator, &"userActivation".into())
-        .ok()
-        .and_then(|v| v.dyn_into::<web_sys::UserActivation>().ok());
-    if activation.is_some_and(|a| !a.has_been_active()) {
-        return false;
+/// A throwaway `AudioContext` starts `running` only when autoplay is allowed. It never
+/// connects a node, so nothing hears it, and it is closed when the probe is dropped. Where
+/// the browser tracks user activation (`navigator.userActivation`), a probe only starts after
+/// a gesture: before one, the answer is almost always no, and Chrome logs a warning for every
+/// context created then.
+pub(crate) struct AutoplayProbe {
+    context: web_sys::AudioContext,
+    /// When the probe started.
+    since: web_time::Instant,
+}
+
+impl AutoplayProbe {
+    /// Start a probe, or `None` when the page had no gesture yet or no context can be made.
+    pub(crate) fn start() -> Option<Self> {
+        let window = web_sys::window()?;
+        let navigator = window.navigator();
+        // Older Safari has no `userActivation`; probe there without the shortcut.
+        let activation = js_sys::Reflect::get(&navigator, &"userActivation".into())
+            .ok()
+            .and_then(|v| v.dyn_into::<web_sys::UserActivation>().ok());
+        if activation.is_some_and(|a| !a.has_been_active()) {
+            return None;
+        }
+        let context = web_sys::AudioContext::new().ok()?;
+        Some(Self {
+            context,
+            since: web_time::Instant::now(),
+        })
     }
-    let Ok(probe) = web_sys::AudioContext::new() else {
-        return false;
-    };
-    let running = probe.state() == web_sys::AudioContextState::Running;
-    let _ = probe.close();
-    running
+
+    /// `Allowed` once the probe runs, `Denied` if it is still suspended after
+    /// [`AUTOPLAY_PROBE_TIMEOUT`], `Pending` in between.
+    pub(crate) fn poll(&self) -> Autoplay {
+        if self.context.state() == web_sys::AudioContextState::Running {
+            Autoplay::Allowed
+        } else if self.since.elapsed() > AUTOPLAY_PROBE_TIMEOUT {
+            Autoplay::Denied
+        } else {
+            Autoplay::Pending
+        }
+    }
+}
+
+impl Drop for AutoplayProbe {
+    fn drop(&mut self) {
+        let _ = self.context.close();
+    }
 }
 
 /// Route panics and `log` records to the browser console. Leaves an already-installed logger

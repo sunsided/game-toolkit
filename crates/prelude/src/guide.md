@@ -148,9 +148,11 @@ if let (Some(audio), Some(id)) = (&mut ctx.audio, music) {
 Keep the `SoundHandle` to control the sound later; dropping it lets the sound play out.
 
 In the browser, audio starts on the player's first key press / click / touch (a browser rule),
-or right at startup if the page already had one (the player clicked through to the game) - then
-`audio.is_started()` is already `true` in `init`, e.g. to skip a "click to start" screen. Before
-that `play` fails with `AudioError::NotStarted` (check `audio.is_started()`), so don't
+or without one if the page already had one (the player clicked through to the game). Chromium
+says so at once, so `audio.is_started()` is already `true` in `init`; Firefox and Safari take up
+to ~1.5 s, so audio starts a few frames in - poll `is_started()` before showing a "click to
+start" screen. If the host page tells the game the player is back (they may have clicked the
+page since), call `ctx.start_audio_if_allowed()` to check again. Before audio starts `play` fails with `AudioError::NotStarted` (check `audio.is_started()`), so don't
 `?` it in `update` - log or ignore it, or use `PlayOptions::deferred` for music.
 
 `audio.suspend()` / `audio.resume()` pause and continue everything at once (a pause menu). On

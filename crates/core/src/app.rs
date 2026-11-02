@@ -289,12 +289,10 @@ impl<G: Game> AppRunner<G> {
         let size = ctx.window.inner_size();
         ctx.gfx.resize(size.width, size.height);
         // If the page already had a user gesture, audio may start now rather than on the first
-        // click on the canvas: `G::init` then sees `is_started()` and music plays at once.
-        #[cfg(target_arch = "wasm32")]
-        if crate::web::audio_allowed() {
-            log::info!("audio allowed without a gesture, starting it now");
-            ctx.start_audio();
-        }
+        // click on the canvas: `G::init` then sees `is_started()` and music plays at once
+        // (Chromium). Where the browser takes a moment to tell (Firefox, WebKit), the probe
+        // keeps going and `frame` starts the audio once it knows.
+        ctx.start_audio_if_allowed();
         let game = match G::init(&mut ctx) {
             Ok(g) => g,
             Err(e) => {
@@ -328,6 +326,8 @@ impl<G: Game> AppRunner<G> {
         };
         state.ctx.time.tick();
         state.ctx.input.poll_gamepads();
+        #[cfg(target_arch = "wasm32")]
+        state.ctx.poll_autoplay();
         #[cfg(target_arch = "wasm32")]
         if let Some(watch) = &state.canvas_watch {
             for attached in watch.take_changes() {
