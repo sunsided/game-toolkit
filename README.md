@@ -142,6 +142,14 @@ template-specific commands and conventions.
 The dependency direction is one-way: `game-toolkit-aseprite` depends on `game-toolkit-gfx`, never the
 reverse, so the renderer stays unaware of asset formats.
 
+## Companion crates
+
+Built on game-toolkit, published separately:
+
+| Crate | What it gives you |
+|-------|-------------------|
+| [`game-toolkit-platformer`](https://github.com/sunsided/game-toolkit-platformer) | A pluggable platforming controller: snappy movement (jump buffer, coyote time, wall jumps, dashes, climbing) with feel presets, control schemes for game-toolkit input, and an animation state graph that follows it. `Platformer::on(&level, preset)`, `update(&input, &mut level, dt)`, draw `sprite()` at `position()`. |
+
 ## Examples
 
 Run any example with `cargo run -p <package>`.
