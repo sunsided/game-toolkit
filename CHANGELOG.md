@@ -69,6 +69,14 @@ All notable changes to this project are documented here. The format is based on
   `pc_monitor`): scanlines locked to canvas rows, aperture grille or shadow mask, bloom,
   phosphor afterglow, curvature, vignette and sharp-bilinear sampling for fractional scales.
   New example `18_post`.
+- `PostPass::indices`: with indexed colour on, every post effect (both stages) gets the
+  canvas's palette indices before the lookup, at canvas size. `ShaderEffect` shaders get them as
+  `indices_tex`, with `index_at(canvas_px)`, `index_in` / `index_out` and the `post.indexed`
+  flag in the prelude.
+- `CrtSettings::bloom_source`: `BloomSource::Luminance` (default, as before) or
+  `BloomSource::IndexMask` (`BloomSource::indices(48..56)`), where only the listed palette
+  indices glow, so a lava ramp blooms and equally bright snow doesn't. It falls back to
+  luminance without an indexed canvas.
 
 - Bitmap pixel fonts (#91): `BitmapFont`, drawn with `Painter::bitmap_text` / `bitmap_text_ex`
   at whole-number scales on whole pixels, through the sprite batcher so text sorts with

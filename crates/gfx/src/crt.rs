@@ -16,6 +16,31 @@ pub enum CrtMask {
     ShadowMask,
 }
 
+/// What glows when [`CrtSettings::bloom`] is on.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub enum BloomSource {
+    /// Every pixel, by its brightness (default).
+    #[default]
+    Luminance,
+    /// Only pixels drawn with these palette indices (feature `indexed`): a 256-bit set, bit
+    /// `i % 32` of word `i / 32` for index `i`, looked up before palette cycling. Lava glows,
+    /// equally bright snow doesn't. Build it with [`BloomSource::indices`]. Without an indexed
+    /// canvas it falls back to [`Luminance`](BloomSource::Luminance).
+    IndexMask([u32; 8]),
+}
+
+impl BloomSource {
+    /// An [`IndexMask`](BloomSource::IndexMask) of `indices`, e.g. `BloomSource::indices(48..56)`
+    /// for a lava ramp.
+    pub fn indices(indices: impl IntoIterator<Item = u8>) -> Self {
+        let mut mask = [0u32; 8];
+        for i in indices {
+            mask[usize::from(i / 32)] |= 1 << (i % 32);
+        }
+        Self::IndexMask(mask)
+    }
+}
+
 /// Settings for [`CrtEffect`]. Start from a preset and adjust: every value is safe to change
 /// at runtime through [`CrtEffect::settings_mut`].
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -29,6 +54,8 @@ pub struct CrtSettings {
     pub mask_size: f32,
     /// Glow added around bright pixels, `0..=1`.
     pub bloom: f32,
+    /// Which pixels glow; default [`BloomSource::Luminance`]. The presets keep the default.
+    pub bloom_source: BloomSource,
     /// Phosphor afterglow: how much of the previous frame survives, `0..1`; `0` disables it
     /// (and the history texture it needs).
     pub persistence: f32,
@@ -58,6 +85,7 @@ impl CrtSettings {
             mask_strength: 0.0,
             mask_size: 1.0,
             bloom: 0.05,
+            bloom_source: BloomSource::Luminance,
             persistence: 0.0,
             curvature: 0.0,
             vignette: 0.1,
@@ -74,6 +102,7 @@ impl CrtSettings {
             mask_strength: 0.3,
             mask_size: 1.0,
             bloom: 0.15,
+            bloom_source: BloomSource::Luminance,
             persistence: 0.35,
             curvature: 0.03,
             vignette: 0.25,
@@ -90,6 +119,7 @@ impl CrtSettings {
             mask_strength: 0.35,
             mask_size: 1.0,
             bloom: 0.3,
+            bloom_source: BloomSource::Luminance,
             persistence: 0.5,
             curvature: 0.06,
             vignette: 0.4,
@@ -106,6 +136,7 @@ impl CrtSettings {
             mask_strength: 0.15,
             mask_size: 1.0,
             bloom: 0.05,
+            bloom_source: BloomSource::Luminance,
             persistence: 0.1,
             curvature: 0.0,
             vignette: 0.1,
@@ -114,7 +145,18 @@ impl CrtSettings {
         }
     }
 
-    fn params(&self) -> CrtParams {
+    /// The shader parameters; `indexed` says whether the frame has an indexed canvas.
+    fn params(&self, indexed: bool) -> CrtParams {
+        let (bloom_from_indices, emissive) = match self.bloom_source {
+            BloomSource::IndexMask(mask) if indexed => (
+                1,
+                [
+                    [mask[0], mask[1], mask[2], mask[3]],
+                    [mask[4], mask[5], mask[6], mask[7]],
+                ],
+            ),
+            _ => (0, [[0; 4]; 2]),
+        };
         CrtParams {
             scanline: self.scanlines,
             mask_strength: self.mask_strength,
@@ -130,7 +172,9 @@ impl CrtSettings {
             vignette: self.vignette,
             brightness: self.brightness,
             sharpness: self.sharpness,
-            _pad: [0.0; 2],
+            bloom_from_indices,
+            _pad: 0.0,
+            emissive,
         }
     }
 }
@@ -149,7 +193,9 @@ struct CrtParams {
     vignette: f32,
     brightness: f32,
     sharpness: f32,
-    _pad: [f32; 2],
+    bloom_from_indices: u32,
+    _pad: f32,
+    emissive: [[u32; 4]; 2],
 }
 
 /// A CRT look: scanlines locked to canvas rows, an aperture grille or shadow mask, bloom,
@@ -165,22 +211,36 @@ struct CrtParams {
 pub struct CrtEffect {
     shader: ShaderEffect,
     settings: CrtSettings,
-    uploaded: Option<CrtSettings>,
+    /// The settings and indexed state last uploaded.
+    uploaded: Option<(CrtSettings, bool)>,
 }
 
 impl CrtEffect {
     pub fn new(gfx: &crate::Graphics, settings: CrtSettings) -> Self {
-        let shader = ShaderEffect::with_params(
-            gfx,
+        Self::with_device(gfx.device(), gfx.surface_format(), settings)
+    }
+
+    pub(crate) fn with_device(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        settings: CrtSettings,
+    ) -> Self {
+        let params = settings.params(false);
+        let shader = ShaderEffect::build(
+            device,
+            format,
             "crt.wgsl",
             include_str!("crt.wgsl"),
-            &settings.params(),
+            Some((
+                bytemuck::bytes_of(&params),
+                std::any::TypeId::of::<CrtParams>(),
+            )),
         )
         .with_history();
         Self {
             shader,
             settings,
-            uploaded: Some(settings),
+            uploaded: Some((settings, false)),
         }
     }
 
@@ -200,9 +260,10 @@ impl CrtEffect {
 
 impl PostEffect for CrtEffect {
     fn apply(&mut self, pass: &mut PostPass<'_>) {
-        if self.uploaded != Some(self.settings) {
-            self.shader.set_params(&self.settings.params());
-            self.uploaded = Some(self.settings);
+        let state = (self.settings, pass.indices.is_some());
+        if self.uploaded != Some(state) {
+            self.shader.set_params(&self.settings.params(state.1));
+            self.uploaded = Some(state);
         }
         self.shader.apply(pass);
     }
@@ -218,6 +279,25 @@ mod tests {
 
     #[test]
     fn params_match_the_wgsl_struct_size() {
-        assert_eq!(size_of::<CrtParams>(), 48);
+        assert_eq!(size_of::<CrtParams>(), 80);
+    }
+
+    #[test]
+    fn index_mask_sets_one_bit_per_index() {
+        let BloomSource::IndexMask(m) = BloomSource::indices([0, 31, 32, 255]) else {
+            unreachable!()
+        };
+        assert_eq!(m, [1 | 1 << 31, 1, 0, 0, 0, 0, 0, 1 << 31]);
+    }
+
+    #[test]
+    fn index_mask_falls_back_to_luminance_without_an_indexed_canvas() {
+        let s = CrtSettings {
+            bloom_source: BloomSource::indices([5]),
+            ..CrtSettings::arcade()
+        };
+        assert_eq!(s.params(false).bloom_from_indices, 0);
+        assert_eq!(s.params(true).bloom_from_indices, 1);
+        assert_eq!(s.params(true).emissive[0][0], 1 << 5);
     }
 }

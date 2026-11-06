@@ -1042,6 +1042,7 @@ impl Graphics {
                 self.start.elapsed().as_secs_f32(),
                 self.frame_count,
             ),
+            indices: None,
         };
 
         // Indexed canvas: indices become colour before any effect sees the scene.
@@ -1063,6 +1064,12 @@ impl Graphics {
             .unwrap_or(&canvas.tex);
         #[cfg(not(feature = "indexed"))]
         let base = &canvas.tex;
+        // Effects in both stages can read the indices behind the resolved colours.
+        #[cfg(feature = "indexed")]
+        let run = StageRun {
+            indices: self.indexed.is_some().then_some(&canvas.tex.view),
+            ..run
+        };
 
         let post = &mut self.post;
         let canvas_out = post.run(PostStage::Canvas, &run, encoder, &base.view, canvas.size());

@@ -12,8 +12,10 @@ struct CrtParams {
     vignette: f32,
     brightness: f32,
     sharpness: f32,
+    // 1u: only palette indices in `emissive` glow (needs the indexed canvas).
+    bloom_from_indices: u32,
     _pad0: f32,
-    _pad1: f32,
+    emissive: array<vec4<u32>, 2>,
 };
 
 @group(1) @binding(0) var<uniform> params: CrtParams;
@@ -36,6 +38,17 @@ fn sample_sharp(t: vec2<f32>) -> vec3<f32> {
     let region = (0.5 - 0.5 / scale) * params.sharpness;
     let g = clamp((f - region) / max(1.0 - 2.0 * region, vec2<f32>(1e-4)), vec2<f32>(0.0), vec2<f32>(1.0));
     return textureSampleLevel(input_tex, linear_sampler, canvas_uv(floor(t) + g), 0.0).rgb;
+}
+
+// How much canvas texel `t` contributes to bloom: 1 for everything by default, else whether
+// its palette index is in the emissive set.
+fn bloom_weight(t: vec2<f32>) -> f32 {
+    if (params.bloom_from_indices == 0u) {
+        return 1.0;
+    }
+    let i = index_at(vec2<i32>(floor(t)));
+    let word = params.emissive[i / 128u][(i / 32u) % 4u];
+    return f32((word >> (i % 32u)) & 1u);
 }
 
 fn mask(frag: vec2<f32>) -> vec3<f32> {
@@ -83,7 +96,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         for (var i = 0; i < 8; i = i + 1) {
             let a = f32(i) * 0.785398;
             let o = vec2<f32>(cos(a), sin(a)) * r;
-            glow = glow + textureSampleLevel(input_tex, linear_sampler, canvas_uv(t + o), 0.0).rgb;
+            let sample = textureSampleLevel(input_tex, linear_sampler, canvas_uv(t + o), 0.0).rgb;
+            glow = glow + sample * bloom_weight(t + o);
         }
         color = color + glow / 8.0 * params.bloom;
     }

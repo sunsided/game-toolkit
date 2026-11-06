@@ -48,7 +48,7 @@ pub use canvas::{CanvasRect, ScaleFilter, ScaleMode};
 pub use color::{Color, Layer};
 pub use config::{DeviceHook, DeviceRequirementsError, GraphicsConfig, MissingLimit};
 #[cfg(feature = "crt")]
-pub use crt::{CrtEffect, CrtMask, CrtSettings};
+pub use crt::{BloomSource, CrtEffect, CrtMask, CrtSettings};
 pub use custom::CustomPass;
 pub use draw::{RectDraw, SpriteDraw, TextDraw};
 pub use frame::Frame;

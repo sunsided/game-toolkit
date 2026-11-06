@@ -62,6 +62,13 @@ pub struct PostPass<'a> {
     /// The stage's final output from the previous frame, when an effect of the stage asked
     /// for it via [`PostEffect::uses_history`]; black on the first frame and after a resize.
     pub history: Option<&'a wgpu::TextureView>,
+    /// With indexed colour on (feature `indexed`), the canvas's palette indices before the
+    /// palette lookup and cycling, at the canvas size (also in the
+    /// [`Window`](PostStage::Window) stage, where `input` is window-sized; map positions with
+    /// [`PostGlobals::canvas_origin`] and `canvas_extent`). Read them with `index_in` from
+    /// [`INDEX_WGSL`](crate::INDEX_WGSL), e.g. to make only some palette entries glow. `None`
+    /// without indexed colour.
+    pub indices: Option<&'a wgpu::TextureView>,
     pub format: wgpu::TextureFormat,
     pub stage: PostStage,
     /// Width and height of `input` and `output`.
@@ -88,6 +95,10 @@ pub struct PostGlobals {
     pub time: f32,
     /// Frames since the renderer started.
     pub frame: u32,
+    /// `1` when [`PostPass::indices`] holds the indexed canvas, else `0`. [`ShaderEffect`]
+    /// fills it in.
+    pub indexed: u32,
+    pub _pad: [u32; 3],
 }
 
 /// Internal: lets `Graphics::post_effect_mut` downcast boxed effects.
@@ -175,6 +186,8 @@ pub(crate) struct StageRun<'a> {
     pub blit: &'a Blit,
     pub format: wgpu::TextureFormat,
     pub globals: PostGlobals,
+    /// The indexed canvas before the palette lookup, when indexed colour is on.
+    pub indices: Option<&'a wgpu::TextureView>,
 }
 
 impl PostChain {
@@ -270,6 +283,7 @@ impl PostChain {
                 input,
                 output: &targets.ping[out].view,
                 history: targets.history.as_ref().map(|h| &h.view),
+                indices: run.indices,
                 format: run.format,
                 stage,
                 size,
@@ -299,11 +313,14 @@ impl PostChain {
 }
 
 /// The bindings, vertex shader and `VsOut` every [`ShaderEffect`] shader gets, plus the
-/// [`BAYER_WGSL`] dithering helpers.
+/// [`BAYER_WGSL`] dithering helpers and the `index_in` / `index_out` palette-index helpers
+/// (`INDEX_WGSL` with feature `indexed`).
 pub const SHADER_PRELUDE: &str = concat!(
     include_str!("post_prelude.wgsl"),
     "\n",
-    include_str!("bayer.wgsl")
+    include_str!("bayer.wgsl"),
+    "\n",
+    include_str!("index.wgsl")
 );
 
 /// WGSL ordered-dithering helpers, `bayer4(p: vec2<i32>) -> f32` and `bayer8`, returning
@@ -324,7 +341,11 @@ pub const BAYER_WGSL: &str = include_str!("bayer.wgsl");
 ///   `canvas_origin`, `canvas_extent`, `time` and `frame` (see [`PostGlobals`]);
 /// - `struct VsOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> }` and the
 ///   vertex shader;
-/// - `bayer4(p)` / `bayer8(p)` ordered-dithering thresholds (see [`BAYER_WGSL`]).
+/// - `bayer4(p)` / `bayer8(p)` ordered-dithering thresholds (see [`BAYER_WGSL`]);
+/// - `indices_tex: texture_2d<f32>` - with indexed colour, the canvas's palette indices
+///   before the lookup, at canvas size (see [`PostPass::indices`]); read them with
+///   `index_at(canvas_px)` or `index_in(textureLoad(indices_tex, ..))`. `post.indexed` is `1u`
+///   when they are there; otherwise `indices_tex` is the input again.
 ///
 /// Your source must define `@fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32>`. With
 /// [`ShaderEffect::with_params`], it must also declare its parameter block as
@@ -418,7 +439,7 @@ impl ShaderEffect {
         };
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("post.bgl"),
-            entries: &[tex(0), sampler(1), sampler(2), uniform(3), tex(4)],
+            entries: &[tex(0), sampler(1), sampler(2), uniform(3), tex(4), tex(5)],
         });
         let params = params.map(|(bytes, type_id)| {
             let params_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -536,8 +557,12 @@ impl ShaderEffect {
 
 impl PostEffect for ShaderEffect {
     fn apply(&mut self, pass: &mut PostPass<'_>) {
+        let globals = PostGlobals {
+            indexed: u32::from(pass.indices.is_some()),
+            ..pass.globals
+        };
         pass.queue
-            .write_buffer(&self.globals, 0, bytemuck::bytes_of(&pass.globals));
+            .write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));
         if let Some(p) = &mut self.params
             && p.dirty
         {
@@ -545,6 +570,7 @@ impl PostEffect for ShaderEffect {
             p.dirty = false;
         }
         let history = pass.history.filter(|_| self.history).unwrap_or(pass.input);
+        let indices = pass.indices.unwrap_or(pass.input);
         let bind_group = pass.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("post.bg"),
             layout: &self.layout,
@@ -568,6 +594,10 @@ impl PostEffect for ShaderEffect {
                 wgpu::BindGroupEntry {
                     binding: 4,
                     resource: wgpu::BindingResource::TextureView(history),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: wgpu::BindingResource::TextureView(indices),
                 },
             ],
         });
@@ -616,6 +646,8 @@ pub(crate) fn globals(
         canvas_extent: rect.size,
         time,
         frame,
+        indexed: 0,
+        _pad: [0; 3],
     }
 }
 

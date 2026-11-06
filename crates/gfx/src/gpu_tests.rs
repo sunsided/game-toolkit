@@ -307,3 +307,105 @@ fn bitmap_text_tinted_with_an_index_writes_exactly_that_index() {
         }
     }
 }
+
+/// A `w x h` texture in the canvas format filled with `rgba` bytes.
+fn texture_with(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    size: [u32; 2],
+    rgba: &[u8],
+) -> wgpu::TextureView {
+    use wgpu::util::DeviceExt as _;
+    device
+        .create_texture_with_data(
+            queue,
+            &wgpu::TextureDescriptor {
+                label: None,
+                size: wgpu::Extent3d {
+                    width: size[0],
+                    height: size[1],
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: FORMAT,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            },
+            wgpu::util::TextureDataOrder::LayerMajor,
+            rgba,
+        )
+        .create_view(&Default::default())
+}
+
+#[cfg(feature = "crt")]
+#[test]
+fn crt_index_mask_blooms_only_emissive_indices() {
+    use crate::canvas::CanvasRect;
+    use crate::crt::{BloomSource, CrtEffect, CrtMask, CrtSettings};
+    use crate::post::{PostEffect, PostPass, PostStage};
+
+    let Some((device, queue)) = device() else {
+        return;
+    };
+    const LAVA: u8 = 2;
+    const SNOW: u8 = 3;
+    let size = [16u32, 16];
+    let (lava_px, snow_px) = ([4u32, 8], [12u32, 8]);
+    let at = |p: [u32; 2]| ((p[1] * size[0] + p[0]) * 4) as usize;
+    // The resolved colours: black, with one white lava and one white snow pixel.
+    let mut colors = vec![0u8; (size[0] * size[1] * 4) as usize];
+    let mut indices = colors.clone();
+    for px in colors.chunks_mut(4).chain(indices.chunks_mut(4)) {
+        px[3] = 255;
+    }
+    for (p, index) in [(lava_px, LAVA), (snow_px, SNOW)] {
+        colors[at(p)..at(p) + 3].copy_from_slice(&[255, 255, 255]);
+        indices[at(p)] = index; // stored byte = index, as `index_out` writes it
+    }
+    let input = texture_with(&device, &queue, size, &colors);
+    let index_view = texture_with(&device, &queue, size, &indices);
+    let (out, out_view) = target(&device, size);
+
+    let mut crt = CrtEffect::with_device(
+        &device,
+        FORMAT,
+        CrtSettings {
+            scanlines: 0.0,
+            mask: CrtMask::None,
+            mask_strength: 0.0,
+            bloom: 1.0,
+            bloom_source: BloomSource::indices([LAVA]),
+            persistence: 0.0,
+            curvature: 0.0,
+            vignette: 0.0,
+            brightness: 1.0,
+            ..CrtSettings::arcade()
+        },
+    );
+    let mut encoder = device.create_command_encoder(&Default::default());
+    let rect = CanvasRect {
+        origin: [0.0, 0.0],
+        size: [size[0] as f32, size[1] as f32],
+    };
+    let mut globals = crate::post::globals(size, size, rect, 0.0, 0);
+    globals.size = [size[0] as f32, size[1] as f32];
+    crt.apply(&mut PostPass {
+        device: &device,
+        queue: &queue,
+        encoder: &mut encoder,
+        input: &input,
+        output: &out_view,
+        history: None,
+        indices: Some(&index_view),
+        format: FORMAT,
+        stage: PostStage::Window,
+        size,
+        globals,
+    });
+    let pixels = read_back(&device, &queue, encoder, &out, size);
+    let beside = |p: [u32; 2]| pixels[at([p[0] + 1, p[1]])];
+    assert!(beside(lava_px) > 20, "lava glows: {}", beside(lava_px));
+    assert_eq!(beside(snow_px), 0, "snow doesn't glow");
+}
