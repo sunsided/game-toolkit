@@ -7,6 +7,9 @@ pub struct Frame {
     pub(crate) surface_texture: Option<wgpu::SurfaceTexture>,
     /// The virtual-resolution canvas the painter draws into, if any.
     pub(crate) canvas: Option<wgpu::TextureView>,
+    /// Size of `canvas`, and whether it is a virtual-resolution canvas (else window-sized).
+    pub(crate) canvas_size: [u32; 2],
+    pub(crate) canvas_virtual: bool,
     pub clear_color: [f32; 4],
     pub(crate) flushed: bool,
     /// Whether the canvas has been scaled onto the window this frame.

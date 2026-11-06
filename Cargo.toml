@@ -31,6 +31,7 @@ members = [
     "examples/15_touch",
     "examples/16_compute",
     "examples/17_virtual_resolution",
+    "examples/18_post",
     "tools/atlas-packer",
 ]
 # cargo-generate templates contain `{{placeholders}}` and depend on the toolkit via git, so

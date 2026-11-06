@@ -1150,6 +1150,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ex_18_post"
+version = "0.10.0"
+dependencies = [
+ "bytemuck",
+ "env_logger",
+ "game-toolkit",
+]
+
+[[package]]
 name = "extended"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1439,6 +1448,7 @@ dependencies = [
  "log",
  "miniscreenshot-wgpu",
  "vello",
+ "web-time",
  "wgpu",
  "winit",
 ]

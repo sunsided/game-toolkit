@@ -68,6 +68,32 @@ Text is drawn at canvas resolution too. For own passes into the canvas use
 `ctx.gfx.canvas_view()` after the painter has flushed; `ctx.gfx.flush_pending(frame)` (or the end
 of the frame) scales it onto the window, after which overlays like egui draw at window resolution.
 
+## Post-processing
+
+Full-screen effects run after the scene, in two stages: `PostStage::Canvas` (at the virtual
+resolution, before the upscale: palette tricks, dithering) and `PostStage::Window` (after it, at
+window resolution: scanlines, masks, bloom). Without a virtual resolution both run at window size.
+
+```rust
+let fx = ShaderEffect::new(&ctx.gfx, "invert", r#"
+    @fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+        let c = textureSample(input_tex, nearest_sampler, in.uv);
+        return vec4<f32>(1.0 - c.rgb, c.a);
+    }
+"#);
+let id = ctx.gfx.add_post_effect(PostStage::Canvas, fx);
+ctx.gfx.set_post_effect_enabled(id, false);
+```
+
+The shader gets `input_tex`, `nearest_sampler`, `linear_sampler`, `history_tex` (previous output,
+with `.with_history()`), the `post` uniform (`size`, `canvas_size`, `window_size`,
+`canvas_origin`, `canvas_extent`, `time`, `frame`) and `VsOut { pos, uv }`; it defines `fs_main`.
+`ShaderEffect::with_params(&gfx, label, wgsl, &pod)` adds `@group(1) @binding(0) var<uniform>
+params`, updated with `gfx.post_effect_mut::<ShaderEffect>(id).unwrap().set_params(&pod)`.
+Implement `PostEffect` for multi-pass effects. Feature `crt`: `CrtEffect::new(&ctx.gfx,
+CrtSettings::arcade())` (also `subtle`, `consumer_tv`, `pc_monitor`) in `PostStage::Window`, with
+scanlines locked to canvas rows; it also makes fractional `ScaleMode::Fit` look even.
+
 ## Drawing: the Painter
 
 In `render`, get a `Painter` for the frame, then issue draw calls. The painter flushes on drop.
@@ -309,6 +335,7 @@ All optional features and what they add to the prelude:
 | `ecs` | `ChannelQueue`, `Vec2` (sillyecs glue) | archetype ECS |
 | `synth` | `Synth`, `SynthHandle`, `synth` (`Song`, `Tempo`, `Preset`, ...), `synthie` | chiptune music (`audio.play_synth`) and effects |
 | `vector` | `vello` | high-quality 2D vector graphics (WebGPU only: skipped on WebGL2) |
+| `crt` | `CrtEffect`, `CrtSettings`, `CrtMask` | built-in CRT post-processing filter (see Post-processing) |
 | `compute` | `Kernel`, `Binding`, `PingPong`, `PingPongBindGroups`, `ReadbackRing`, `StorageTexture`, `ComputeSubmitter` | GPU simulations offloaded from `update` (`ComputeSubmitter::try_submit`, throttled by in-flight work) or recorded into `frame.encoder_mut()`; read/write buffer pairs drawable as vertex buffers, non-blocking read-back a few frames late (WebGPU only: check `ctx.gfx.supports_compute()`) |
 
 Enable in `Cargo.toml`: `game-toolkit = { ..., features = ["ui", "aseprite"] }`.

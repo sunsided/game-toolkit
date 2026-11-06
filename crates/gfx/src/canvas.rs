@@ -96,54 +96,30 @@ pub(crate) fn layout(window: [u32; 2], canvas: [u32; 2], mode: ScaleMode) -> Can
     }
 }
 
-/// The canvas texture plus the pass that scales it onto the window.
-pub(crate) struct Canvas {
+/// An offscreen colour texture the toolkit renders into and samples from, with blit bind
+/// groups for both filters.
+pub(crate) struct RenderTexture {
     pub size: [u32; 2],
+    pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
-    blit: Blit,
-    bind_groups: [wgpu::BindGroup; 2],
+    /// Indexed by [`ScaleFilter::index`].
+    pub blit_bind_groups: [wgpu::BindGroup; 2],
 }
 
-impl Canvas {
-    /// A zero width or height is raised to 1, so the cameras and text never see a zero size.
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat, size: [u32; 2]) -> Self {
+impl RenderTexture {
+    pub fn new(
+        device: &wgpu::Device,
+        blit: &Blit,
+        format: wgpu::TextureFormat,
+        size: [u32; 2],
+        label: &str,
+    ) -> Self {
         let size = [size[0].max(1), size[1].max(1)];
-        let blit = Blit::new(device, format);
-        let view = make_texture(device, format, size);
-        let bind_groups = blit.bind_groups(device, &view);
-        Self {
-            size,
-            view,
-            blit,
-            bind_groups,
-        }
-    }
-
-    /// Clear `dst` to `border` (linear) and draw the canvas into `rect`.
-    pub fn present(
-        &self,
-        encoder: &mut wgpu::CommandEncoder,
-        dst: &wgpu::TextureView,
-        rect: CanvasRect,
-        filter: ScaleFilter,
-        border: wgpu::Color,
-    ) {
-        let bg = &self.bind_groups[filter.index()];
-        self.blit.draw(encoder, bg, dst, rect, border);
-    }
-}
-
-fn make_texture(
-    device: &wgpu::Device,
-    format: wgpu::TextureFormat,
-    size: [u32; 2],
-) -> wgpu::TextureView {
-    device
-        .create_texture(&wgpu::TextureDescriptor {
-            label: Some("canvas"),
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some(label),
             size: wgpu::Extent3d {
-                width: size[0].max(1),
-                height: size[1].max(1),
+                width: size[0],
+                height: size[1],
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -152,10 +128,34 @@ fn make_texture(
             format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                 | wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_SRC,
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
-        })
-        .create_view(&wgpu::TextureViewDescriptor::default())
+        });
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let blit_bind_groups = blit.bind_groups(device, &view);
+        Self {
+            size,
+            texture,
+            view,
+            blit_bind_groups,
+        }
+    }
+}
+
+/// The offscreen scene the painter draws into: the virtual-resolution canvas, or a
+/// window-sized stand-in while post effects need the scene as a texture.
+pub(crate) struct Canvas {
+    pub tex: RenderTexture,
+    /// `true` for the window-sized stand-in (no virtual resolution): it is resized with the
+    /// window and placed 1:1.
+    pub follows_window: bool,
+}
+
+impl Canvas {
+    pub fn size(&self) -> [u32; 2] {
+        self.tex.size
+    }
 }
 
 /// A full-screen-triangle copy of one texture into a viewport of another, nearest or linear.

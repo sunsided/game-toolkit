@@ -8,11 +8,12 @@ use winit::window::Window;
 
 use crate::camera::{Camera2D, CameraUniform};
 use crate::camera3d::{Camera, Camera3D};
-use crate::canvas::{self, Canvas, CanvasRect, ScaleFilter, ScaleMode};
+use crate::canvas::{self, Blit, Canvas, CanvasRect, RenderTexture, ScaleFilter, ScaleMode};
 use crate::color::Color;
 use crate::config::{self, GraphicsConfig};
 use crate::frame::Frame;
 use crate::mesh::{MeshBatcher, MeshId, MeshInstance, MeshRegistry, MeshVertex};
+use crate::post::{self, PostChain, PostEffect, PostEffectId, PostStage, StageRun};
 use crate::primitives::PrimitiveBatcher;
 use crate::shapes::ShapeBatcher;
 use crate::sprite::SpriteBatcher;
@@ -60,8 +61,16 @@ pub struct Graphics {
     pending_screenshot: Option<PathBuf>,
     adapter_info: wgpu::AdapterInfo,
     supports_compute: bool,
-    /// The virtual-resolution canvas the painter draws into, when one is set.
+    /// The offscreen scene the painter draws into: the virtual-resolution canvas, or a
+    /// window-sized one while post effects are registered. `None`: straight to the surface.
     canvas: Option<Canvas>,
+    virtual_resolution: Option<(u32, u32)>,
+    blit: Blit,
+    post: PostChain,
+    /// Window-sized target the canvas is scaled into when window-stage effects run.
+    window_scratch: Option<RenderTexture>,
+    start: web_time::Instant,
+    frame_count: u32,
     scale_mode: ScaleMode,
     scale_filter: ScaleFilter,
     border_color: Color,
@@ -185,8 +194,12 @@ impl Graphics {
 
         // With a virtual resolution everything the painter draws goes into the canvas, so the
         // cameras, text, attachments and vector target are all sized to it.
-        let canvas = virtual_resolution.map(|(w, h)| Canvas::new(&device, format, [w, h]));
-        let [width, height] = canvas.as_ref().map_or([width, height], |c| c.size);
+        let blit = Blit::new(&device, format);
+        let canvas = virtual_resolution.map(|(w, h)| Canvas {
+            tex: RenderTexture::new(&device, &blit, format, [w, h], "canvas"),
+            follows_window: false,
+        });
+        let [width, height] = canvas.as_ref().map_or([width, height], Canvas::size);
 
         let camera = Camera2D::new(width as f32, height as f32);
         let camera_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -309,6 +322,12 @@ impl Graphics {
             adapter_info: info,
             supports_compute,
             canvas,
+            virtual_resolution,
+            blit,
+            post: PostChain::default(),
+            window_scratch: None,
+            start: web_time::Instant::now(),
+            frame_count: 0,
             scale_mode,
             scale_filter,
             border_color,
@@ -322,9 +341,39 @@ impl Graphics {
         self.surface_config.width = width;
         self.surface_config.height = height;
         self.surface.configure(&self.device, &self.surface_config);
-        // With a canvas, the drawing size stays put; only where it lands in the window moves.
-        if self.canvas.is_none() {
-            self.resize_render_targets(width, height);
+        // With a virtual resolution the drawing size stays put; only where the canvas lands
+        // in the window moves.
+        self.sync_canvas();
+    }
+
+    /// Make the offscreen canvas match the virtual resolution and post effects, and resize
+    /// the render targets if the drawing size changed.
+    fn sync_canvas(&mut self) {
+        let before = self.canvas.as_ref().map(Canvas::size);
+        let (w, h) = self.window_size();
+        let wanted = match self.virtual_resolution {
+            Some((cw, ch)) => Some(([cw.max(1), ch.max(1)], false)),
+            None if !self.post.is_empty() => Some(([w, h], true)),
+            None => None,
+        };
+        let current = self.canvas.as_ref().map(|c| (c.size(), c.follows_window));
+        if current != wanted {
+            self.canvas = wanted.map(|(size, follows_window)| Canvas {
+                tex: RenderTexture::new(
+                    &self.device,
+                    &self.blit,
+                    self.surface_format(),
+                    size,
+                    "canvas",
+                ),
+                follows_window,
+            });
+        }
+        let after = self.canvas.as_ref().map(Canvas::size);
+        // Without a canvas the window size drives everything; resize on every call then.
+        if after != before || after.is_none() {
+            let (w, h) = self.size();
+            self.resize_render_targets(w, h);
         }
     }
 
@@ -355,19 +404,52 @@ impl Graphics {
     pub fn set_virtual_resolution(&mut self, resolution: Option<(u32, u32)>) {
         // A zero-sized canvas would give the cameras a zero viewport; use at least 1 x 1.
         let resolution = resolution.map(|(w, h)| (w.max(1), h.max(1)));
-        let current = self.canvas.as_ref().map(|c| (c.size[0], c.size[1]));
-        if current == resolution {
+        if self.virtual_resolution == resolution {
             return;
         }
-        self.canvas =
-            resolution.map(|(w, h)| Canvas::new(&self.device, self.surface_format(), [w, h]));
-        let (w, h) = self.size();
-        self.resize_render_targets(w, h);
+        self.virtual_resolution = resolution;
+        self.sync_canvas();
     }
 
     /// The virtual resolution set by [`Self::set_virtual_resolution`], if any.
     pub fn virtual_resolution(&self) -> Option<(u32, u32)> {
-        self.canvas.as_ref().map(|c| (c.size[0], c.size[1]))
+        self.virtual_resolution
+    }
+
+    /// Run `effect` on every frame from now on, after the effects already in `stage`. See
+    /// [`PostStage`] for the two stages and [`ShaderEffect`](crate::ShaderEffect) for
+    /// single-shader effects. While any effect is registered, the scene is drawn into an
+    /// offscreen texture (window-sized without a virtual resolution).
+    pub fn add_post_effect(&mut self, stage: PostStage, effect: impl PostEffect) -> PostEffectId {
+        let id = self.post.add(stage, Box::new(effect));
+        self.sync_canvas();
+        id
+    }
+
+    /// Remove an effect; returns whether it existed.
+    pub fn remove_post_effect(&mut self, id: PostEffectId) -> bool {
+        let removed = self.post.remove(id);
+        self.sync_canvas();
+        removed
+    }
+
+    /// Switch an effect off (skipped, keeps its place) or back on. Unknown ids are ignored.
+    pub fn set_post_effect_enabled(&mut self, id: PostEffectId, enabled: bool) {
+        if !self.post.set_enabled(id, enabled) {
+            log::warn!("set_post_effect_enabled: unknown {id:?}");
+        }
+    }
+
+    /// Whether an effect is enabled; `None` for an unknown id.
+    pub fn post_effect_enabled(&self, id: PostEffectId) -> Option<bool> {
+        self.post.is_enabled(id)
+    }
+
+    /// The effect behind `id` as its concrete type, to change its settings, e.g.
+    /// `gfx.post_effect_mut::<ShaderEffect>(id).unwrap().set_params(&p)`. `None` for an
+    /// unknown id or another type.
+    pub fn post_effect_mut<T: PostEffect>(&mut self, id: PostEffectId) -> Option<&mut T> {
+        self.post.get_mut(id)?.downcast_mut::<T>()
     }
 
     /// How the canvas is scaled onto the window. Takes effect on the next frame.
@@ -401,20 +483,20 @@ impl Graphics {
     /// resolution. Use [`CanvasRect::window_to_canvas`] to map window positions; the toolkit's
     /// `Input` already reports the mouse and touches in canvas pixels.
     pub fn canvas_rect(&self) -> Option<CanvasRect> {
-        let canvas = self.canvas.as_ref()?;
+        let (w, h) = self.virtual_resolution?;
         Some(canvas::layout(
             [self.surface_config.width, self.surface_config.height],
-            canvas.size,
+            [w, h],
             self.scale_mode,
         ))
     }
 
-    /// The canvas texture the painter draws into, when a virtual resolution is set, for games
-    /// that record their own passes into it (in [`Self::surface_format`], at
+    /// The offscreen texture the painter draws into, when there is one (a virtual resolution
+    /// is set or post effects are registered), for games that record their own passes into it (in [`Self::surface_format`], at
     /// [`Self::size`]). Draw after the painter has flushed (it clears the canvas) and before
     /// [`Self::flush_pending`] or the end of the frame, which scale it onto the window.
     pub fn canvas_view(&self) -> Option<&wgpu::TextureView> {
-        self.canvas.as_ref().map(|c| &c.view)
+        self.canvas.as_ref().map(|c| &c.tex.view)
     }
 
     pub fn window(&self) -> &Arc<Window> {
@@ -425,7 +507,7 @@ impl Graphics {
     /// else the window's size. Lay out the game with this.
     pub fn size(&self) -> (u32, u32) {
         match &self.canvas {
-            Some(c) => (c.size[0], c.size[1]),
+            Some(c) => (c.size()[0], c.size()[1]),
             None => self.window_size(),
         }
     }
@@ -623,6 +705,7 @@ impl Graphics {
     }
 
     pub fn begin_frame(&mut self) -> Result<Frame> {
+        self.frame_count = self.frame_count.wrapping_add(1);
         self.queue.write_buffer(
             &self.camera_buf,
             0,
@@ -658,7 +741,9 @@ impl Graphics {
             encoder: Some(encoder),
             view,
             surface_texture: Some(surface_texture),
-            canvas: self.canvas.as_ref().map(|c| c.view.clone()),
+            canvas: self.canvas.as_ref().map(|c| c.tex.view.clone()),
+            canvas_size: self.canvas.as_ref().map_or([0, 0], Canvas::size),
+            canvas_virtual: self.virtual_resolution.is_some(),
             clear_color: self.clear_color,
             flushed: false,
             composited: false,
@@ -714,33 +799,139 @@ impl Graphics {
         self.composite(frame);
     }
 
-    /// Scale the canvas onto the window, once per frame; nothing without a virtual
-    /// resolution.
+    /// Run the post effects and scale the canvas onto the window, once per frame; nothing
+    /// when the frame was drawn straight into the window.
     fn composite(&mut self, frame: &mut Frame) {
         if frame.composited {
             return;
         }
         frame.composited = true;
-        let (Some(canvas), Some(rect), Some(encoder)) = (
-            self.canvas.as_ref(),
-            self.canvas_rect(),
-            frame.encoder.as_mut(),
-        ) else {
+        // A canvas created mid-frame (an effect added during `render`) wasn't drawn into.
+        if frame.canvas.is_none() {
+            return;
+        }
+        let window = [self.surface_config.width, self.surface_config.height];
+        let rect = self.canvas_rect().unwrap_or(CanvasRect {
+            origin: [0.0, 0.0],
+            size: [window[0] as f32, window[1] as f32],
+        });
+        let format = self.surface_format();
+        let b = self.border_color;
+        let border = wgpu::Color {
+            r: srgb_to_linear(b.r),
+            g: srgb_to_linear(b.g),
+            b: srgb_to_linear(b.b),
+            a: f64::from(b.a),
+        };
+        let Some(encoder) = frame.encoder.as_mut() else {
             return;
         };
-        let b = self.border_color;
-        canvas.present(
+        // The canvas was removed or replaced during the frame (the last effect removed, the
+        // virtual resolution changed): show what was drawn into the frame's canvas, without
+        // effects, rather than an empty frame.
+        let canvas = self
+            .canvas
+            .as_ref()
+            .filter(|c| frame.canvas.as_ref() == Some(&c.tex.view));
+        let Some(canvas) = canvas else {
+            if let Some(view) = &frame.canvas {
+                let rect = if frame.canvas_virtual {
+                    canvas::layout(window, frame.canvas_size, self.scale_mode)
+                } else {
+                    CanvasRect {
+                        origin: [0.0, 0.0],
+                        size: [window[0] as f32, window[1] as f32],
+                    }
+                };
+                let groups = self.blit.bind_groups(&self.device, view);
+                self.blit.draw(
+                    encoder,
+                    &groups[self.scale_filter.index()],
+                    &frame.view,
+                    rect,
+                    border,
+                );
+            }
+            return;
+        };
+        let run = StageRun {
+            device: &self.device,
+            queue: &self.queue,
+            blit: &self.blit,
+            format,
+            globals: post::globals(
+                canvas.size(),
+                window,
+                rect,
+                self.start.elapsed().as_secs_f32(),
+                self.frame_count,
+            ),
+        };
+
+        let post = &mut self.post;
+        let canvas_out = post.run(
+            PostStage::Canvas,
+            &run,
             encoder,
-            &frame.view,
-            rect,
-            self.scale_filter,
-            wgpu::Color {
-                r: srgb_to_linear(b.r),
-                g: srgb_to_linear(b.g),
-                b: srgb_to_linear(b.b),
-                a: f64::from(b.a),
-            },
+            &canvas.tex.view,
+            canvas.size(),
         );
+        let scene = match canvas_out {
+            Some(out) => post.output(PostStage::Canvas, out).unwrap_or(&canvas.tex),
+            None => &canvas.tex,
+        };
+
+        if !post.active(PostStage::Window) {
+            self.blit.draw(
+                encoder,
+                &scene.blit_bind_groups[self.scale_filter.index()],
+                &frame.view,
+                rect,
+                border,
+            );
+            return;
+        }
+
+        // Window stage: it needs the upscaled frame, border included, as a texture. A
+        // window-sized canvas already is that.
+        let scene_view = scene.view.clone();
+        let window_in = if canvas.follows_window {
+            scene_view
+        } else {
+            if self.window_scratch.as_ref().map(|t| t.size) != Some(window) {
+                self.window_scratch = Some(RenderTexture::new(
+                    &self.device,
+                    &self.blit,
+                    format,
+                    window,
+                    "post.window.input",
+                ));
+            }
+            let scratch = self.window_scratch.as_ref().expect("just created");
+            self.blit.draw(
+                encoder,
+                &scene.blit_bind_groups[self.scale_filter.index()],
+                &scratch.view,
+                rect,
+                border,
+            );
+            scratch.view.clone()
+        };
+        let full = CanvasRect {
+            origin: [0.0, 0.0],
+            size: [window[0] as f32, window[1] as f32],
+        };
+        if let Some(out) = post.run(PostStage::Window, &run, encoder, &window_in, window)
+            && let Some(result) = post.output(PostStage::Window, out)
+        {
+            self.blit.draw(
+                encoder,
+                &result.blit_bind_groups[ScaleFilter::Nearest.index()],
+                &frame.view,
+                full,
+                wgpu::Color::BLACK,
+            );
+        }
     }
 
     pub(crate) fn flush_into(&mut self, frame: &mut Frame) {

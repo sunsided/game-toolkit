@@ -29,6 +29,7 @@ aseprite = ["dep:game-toolkit-aseprite"]
 ecs = ["dep:game-toolkit-ecs"]
 synth = ["game-toolkit-audio/synth"]
 vector = ["game-toolkit-gfx/vector"]
+crt = ["game-toolkit-gfx/crt"]
 compute = ["dep:game-toolkit-compute"]
 
 [lints]

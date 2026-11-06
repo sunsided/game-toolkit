@@ -245,6 +245,13 @@ tasks:
       - task: run
         vars: {EXAMPLE: ex_17_virtual_resolution}
 
+  example:post:
+    desc: Run the post-processing example (CRT filter, custom WGSL effect)
+    aliases: [run:post]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_18_post}
+
   web:
     desc: 'Serve a crate in the browser with live rebuild (WEB_DIR=examples/13_web), http://localhost:8080'
     aliases: [example:web, run:web]

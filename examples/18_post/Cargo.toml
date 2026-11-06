@@ -1,0 +1,22 @@
+[package]
+name = "ex_18_post"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "18_post"
+path = "src/main.rs"
+
+[dependencies]
+game-toolkit = { workspace = true, features = ["crt"] }
+bytemuck = { workspace = true }
+
+# On the web the toolkit logs to the browser console itself.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+env_logger = { workspace = true }
+
+[lints]
+workspace = true

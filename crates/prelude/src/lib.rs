@@ -3,7 +3,7 @@
 //! This is the umbrella entry-point crate. Depend on `game-toolkit` and write
 //! `use game_toolkit::prelude::*;` to pull in the runtime types from the `game-toolkit-*`
 //! crates behind one dependency. Optional features: `ui`, `aseprite`, `ecs`, `synth`,
-//! `vector`, `compute`.
+//! `vector`, `crt`, `compute`.
 //!
 //! New here? The [`guide`] walks through the whole API on one page.
 
@@ -35,8 +35,8 @@ pub mod prelude {
     pub use game_toolkit_gfx::{
         Align, BlendMode, Camera, Camera2D, Camera3D, CircleInstance, Color,
         DeviceRequirementsError, Frame, Graphics, Layer, Mat4, MeshId, MeshInstance, MeshVertex,
-        Painter, ScaleFilter, ScaleMode, SpriteInstance, TextureId, TextureWrap, Tilemap,
-        transform, wgpu,
+        Painter, PostEffect, PostEffectId, PostPass, PostStage, ScaleFilter, ScaleMode,
+        ShaderEffect, SpriteInstance, TextureId, TextureWrap, Tilemap, transform, wgpu,
     };
     pub use game_toolkit_input::{
         Axis, Button, Gamepad, GamepadId, Input, Key, MouseButton, PointerMapping, Touch,
@@ -60,6 +60,9 @@ pub mod prelude {
 
     #[cfg(feature = "vector")]
     pub use game_toolkit_gfx::vello;
+
+    #[cfg(feature = "crt")]
+    pub use game_toolkit_gfx::{CrtEffect, CrtMask, CrtSettings};
 
     #[cfg(feature = "compute")]
     pub use game_toolkit_compute::{
