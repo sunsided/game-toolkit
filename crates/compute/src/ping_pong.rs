@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use bytemuck::Pod;
-use game_toolkit_gfx::wgpu::{self, util::DeviceExt};
+use wgpu::util::DeviceExt;
 
 use crate::Kernel;
 

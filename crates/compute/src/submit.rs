@@ -1,15 +1,13 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use game_toolkit_gfx::wgpu;
-
 /// Runs simulation steps on the GPU in their own submissions, separate from the frame, and
 /// keeps them from piling up while the GPU is also busy drawing.
 ///
 /// Use it to offload a simulation to the GPU at its own rate (a fixed tick in `update`, or
 /// as many steps as the GPU keeps up with) while the game renders as usual. Steps go into the
 /// shared device queue in submission order, so drawing recorded later in the frame (a sprite
-/// of a [`StorageTexture`](crate::StorageTexture), a custom pass that reads a
+/// of a `StorageTexture`, a custom pass that reads a
 /// [`PingPong`](crate::PingPong) buffer as vertices or storage) sees every step submitted
 /// before it, with no CPU round trip.
 ///
@@ -24,10 +22,10 @@ use game_toolkit_gfx::wgpu;
 ///
 /// ```no_run
 /// # use game_toolkit_compute::ComputeSubmitter;
-/// # use game_toolkit_gfx::Graphics;
-/// # fn update(gfx: &Graphics, sim: &ComputeSubmitter) {
-/// // In `update`, independent of rendering:
-/// sim.try_submit(gfx.device(), gfx.queue(), |encoder| {
+/// # use game_toolkit_compute::wgpu;
+/// # fn update(device: &wgpu::Device, queue: &wgpu::Queue, sim: &ComputeSubmitter) {
+/// // In `update`, independent of rendering (`ctx.gfx.device()`, `ctx.gfx.queue()` in a game):
+/// sim.try_submit(device, queue, |encoder| {
 ///     // kernel.dispatch_for(encoder, groups.current(&cells), w, h); cells.swap();
 ///     // readback.request(encoder, &counter, 0..1);
 /// });

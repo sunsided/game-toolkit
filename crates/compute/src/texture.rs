@@ -1,4 +1,4 @@
-use game_toolkit_gfx::{Graphics, TextureId, wgpu};
+use game_toolkit_gfx::{Graphics, TextureId};
 
 /// An RGBA texture a compute shader writes and the [`Painter`](game_toolkit_gfx::Painter)
 /// draws: the usual way to show a GPU simulation without reading it back.

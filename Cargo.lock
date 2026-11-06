@@ -1416,6 +1416,8 @@ dependencies = [
  "bytemuck",
  "game-toolkit-gfx",
  "log",
+ "pollster",
+ "wgpu",
 ]
 
 [[package]]

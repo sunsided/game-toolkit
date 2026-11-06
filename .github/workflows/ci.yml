@@ -50,6 +50,19 @@ jobs:
       - name: Clippy (all features)
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
+      # game-toolkit-compute must stay usable by simulation crates that don't depend on the
+      # toolkit: without its default `gfx` feature it may only pull in wgpu and bytemuck.
+      - name: Compute without gfx
+        run: |
+          cargo clippy -p game-toolkit-compute --no-default-features --all-targets --locked -- -D warnings
+          cargo doc -p game-toolkit-compute --no-default-features --no-deps --locked
+          if cargo tree -p game-toolkit-compute --no-default-features -e normal --locked | grep -E 'game-toolkit-gfx|winit'; then
+            echo "game-toolkit-compute without default features depends on gfx or winit" >&2
+            exit 1
+          fi
+        env:
+          RUSTDOCFLAGS: -D warnings
+
       - name: Test
         run: cargo test --workspace --locked
 
@@ -103,6 +116,9 @@ jobs:
 
       - name: Clippy (wasm32, all features)
         run: cargo clippy --target wasm32-unknown-unknown --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: Clippy (wasm32, compute without gfx)
+        run: cargo clippy --target wasm32-unknown-unknown -p game-toolkit-compute --no-default-features --locked -- -D warnings
 
       # trunk fetches the wasm-bindgen CLI matching Cargo.lock on its own.
       - name: Install trunk

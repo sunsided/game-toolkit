@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 use bytemuck::Pod;
-use game_toolkit_gfx::wgpu;
 
 /// Map state of one request, written by the `map_buffer_on_submit` callback.
 const PENDING: u8 = 0;
@@ -25,7 +24,7 @@ const FAILED: u8 = 2;
 ///
 /// ```no_run
 /// # use game_toolkit_compute::ReadbackRing;
-/// # use game_toolkit_gfx::wgpu;
+/// # use game_toolkit_compute::wgpu;
 /// # fn demo(device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, counter: &wgpu::Buffer) {
 /// let mut ring = ReadbackRing::<u32>::new(device, "count", 1, 3);
 /// // Every frame, after the work that fills `counter` is recorded into the frame's encoder:

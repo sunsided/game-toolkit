@@ -38,6 +38,11 @@ All notable changes to this project are documented here. The format is based on
   live-cell count read back (#92).
 - `Graphics::register_texture` makes a game's own `wgpu::Texture` (a compute output, a render
   target) drawable as a `TextureId` (#92).
+- `game-toolkit-compute` without its default `gfx` feature depends only on `wgpu` (re-exported
+  as `game_toolkit_compute::wgpu`) and `bytemuck`, not on game-toolkit-gfx or winit: `Kernel`,
+  `PingPong`, `ReadbackRing` and `ComputeSubmitter` work on any wgpu device, e.g. in a
+  simulation crate or a headless runner. `StorageTexture` needs `gfx`. CI checks the
+  dependency tree.
 
 - Virtual resolution (#88): `AppConfig::virtual_resolution: Option<(u32, u32)>` makes the
   painter (sprites, shapes, text, tilemaps, vector art, 3D meshes) draw into a canvas of that
