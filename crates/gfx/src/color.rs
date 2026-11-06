@@ -41,6 +41,16 @@ impl Color {
         Self { r, g, b, a }
     }
 
+    /// Palette index `i` as a painter colour, for an indexed canvas (feature `indexed`, see
+    /// [`Graphics::enable_indexed`](crate::Graphics::enable_indexed)): the index rides in the
+    /// red channel and is turned into the palette's colour at the end of the frame. Draw
+    /// indices only with full opacity: blending (anti-aliased circle edges, alpha below 1)
+    /// mixes indices, not colours.
+    #[cfg(feature = "indexed")]
+    pub const fn index(i: u8) -> Self {
+        Self::rgba(i as f32 / 255.0, 0.0, 0.0, 1.0)
+    }
+
     /// Opaque colour from 8-bit components.
     pub const fn rgb8(r: u8, g: u8, b: u8) -> Self {
         Self::rgba8(r, g, b, 255)

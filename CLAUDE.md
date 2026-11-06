@@ -20,7 +20,7 @@ crate; consumers depend on it and write `use game_toolkit::prelude::*;` (the pre
 | `ecs` | `game-toolkit-ecs` | glue for the sillyecs archetype ECS |
 | `ui` | `game-toolkit-ui` | egui debug-overlay integration (feature-gated) |
 | `compute` | `game-toolkit-compute` | GPU compute helpers: WGSL kernels, ping-pong buffers, non-blocking read-back |
-| `prelude` | `game-toolkit` | umbrella + prelude; features `ui`, `aseprite`, `ecs`, `synth`, `vector`, `compute` |
+| `prelude` | `game-toolkit` | umbrella + prelude; features `ui`, `aseprite`, `ecs`, `synth`, `vector`, `crt`, `indexed`, `compute` |
 
 **Dependency direction is one-way.** `game-toolkit-aseprite` and `game-toolkit-compute` depend on
 `game-toolkit-gfx`, never the reverse, so the renderer stays unaware of asset formats and compute.
@@ -80,7 +80,7 @@ task labels                # create/update GitHub PR labels (gh); keep in sync w
 PRs are labelled by changed paths (`.github/workflows/labeler.yml`, config in
 `.github/labeler.yml`). Adding a crate or top-level area means a new entry there and in `task labels`.
 
-Examples live in `examples/` (`ex_01_window` … `ex_18_post`, `bouncing_ball`); the offline
+Examples live in `examples/` (`ex_01_window` … `ex_19_palette`, `bouncing_ball`); the offline
 atlas-packer is in `tools/atlas-packer`.
 
 ## Templates

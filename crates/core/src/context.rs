@@ -208,6 +208,20 @@ impl Context {
         game_toolkit_gfx::BitmapFont::from_bmfont(&mut self.gfx, &fnt, &png)
     }
 
+    /// Load an indexed-colour PNG from the asset root as a texture of palette indices, for an
+    /// indexed canvas (feature `indexed`); also returns the PNG's palette. See
+    /// [`Graphics::enable_indexed`](game_toolkit_gfx::Graphics::enable_indexed).
+    #[cfg(feature = "indexed")]
+    pub fn load_indexed_texture(
+        &mut self,
+        rel: impl AsRef<Path>,
+    ) -> Result<(TextureId, game_toolkit_gfx::Palette)> {
+        let rel = rel.as_ref();
+        let bytes = self.assets.read(rel)?;
+        self.gfx
+            .load_indexed_texture(&bytes, Some(&rel.to_string_lossy()))
+    }
+
     /// Load a sound (wav/ogg/flac/mp3) from the asset root. `Ok(None)` when audio is muted
     /// because the backend failed to initialize.
     pub fn load_sound(&mut self, rel: impl AsRef<Path>) -> Result<Option<SoundId>> {

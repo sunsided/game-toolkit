@@ -20,6 +20,7 @@ glyphon  = { workspace = true }
 miniscreenshot-wgpu = { workspace = true }
 vello    = { workspace = true, optional = true }
 web-time = { workspace = true }
+png      = { workspace = true, optional = true }
 
 # Web: WebGPU (a wgpu default) plus the WebGL2 fallback for browsers without it.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -30,6 +31,8 @@ wgpu     = { workspace = true, features = ["webgl"] }
 vector = ["dep:vello"]
 # Built-in CRT post-processing effect (`CrtEffect`).
 crt = []
+# Indexed-colour canvas: palettes, palette cycling, indexed PNGs.
+indexed = ["dep:png"]
 
 [lints]
 workspace = true

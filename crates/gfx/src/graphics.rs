@@ -72,6 +72,13 @@ pub struct Graphics {
     window_scratch: Option<RenderTexture>,
     start: web_time::Instant,
     frame_count: u32,
+    #[cfg(feature = "indexed")]
+    indexed: Option<crate::indexed::IndexedState>,
+    /// `disable_indexed` was called mid-frame; applied once the frame is presented.
+    #[cfg(feature = "indexed")]
+    disable_indexed_after_frame: bool,
+    /// Between `begin_frame` and `present`.
+    frame_active: bool,
     /// The built-in pixel font, uploaded on first use.
     pub(crate) builtin_font: Option<BitmapFont>,
     scale_mode: ScaleMode,
@@ -332,6 +339,11 @@ impl Graphics {
             start: web_time::Instant::now(),
             frame_count: 0,
             builtin_font: None,
+            #[cfg(feature = "indexed")]
+            indexed: None,
+            #[cfg(feature = "indexed")]
+            disable_indexed_after_frame: false,
+            frame_active: false,
             scale_mode,
             scale_filter,
             border_color,
@@ -357,7 +369,7 @@ impl Graphics {
         let (w, h) = self.window_size();
         let wanted = match self.virtual_resolution {
             Some((cw, ch)) => Some(([cw.max(1), ch.max(1)], false)),
-            None if !self.post.is_empty() => Some(([w, h], true)),
+            None if !self.post.is_empty() || self.is_indexed() => Some(([w, h], true)),
             None => None,
         };
         let current = self.canvas.as_ref().map(|c| (c.size(), c.follows_window));
@@ -428,6 +440,106 @@ impl Graphics {
         let id = self.post.add(stage, Box::new(effect));
         self.sync_canvas();
         id
+    }
+
+    /// Whether the canvas holds palette indices (feature `indexed`); always `false` without it.
+    pub fn is_indexed(&self) -> bool {
+        #[cfg(feature = "indexed")]
+        return self.indexed.is_some();
+        #[cfg(not(feature = "indexed"))]
+        false
+    }
+
+    /// Switch to indexed colour with `palette` in row 0: from the next frame on, the painter
+    /// draws palette indices ([`Color::index`], textures from
+    /// [`Self::load_indexed_texture`]) and the end of the frame looks them up, before post
+    /// effects and the upscale. Works with or without a virtual resolution. Keep the
+    /// [`PaletteCycle`](crate::PaletteCycle)s and rows, reset by [`Self::disable_indexed`].
+    #[cfg(feature = "indexed")]
+    pub fn enable_indexed(&mut self, palette: &crate::Palette) {
+        // The latest call wins: cancel a `disable_indexed` deferred earlier in this frame.
+        self.disable_indexed_after_frame = false;
+        let format = self.surface_format();
+        let state = self.indexed.get_or_insert_with(|| {
+            crate::indexed::IndexedState::new(&self.device, &self.queue, format)
+        });
+        state.set_palette(&self.queue, 0, palette);
+        self.sync_canvas();
+    }
+
+    /// Back to direct RGBA drawing; drops palettes and cycles.
+    #[cfg(feature = "indexed")]
+    pub fn disable_indexed(&mut self) {
+        // During a frame, the canvas already holds indices: keep the palette until that frame
+        // is resolved and presented, then switch.
+        if self.frame_active {
+            self.disable_indexed_after_frame = true;
+            return;
+        }
+        self.indexed = None;
+        self.sync_canvas();
+    }
+
+    /// Fill palette row `row` (`0..PALETTE_ROWS`). Row 0 shows unless
+    /// [`Self::set_palette_blend`] picks others. Takes effect this frame; ignored when not
+    /// indexed.
+    #[cfg(feature = "indexed")]
+    pub fn set_palette(&mut self, row: u32, palette: &crate::Palette) {
+        if let Some(ix) = self.indexed.as_mut() {
+            ix.set_palette(&self.queue, row, palette);
+        }
+    }
+
+    /// Show row `row_a` crossfaded towards `row_b` by `t` (`0` = all `a`, `1` = all `b`), e.g.
+    /// a day-night fade or a damage flash. Default: row 0, no blend.
+    #[cfg(feature = "indexed")]
+    pub fn set_palette_blend(&mut self, row_a: u32, row_b: u32, t: f32) {
+        if let Some(ix) = self.indexed.as_mut() {
+            ix.set_blend(row_a, row_b, t);
+        }
+    }
+
+    /// Start rotating a range of palette entries; `None` when not indexed, when the range is
+    /// empty or runs past index 255, or when
+    /// [`MAX_PALETTE_CYCLES`](crate::MAX_PALETTE_CYCLES) are already running.
+    #[cfg(feature = "indexed")]
+    pub fn add_palette_cycle(
+        &mut self,
+        cycle: crate::PaletteCycle,
+    ) -> Option<crate::PaletteCycleId> {
+        self.indexed.as_mut()?.add_cycle(cycle)
+    }
+
+    /// Stop a palette cycle; returns whether it existed.
+    #[cfg(feature = "indexed")]
+    pub fn remove_palette_cycle(&mut self, id: crate::PaletteCycleId) -> bool {
+        self.indexed.as_mut().is_some_and(|ix| ix.remove_cycle(id))
+    }
+
+    /// Upload an [`IndexedImage`](crate::IndexedImage) as a texture of indices for an indexed
+    /// canvas: draw it like any sprite (untinted) and its pixels come out in the canvas
+    /// palette's colours. Transparent indices (`tRNS` alpha 0) stay transparent.
+    #[cfg(feature = "indexed")]
+    pub fn create_indexed_texture(
+        &mut self,
+        image: &crate::IndexedImage,
+        label: Option<&str>,
+    ) -> TextureId {
+        self.create_texture_rgba(image.width, image.height, &image.index_texels(), label)
+    }
+
+    /// Decode an indexed PNG and upload its indices ([`Self::create_indexed_texture`]);
+    /// returns the texture and the PNG's own palette, e.g. for
+    /// [`Self::enable_indexed`].
+    #[cfg(feature = "indexed")]
+    pub fn load_indexed_texture(
+        &mut self,
+        png: &[u8],
+        label: Option<&str>,
+    ) -> Result<(TextureId, crate::Palette)> {
+        let image = crate::IndexedImage::from_png(png)?;
+        let id = self.create_indexed_texture(&image, label);
+        Ok((id, image.palette))
     }
 
     /// Remove an effect; returns whether it existed.
@@ -751,6 +863,7 @@ impl Graphics {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("frame.encoder"),
             });
+        self.frame_active = true;
         Ok(Frame {
             encoder: Some(encoder),
             view,
@@ -784,6 +897,11 @@ impl Graphics {
         if let Some(st) = frame.surface_texture.take() {
             self.window.pre_present_notify();
             self.queue.present(st);
+        }
+        self.frame_active = false;
+        #[cfg(feature = "indexed")]
+        if std::mem::take(&mut self.disable_indexed_after_frame) {
+            self.disable_indexed();
         }
     }
 
@@ -882,17 +1000,31 @@ impl Graphics {
             ),
         };
 
+        // Indexed canvas: indices become colour before any effect sees the scene.
+        #[cfg(feature = "indexed")]
+        if let Some(ix) = self.indexed.as_mut() {
+            ix.resolve(
+                &run,
+                encoder,
+                &canvas.tex.view,
+                canvas.size(),
+                self.start.elapsed().as_secs_f64(),
+            );
+        }
+        #[cfg(feature = "indexed")]
+        let base = self
+            .indexed
+            .as_ref()
+            .and_then(|ix| ix.resolved.as_ref())
+            .unwrap_or(&canvas.tex);
+        #[cfg(not(feature = "indexed"))]
+        let base = &canvas.tex;
+
         let post = &mut self.post;
-        let canvas_out = post.run(
-            PostStage::Canvas,
-            &run,
-            encoder,
-            &canvas.tex.view,
-            canvas.size(),
-        );
+        let canvas_out = post.run(PostStage::Canvas, &run, encoder, &base.view, canvas.size());
         let scene = match canvas_out {
-            Some(out) => post.output(PostStage::Canvas, out).unwrap_or(&canvas.tex),
-            None => &canvas.tex,
+            Some(out) => post.output(PostStage::Canvas, out).unwrap_or(base),
+            None => base,
         };
 
         if !post.active(PostStage::Window) {

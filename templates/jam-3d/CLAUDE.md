@@ -111,6 +111,26 @@ Implement `PostEffect` for multi-pass effects. Feature `crt`: `CrtEffect::new(&c
 CrtSettings::arcade())` (also `subtle`, `consumer_tv`, `pc_monitor`) in `PostStage::Window`, with
 scanlines locked to canvas rows; it also makes fractional `ScaleMode::Fit` look even.
 
+## Indexed colour (feature `indexed`)
+
+Draw palette indices instead of colours; the end of the frame looks them up in a 256-entry
+`Palette`, so swapping, crossfading or cycling palette entries recolours the screen for free.
+
+```rust
+ctx.gfx.enable_indexed(&Palette::from_hex(&[0x000000, 0x8cc8f0, 0x4a9a3a]));
+ctx.gfx.set_palette(1, &night);                 // rows 0..PALETTE_ROWS
+ctx.gfx.set_palette_blend(0, 1, t);             // crossfade row 0 -> 1
+ctx.gfx.add_palette_cycle(PaletteCycle { start: 16, len: 8, speed: 10.0 }); // steps/s, <0 reverses
+let (tex, png_palette) = ctx.load_indexed_texture("tiles.png")?; // indexed PNG, kept as indices
+p.rect(pos, size, Color::index(2));             // shapes, text: palette index as colour
+```
+
+Indices ride in the canvas's red channel, so draw them fully opaque and untinted (circle edges
+are anti-aliased and blend indices). `IndexedImage` builds index textures by hand
+(`create_indexed_texture`). Post effects see the resolved colours. Every effect shader also has
+`bayer4(p)` / `bayer8(p)` ordered-dither thresholds (`BAYER_WGSL` for your own shaders); add a
+world-anchored offset to `p` so the pattern doesn't crawl.
+
 ## Drawing: the Painter
 
 In `render`, get a `Painter` for the frame, then issue draw calls. The painter flushes on drop.
@@ -353,6 +373,7 @@ All optional features and what they add to the prelude:
 | `synth` | `Synth`, `SynthHandle`, `synth` (`Song`, `Tempo`, `Preset`, ...), `synthie` | chiptune music (`audio.play_synth`) and effects |
 | `vector` | `vello` | high-quality 2D vector graphics (WebGPU only: skipped on WebGL2) |
 | `crt` | `CrtEffect`, `CrtSettings`, `CrtMask` | built-in CRT post-processing filter (see Post-processing) |
+| `indexed` | `Palette`, `PaletteCycle`, `IndexedImage`, `Color::index` | indexed-colour canvas with palette cycling (see Indexed colour) |
 | `compute` | `Kernel`, `Binding`, `PingPong`, `PingPongBindGroups`, `ReadbackRing`, `StorageTexture`, `ComputeSubmitter` | GPU simulations offloaded from `update` (`ComputeSubmitter::try_submit`, throttled by in-flight work) or recorded into `frame.encoder_mut()`; read/write buffer pairs drawable as vertex buffers, non-blocking read-back a few frames late (WebGPU only: check `ctx.gfx.supports_compute()`) |
 
 Enable in `Cargo.toml`: `game-toolkit = { ..., features = ["ui", "aseprite"] }`.

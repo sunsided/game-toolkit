@@ -3,7 +3,7 @@
 //! This is the umbrella entry-point crate. Depend on `game-toolkit` and write
 //! `use game_toolkit::prelude::*;` to pull in the runtime types from the `game-toolkit-*`
 //! crates behind one dependency. Optional features: `ui`, `aseprite`, `ecs`, `synth`,
-//! `vector`, `crt`, `compute`.
+//! `vector`, `crt`, `indexed`, `compute`.
 //!
 //! New here? The [`guide`] walks through the whole API on one page.
 
@@ -64,6 +64,9 @@ pub mod prelude {
 
     #[cfg(feature = "crt")]
     pub use game_toolkit_gfx::{CrtEffect, CrtMask, CrtSettings};
+
+    #[cfg(feature = "indexed")]
+    pub use game_toolkit_gfx::{IndexedImage, Palette, PaletteCycle, PaletteCycleId};
 
     #[cfg(feature = "compute")]
     pub use game_toolkit_compute::{

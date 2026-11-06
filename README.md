@@ -89,7 +89,9 @@ and `ctx.input.mouse_pos()` are then in canvas pixels; `ctx.gfx.window_size()` a
 5 × 7 font, `p.bitmap_text(&font, ..)` a `BitmapFont` loaded from a glyph sheet
 (`ctx.load_bitmap_font`) or a BMFont `.fnt` (`ctx.load_bmfont`). Full-screen post effects run after the scene:
 `ctx.gfx.add_post_effect(PostStage::Window, effect)` takes a `ShaderEffect` (one WGSL fragment
-shader) or any `PostEffect`; the `crt` feature adds `CrtEffect` with presets.
+shader) or any `PostEffect`; the `crt` feature adds `CrtEffect` with presets. The `indexed`
+feature draws palette indices (`Color::index`, indexed PNGs) and resolves them through a
+`Palette` at the end of the frame, with palette cycling and crossfades.
 `AppConfig::random_seed` seeds the deterministic
 per-`Context` RNG (`ctx.rng`); a fixed seed reproduces a run.
 
@@ -189,6 +191,7 @@ Run any example with `cargo run -p <package>`.
 | `16_compute` | `ex_16_compute` | Game of Life offloaded to the GPU (`compute` feature): `update` submits generations through a `ComputeSubmitter`, a ping-pong kernel paints a storage texture, the live-cell count comes back via a non-blocking read-back ring. |
 | `17_virtual_resolution` | `ex_17_virtual_resolution` | A 320 × 180 scene scaled onto the window: integer, fit and stretch modes, nearest vs. linear, mouse in canvas pixels, built-in pixel font. |
 | `18_post` | `ex_18_post` | Post-processing: the `crt` feature's CRT filter (presets, afterglow, curvature) and a custom WGSL posterize effect on the canvas. |
+| `19_palette` | `ex_19_palette` | Indexed colour: palette cycling, a day-night palette crossfade, an indexed sprite and Bayer-dithered shading. |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
 
 ## Audio
