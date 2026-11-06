@@ -95,8 +95,7 @@ pub struct PostGlobals {
     pub time: f32,
     /// Frames since the renderer started.
     pub frame: u32,
-    /// `1` when [`PostPass::indices`] holds the indexed canvas, else `0`. [`ShaderEffect`]
-    /// fills it in.
+    /// `1` when [`PostPass::indices`] holds the indexed canvas, else `0`.
     pub indexed: u32,
     pub _pad: [u32; 3],
 }
@@ -272,6 +271,7 @@ impl PostChain {
         let targets = st.targets.as_ref()?;
         let mut globals = run.globals;
         globals.size = [size[0] as f32, size[1] as f32];
+        globals.indexed = u32::from(run.indices.is_some());
         let mut current: Option<usize> = None;
         for entry in st.effects.iter_mut().filter(|e| e.enabled) {
             let out = current.map_or(0, |c| 1 - c);
@@ -557,12 +557,8 @@ impl ShaderEffect {
 
 impl PostEffect for ShaderEffect {
     fn apply(&mut self, pass: &mut PostPass<'_>) {
-        let globals = PostGlobals {
-            indexed: u32::from(pass.indices.is_some()),
-            ..pass.globals
-        };
         pass.queue
-            .write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));
+            .write_buffer(&self.globals, 0, bytemuck::bytes_of(&pass.globals));
         if let Some(p) = &mut self.params
             && p.dirty
         {
