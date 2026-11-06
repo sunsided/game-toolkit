@@ -128,6 +128,19 @@ impl Context {
         }
     }
 
+    /// Point the input's mouse and touch mapping at where the canvas lands in the window.
+    pub(crate) fn sync_pointer_mapping(&mut self) {
+        let mapping = self.gfx.canvas_rect().map(|rect| {
+            let (w, h) = self.gfx.size();
+            let scale = rect.canvas_per_window([w, h]);
+            game_toolkit_input::PointerMapping {
+                origin: (rect.origin[0], rect.origin[1]),
+                scale: (scale[0], scale[1]),
+            }
+        });
+        self.input.set_pointer_mapping(mapping);
+    }
+
     pub fn quit(&mut self) {
         self.quit_requested = true;
     }

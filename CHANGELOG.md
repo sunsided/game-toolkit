@@ -30,7 +30,27 @@ All notable changes to this project are documented here. The format is based on
 - `Graphics::register_texture` makes a game's own `wgpu::Texture` (a compute output, a render
   target) drawable as a `TextureId` (#92).
 
+- Virtual resolution (#88): `AppConfig::virtual_resolution: Option<(u32, u32)>` makes the
+  painter (sprites, shapes, text, tilemaps, vector art, 3D meshes) draw into a canvas of that
+  size, which is scaled onto the window with `AppConfig::scale_mode` (`ScaleMode::Integer`,
+  the default, by whole multiples with a `border_color` border; `Fit`, fractional; `Stretch`)
+  and `scale_filter` (`Nearest` or `Linear`). All of them can change at runtime through
+  `Graphics::set_virtual_resolution`, `set_scale_mode`, `set_scale_filter` and
+  `set_border_color`. `Graphics::canvas_rect()` says where the canvas lands,
+  `Graphics::canvas_view()` and `Frame::target_view()` give games the canvas for their own
+  passes. New example `17_virtual_resolution`.
+- `Input::mouse_pos`, `mouse_delta` and touch positions are reported in canvas pixels while a
+  virtual resolution is set (the toolkit installs a `PointerMapping` each frame);
+  `Input::mouse_pos_window()` keeps the raw window position.
+- `Graphics::window_size()`: the window's size, whatever the drawing size is.
+
 ### Changed
+
+- `Graphics::size()` is the size the painter draws at: the virtual resolution when one is set,
+  otherwise (as before) the window size. Layout code keeps working with a canvas.
+- `Graphics::flush_pending` also scales the canvas onto the window, so egui and other window
+  overlays drawn after it land on top at window resolution. `game-toolkit-ui` sizes egui by
+  `window_size()`.
 
 - **Breaking:** `Graphics::new` takes a `GraphicsConfig` instead of positional `vsync`,
   `depth_format` and `msaa_samples` arguments. `AppConfig::graphics_config()` builds it.

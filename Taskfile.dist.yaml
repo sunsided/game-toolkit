@@ -238,6 +238,13 @@ tasks:
       - task: run
         vars: {EXAMPLE: ex_15_touch}
 
+  example:virtual-resolution:
+    desc: Run the virtual-resolution example (320x180 canvas, integer / fit / stretch scaling)
+    aliases: [run:virtual-resolution]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_17_virtual_resolution}
+
   web:
     desc: 'Serve a crate in the browser with live rebuild (WEB_DIR=examples/13_web), http://localhost:8080'
     aliases: [example:web, run:web]

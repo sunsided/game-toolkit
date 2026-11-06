@@ -53,6 +53,21 @@ at `None`: the world runs its own fixed phases (see the `game-toolkit-ecs` docs)
 | `ctx.load_texture(p)` | `Result<TextureId>` | PNG from the asset root (native + web, hot-reloadable natively) |
 | `ctx.load_sound(p)` | `Result<Option<SoundId>>` | wav/ogg/flac/mp3 from the asset root; `Ok(None)` when muted |
 
+## Virtual resolution (pixel art)
+
+Set `virtual_resolution: Some((320, 180))` in `AppConfig` to draw everything into a small canvas
+that is scaled onto the window with crisp pixels. `scale_mode`: `ScaleMode::Integer` (default;
+whole multiples, the leftover window is `border_color`), `ScaleMode::Fit` (fractional, keeps
+aspect) or `ScaleMode::Stretch`; `scale_filter`: `ScaleFilter::Nearest` (default) or `Linear`.
+With a canvas, `ctx.gfx.size()`, the cameras, `ctx.input.mouse_pos()`/`mouse_delta()` and touch
+positions are all in canvas pixels, so layout code is unchanged; `ctx.gfx.window_size()` and
+`ctx.input.mouse_pos_window()` give the window's. All change at runtime:
+`ctx.gfx.set_virtual_resolution(..)`, `ctx.gfx.set_scale_mode(..)`, `ctx.gfx.set_scale_filter(..)`,
+`ctx.gfx.set_border_color(..)`.
+Text is drawn at canvas resolution too. For own passes into the canvas use
+`ctx.gfx.canvas_view()` after the painter has flushed; `ctx.gfx.flush_pending(frame)` (or the end
+of the frame) scales it onto the window, after which overlays like egui draw at window resolution.
+
 ## Drawing: the Painter
 
 In `render`, get a `Painter` for the frame, then issue draw calls. The painter flushes on drop.
