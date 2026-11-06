@@ -67,13 +67,7 @@ pub(crate) fn create_window(
 /// Initialize the GPU and the asset store. Awaited with `pollster` on native; on the web it
 /// runs as a browser task because adapter/device requests resolve as JS promises.
 pub(crate) async fn init_parts(window: Arc<Window>, config: AppConfig) -> Result<Parts> {
-    let gfx = game_toolkit_gfx::Graphics::new(
-        window,
-        config.vsync,
-        config.depth_format,
-        config.msaa_samples,
-    )
-    .await?;
+    let gfx = game_toolkit_gfx::Graphics::new(window, &config.graphics_config()).await?;
     let assets = open_assets(&config).await?;
     Ok(Parts { gfx, assets })
 }

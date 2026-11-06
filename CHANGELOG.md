@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `AppConfig::required_limits` and `AppConfig::required_features` let a game request more
+  than the toolkit's own device limits and features (e.g. more storage buffers per shader
+  stage for compute). They are merged with what the toolkit needs; when the adapter can't
+  provide them, init fails with a `DeviceRequirementsError` that names each missing limit and
+  feature. `AppConfig::device_hook` edits the device request with the adapter at hand (#87).
+- `Graphics::adapter_info()`, `Graphics::backend()` and `Graphics::supports_compute()`, e.g.
+  to show a "WebGPU required" message on WebGL2 instead of failing.
+
+### Changed
+
+- **Breaking:** `Graphics::new` takes a `GraphicsConfig` instead of positional `vsync`,
+  `depth_format` and `msaa_samples` arguments. `AppConfig::graphics_config()` builds it.
+
 ## [0.10.0] - 2026-11-02
 
 ### Added

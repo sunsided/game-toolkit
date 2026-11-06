@@ -268,7 +268,12 @@ fetch instead of `assets/manifest.txt`), `canvas_id: Option<String>` (web: exist
 appends one), `random_seed: u64` (seeds `ctx.rng`; default is
 a fixed nonzero constant, so runs are reproducible until you change it), `depth_format:
 Option<wgpu::TextureFormat>` (default `None`; set `Some(wgpu::TextureFormat::Depth32Float)` for 3D),
-`msaa_samples` (default `1`; `4` for anti-aliasing).
+`msaa_samples` (default `1`; `4` for anti-aliasing), `touch_emulates_mouse` (default `false`),
+`required_limits: Option<wgpu::Limits>` / `required_features: wgpu::Features` (extra device
+limits and features for your own compute or render passes; merged with the toolkit's, and init
+fails naming whatever the adapter lacks) and `device_hook` (edit the device request with the
+adapter at hand). WebGL2 has no compute: to degrade instead of failing, check
+`ctx.gfx.supports_compute()` in `init`.
 
 ## Features
 

@@ -77,7 +77,11 @@ opt-level = 3
 `AppConfig` also exposes `msaa_samples` (e.g. `4` for anti-aliasing; default `1`) and
 `depth_format` (`Some(wgpu::TextureFormat::Depth32Float)` to allocate a depth buffer;
 default `None`). The built-in 2D pipelines never write depth, so enabling it is harmless
-and is there to support depth-tested rendering. `AppConfig::random_seed` seeds the deterministic
+and is there to support depth-tested rendering. Games that record their own compute or render
+passes through `ctx.gfx.device()` can ask for more than the toolkit's downlevel defaults with
+`required_limits` and `required_features` (merged with the toolkit's; init fails with a
+`DeviceRequirementsError` naming what the adapter lacks), or edit the request in `device_hook`.
+`AppConfig::random_seed` seeds the deterministic
 per-`Context` RNG (`ctx.rng`); a fixed seed reproduces a run.
 
 ## Drawing
