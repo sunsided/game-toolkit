@@ -171,6 +171,7 @@ Built on game-toolkit, published separately:
 | Crate | What it gives you |
 |-------|-------------------|
 | [`game-toolkit-platformer`](https://github.com/sunsided/game-toolkit-platformer) | A pluggable platforming controller: snappy movement (jump buffer, coyote time, wall jumps, dashes, climbing) with feel presets, control schemes for game-toolkit input, and an animation state graph that follows it. `Platformer::on(&level, preset)`, `update(&input, &mut level, dt)`, draw `sprite()` at `position()`. |
+| [`game-toolkit-dosvideo`](https://github.com/sunsided/game-toolkit-dosvideo) | DOS-era PC video, emulated at the register level with a beam-accurate CRT: VGA (mode 13h, Mode X, 16-color planar, text), EGA, CGA (composite artifact colors, snow), Hercules, Tandy 1000 and VESA SVGA, plus the PC speaker. Program it through I/O ports and memory pokes or higher-level helpers; implement `DosGame` and `run` it with a `DosConfig`. |
 
 ## Examples
 
