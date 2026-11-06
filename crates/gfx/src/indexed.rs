@@ -95,10 +95,16 @@ pub struct PaletteCycle {
 }
 
 impl PaletteCycle {
-    /// The rotation at `time` seconds, in `0..len`.
-    pub fn offset_at(&self, time: f32) -> u32 {
+    /// The rotation at `time` seconds, in `0..len`. Computed in `f64`, so cycles keep
+    /// stepping evenly however long the game runs.
+    pub fn offset_at(&self, time: f64) -> u32 {
         let len = i64::from(self.len.max(1));
-        ((time * self.speed).floor() as i64).rem_euclid(len) as u32
+        ((time * f64::from(self.speed)).floor() as i64).rem_euclid(len) as u32
+    }
+
+    /// Whether the range is non-empty and fits in the palette.
+    pub fn is_valid(&self) -> bool {
+        self.len > 0 && u32::from(self.start) + u32::from(self.len) <= 256
     }
 }
 
@@ -346,6 +352,14 @@ impl IndexedState {
     }
 
     pub fn add_cycle(&mut self, cycle: PaletteCycle) -> Option<PaletteCycleId> {
+        if !cycle.is_valid() {
+            log::warn!(
+                "add_palette_cycle: range {}..{} is empty or past index 255",
+                cycle.start,
+                u32::from(cycle.start) + u32::from(cycle.len)
+            );
+            return None;
+        }
         if self.cycles.len() >= MAX_PALETTE_CYCLES {
             log::warn!("add_palette_cycle: at most {MAX_PALETTE_CYCLES} cycles");
             return None;
@@ -369,6 +383,7 @@ impl IndexedState {
         encoder: &mut wgpu::CommandEncoder,
         indices: &wgpu::TextureView,
         size: [u32; 2],
+        time: f64,
     ) {
         let StageRun {
             device,
@@ -377,7 +392,6 @@ impl IndexedState {
             format,
             ..
         } = *run;
-        let time = run.globals.time;
         if self.resolved.as_ref().map(|r| r.size) != Some(size) {
             self.resolved = Some(RenderTexture::new(
                 device,
@@ -395,8 +409,9 @@ impl IndexedState {
             cycles: [[0; 4]; MAX_PALETTE_CYCLES],
         };
         for (slot, (_, c)) in uniform.cycles.iter_mut().zip(&self.cycles) {
-            let len = u32::from(c.len).min(256 - u32::from(c.start));
-            *slot = [u32::from(c.start), len, c.offset_at(time) % len.max(1), 0];
+            // `add_cycle` only accepts ranges that fit, so `len` is the cycle's own.
+            let len = u32::from(c.len);
+            *slot = [u32::from(c.start), len, c.offset_at(time), 0];
         }
         queue.write_buffer(&self.uniform, 0, bytemuck::bytes_of(&uniform));
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -458,6 +473,22 @@ mod tests {
         assert_eq!(c.offset_at(2.0), 0);
         let back = PaletteCycle { speed: -2.0, ..c };
         assert_eq!(back.offset_at(0.5), 3);
+        // Still steps after weeks of running at a high speed (f32 would stall here).
+        let fast = PaletteCycle { speed: 1000.0, ..c };
+        let t = 30.0 * 24.0 * 3600.0;
+        assert_ne!(fast.offset_at(t), fast.offset_at(t + 0.001));
+    }
+
+    #[test]
+    fn cycles_must_fit_the_palette() {
+        let ok = PaletteCycle {
+            start: 248,
+            len: 8,
+            speed: 1.0,
+        };
+        assert!(ok.is_valid());
+        assert!(!PaletteCycle { len: 9, ..ok }.is_valid());
+        assert!(!PaletteCycle { len: 0, ..ok }.is_valid());
     }
 
     #[test]

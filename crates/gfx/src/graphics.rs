@@ -74,6 +74,11 @@ pub struct Graphics {
     frame_count: u32,
     #[cfg(feature = "indexed")]
     indexed: Option<crate::indexed::IndexedState>,
+    /// `disable_indexed` was called mid-frame; applied once the frame is presented.
+    #[cfg(feature = "indexed")]
+    disable_indexed_after_frame: bool,
+    /// Between `begin_frame` and `present`.
+    frame_active: bool,
     /// The built-in pixel font, uploaded on first use.
     pub(crate) builtin_font: Option<BitmapFont>,
     scale_mode: ScaleMode,
@@ -336,6 +341,9 @@ impl Graphics {
             builtin_font: None,
             #[cfg(feature = "indexed")]
             indexed: None,
+            #[cfg(feature = "indexed")]
+            disable_indexed_after_frame: false,
+            frame_active: false,
             scale_mode,
             scale_filter,
             border_color,
@@ -460,6 +468,12 @@ impl Graphics {
     /// Back to direct RGBA drawing; drops palettes and cycles.
     #[cfg(feature = "indexed")]
     pub fn disable_indexed(&mut self) {
+        // During a frame, the canvas already holds indices: keep the palette until that frame
+        // is resolved and presented, then switch.
+        if self.frame_active {
+            self.disable_indexed_after_frame = true;
+            return;
+        }
         self.indexed = None;
         self.sync_canvas();
     }
@@ -483,7 +497,8 @@ impl Graphics {
         }
     }
 
-    /// Start rotating a range of palette entries; `None` when not indexed or when
+    /// Start rotating a range of palette entries; `None` when not indexed, when the range is
+    /// empty or runs past index 255, or when
     /// [`MAX_PALETTE_CYCLES`](crate::MAX_PALETTE_CYCLES) are already running.
     #[cfg(feature = "indexed")]
     pub fn add_palette_cycle(
@@ -823,6 +838,7 @@ impl Graphics {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("frame.encoder"),
             });
+        self.frame_active = true;
         Ok(Frame {
             encoder: Some(encoder),
             view,
@@ -856,6 +872,11 @@ impl Graphics {
         if let Some(st) = frame.surface_texture.take() {
             self.window.pre_present_notify();
             self.queue.present(st);
+        }
+        self.frame_active = false;
+        #[cfg(feature = "indexed")]
+        if std::mem::take(&mut self.disable_indexed_after_frame) {
+            self.disable_indexed();
         }
     }
 
@@ -957,7 +978,13 @@ impl Graphics {
         // Indexed canvas: indices become colour before any effect sees the scene.
         #[cfg(feature = "indexed")]
         if let Some(ix) = self.indexed.as_mut() {
-            ix.resolve(&run, encoder, &canvas.tex.view, canvas.size());
+            ix.resolve(
+                &run,
+                encoder,
+                &canvas.tex.view,
+                canvas.size(),
+                self.start.elapsed().as_secs_f64(),
+            );
         }
         #[cfg(feature = "indexed")]
         let base = self
