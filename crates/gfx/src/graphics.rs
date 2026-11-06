@@ -1057,6 +1057,7 @@ impl Graphics {
                 self.frame_count,
             ),
             indices: None,
+            textures: &self.textures,
         };
 
         // Indexed canvas: indices become colour before any effect sees the scene.

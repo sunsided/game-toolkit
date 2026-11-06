@@ -7,6 +7,7 @@ use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
 use crate::canvas::{Blit, CanvasRect, RenderTexture};
+use crate::texture::{TextureId, TextureRegistry};
 
 /// Where in the frame a post effect runs.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -74,6 +75,24 @@ pub struct PostPass<'a> {
     /// Width and height of `input` and `output`.
     pub size: [u32; 2],
     pub globals: PostGlobals,
+    /// The painter's textures, for [`Self::texture`].
+    pub(crate) textures: &'a TextureRegistry,
+}
+
+impl<'a> PostPass<'a> {
+    /// The view of a painter texture (from `create_texture_rgba`, `load_texture`,
+    /// `register_texture`, ...), for effects that read a source of the game's own besides the
+    /// scene: a video frame or emulated screen uploaded each frame with
+    /// `update_texture_rgba`, a lookup table. Looked up on every run, so it follows hot
+    /// reloads. `None` for an unknown id.
+    pub fn texture(&self, id: TextureId) -> Option<&'a wgpu::TextureView> {
+        self.textures.get(id).map(|t| &t.view)
+    }
+
+    /// The size of a painter texture in pixels; `None` for an unknown id.
+    pub fn texture_size(&self, id: TextureId) -> Option<[u32; 2]> {
+        self.textures.get(id).map(|t| t.size)
+    }
 }
 
 /// Frame values passed to every effect, and to [`ShaderEffect`] shaders as the `post`
@@ -97,7 +116,10 @@ pub struct PostGlobals {
     pub frame: u32,
     /// `1` when [`PostPass::indices`] holds the indexed canvas, else `0`.
     pub indexed: u32,
-    pub _pad: [u32; 3],
+    /// `1` when a [`ShaderEffect`]'s `source_tex` holds its source texture (see
+    /// [`ShaderEffect::with_source`]), else `0`. Set by `ShaderEffect` for its own run.
+    pub source: u32,
+    pub _pad: [u32; 2],
 }
 
 /// Internal: lets `Graphics::post_effect_mut` downcast boxed effects.
@@ -187,6 +209,7 @@ pub(crate) struct StageRun<'a> {
     pub globals: PostGlobals,
     /// The indexed canvas before the palette lookup, when indexed colour is on.
     pub indices: Option<&'a wgpu::TextureView>,
+    pub textures: &'a TextureRegistry,
 }
 
 impl PostChain {
@@ -284,6 +307,7 @@ impl PostChain {
                 output: &targets.ping[out].view,
                 history: targets.history.as_ref().map(|h| &h.view),
                 indices: run.indices,
+                textures: run.textures,
                 format: run.format,
                 stage,
                 size,
@@ -345,7 +369,10 @@ pub const BAYER_WGSL: &str = include_str!("bayer.wgsl");
 /// - `indices_tex: texture_2d<f32>` - with indexed colour, the canvas's palette indices
 ///   before the lookup, at canvas size (see [`PostPass::indices`]); read them with
 ///   `index_at(canvas_px)` or `index_in(textureLoad(indices_tex, ..))`. `post.indexed` is `1u`
-///   when they are there; otherwise `indices_tex` is the input again.
+///   when they are there; otherwise `indices_tex` is the input again;
+/// - `source_tex: texture_2d<f32>` - the effect's own source texture, set with
+///   [`ShaderEffect::with_source`] (a frame the game uploads, a lookup table); `post.source` is
+///   `1u` when it is bound, otherwise `source_tex` is the input again.
 ///
 /// Your source must define `@fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32>`. With
 /// [`ShaderEffect::with_params`], it must also declare its parameter block as
@@ -368,6 +395,10 @@ pub struct ShaderEffect {
     samplers: [wgpu::Sampler; 2],
     params: Option<Params>,
     history: bool,
+    source: Option<TextureId>,
+    /// Whether the missing `source` has been reported, so it is logged once rather than
+    /// every frame; cleared when it resolves or changes.
+    source_warned: bool,
 }
 
 struct Params {
@@ -439,7 +470,15 @@ impl ShaderEffect {
         };
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("post.bgl"),
-            entries: &[tex(0), sampler(1), sampler(2), uniform(3), tex(4), tex(5)],
+            entries: &[
+                tex(0),
+                sampler(1),
+                sampler(2),
+                uniform(3),
+                tex(4),
+                tex(5),
+                tex(6),
+            ],
         });
         let params = params.map(|(bytes, type_id)| {
             let params_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -528,7 +567,40 @@ impl ShaderEffect {
             ],
             params: params.map(|(_, p)| p),
             history: false,
+            source: None,
+            source_warned: false,
         }
+    }
+
+    /// Bind painter texture `source` as `source_tex`, besides the scene in `input_tex`: an
+    /// emulated screen or video frame the game uploads every frame with
+    /// `Graphics::update_texture_rgba`, a colour lookup table. It is looked up on every run,
+    /// so it follows `update_texture_rgba` and hot reloads. Sample it with `linear_sampler` or
+    /// `nearest_sampler`; in the [`Window`](PostStage::Window) stage map a fragment to its
+    /// place in the canvas with `(in.pos.xy - post.canvas_origin) / post.canvas_extent`.
+    ///
+    /// ```ignore
+    /// let screen = ctx.gfx.create_texture_rgba(320, 200, &pixels, Some("screen"));
+    /// let beam = ShaderEffect::new(&ctx.gfx, "beam", BEAM_WGSL).with_source(screen);
+    /// ctx.gfx.add_post_effect(PostStage::Window, beam);
+    /// // every frame: ctx.gfx.update_texture_rgba(screen, &pixels);
+    /// ```
+    #[must_use]
+    pub fn with_source(mut self, source: TextureId) -> Self {
+        self.source = Some(source);
+        self.source_warned = false;
+        self
+    }
+
+    /// Change or (`None`) drop the source texture; see [`Self::with_source`].
+    pub fn set_source(&mut self, source: Option<TextureId>) {
+        self.source = source;
+        self.source_warned = false;
+    }
+
+    /// The source texture set with [`Self::with_source`] or [`Self::set_source`].
+    pub fn source(&self) -> Option<TextureId> {
+        self.source
     }
 
     /// Bind the stage's previous output as `history_tex` (otherwise it is the input again).
@@ -557,8 +629,21 @@ impl ShaderEffect {
 
 impl PostEffect for ShaderEffect {
     fn apply(&mut self, pass: &mut PostPass<'_>) {
+        let source = self.source.and_then(|id| pass.texture(id));
+        match (self.source, source) {
+            (Some(id), None) if !self.source_warned => {
+                log::warn!("ShaderEffect: unknown source texture {id:?}; using the input");
+                self.source_warned = true;
+            }
+            (_, Some(_)) => self.source_warned = false,
+            _ => {}
+        }
+        let globals = PostGlobals {
+            source: u32::from(source.is_some()),
+            ..pass.globals
+        };
         pass.queue
-            .write_buffer(&self.globals, 0, bytemuck::bytes_of(&pass.globals));
+            .write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));
         if let Some(p) = &mut self.params
             && p.dirty
         {
@@ -594,6 +679,10 @@ impl PostEffect for ShaderEffect {
                 wgpu::BindGroupEntry {
                     binding: 5,
                     resource: wgpu::BindingResource::TextureView(indices),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::TextureView(source.unwrap_or(pass.input)),
                 },
             ],
         });
@@ -643,7 +732,8 @@ pub(crate) fn globals(
         time,
         frame,
         indexed: 0,
-        _pad: [0; 3],
+        source: 0,
+        _pad: [0; 2],
     }
 }
 

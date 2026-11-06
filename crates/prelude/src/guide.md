@@ -103,6 +103,9 @@ with `.with_history()`), the `post` uniform (`size`, `canvas_size`, `window_size
 `canvas_origin`, `canvas_extent`, `time`, `frame`, `indexed`) and `VsOut { pos, uv }`; it defines
 `fs_main`. With indexed colour, `indices_tex` / `index_at(canvas_px)` give the palette index
 behind each canvas pixel (`post.indexed == 1u`), e.g. to make only some entries glow.
+`.with_source(texture_id)` binds a texture of your own as `source_tex` (`post.source == 1u`),
+e.g. an emulated screen uploaded each frame with `ctx.gfx.update_texture_rgba`; a hand-written
+`PostEffect` gets any texture through `pass.texture(id)`.
 `ShaderEffect::with_params(&gfx, label, wgsl, &pod)` adds `@group(1) @binding(0) var<uniform>
 params`, updated with `gfx.post_effect_mut::<ShaderEffect>(id).unwrap().set_params(&pod)`.
 Implement `PostEffect` for multi-pass effects. Feature `crt`: `CrtEffect::new(&ctx.gfx,

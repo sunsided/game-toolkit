@@ -10,9 +10,10 @@ struct PostGlobals {
     frame: u32,
     // 1u when `indices_tex` holds the indexed canvas's palette indices.
     indexed: u32,
+    // 1u when `source_tex` holds the effect's own source texture (`ShaderEffect::with_source`).
+    source: u32,
     _pad0: u32,
     _pad1: u32,
-    _pad2: u32,
 };
 
 @group(0) @binding(0) var input_tex: texture_2d<f32>;
@@ -21,6 +22,7 @@ struct PostGlobals {
 @group(0) @binding(3) var<uniform> post: PostGlobals;
 @group(0) @binding(4) var history_tex: texture_2d<f32>;
 @group(0) @binding(5) var indices_tex: texture_2d<f32>;
+@group(0) @binding(6) var source_tex: texture_2d<f32>;
 
 // The palette index at canvas pixel `p` (before cycling), with indexed colour on
 // (`post.indexed == 1u`). `index_in` comes from the index helpers appended to this prelude.
