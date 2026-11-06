@@ -85,7 +85,7 @@ For pixel art, `virtual_resolution: Some((320, 180))` makes the painter draw int
 that size, scaled onto the window by `scale_mode` (`ScaleMode::Integer` by default: whole
 multiples, the rest of the window is `border_color`; or `Fit` / `Stretch`). `ctx.gfx.size()`
 and `ctx.input.mouse_pos()` are then in canvas pixels; `ctx.gfx.window_size()` and
-`mouse_pos_window()` keep the window's. `AppConfig::random_seed` seeds the deterministic
+`ctx.input.mouse_pos_window()` keep the window's. `AppConfig::random_seed` seeds the deterministic
 per-`Context` RNG (`ctx.rng`); a fixed seed reproduces a run.
 
 ## Drawing

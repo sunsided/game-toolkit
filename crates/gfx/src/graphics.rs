@@ -353,6 +353,8 @@ impl Graphics {
     /// `AppConfig::virtual_resolution`; changing it at runtime reallocates the canvas.
     /// See [`GraphicsConfig::virtual_resolution`].
     pub fn set_virtual_resolution(&mut self, resolution: Option<(u32, u32)>) {
+        // A zero-sized canvas would give the cameras a zero viewport; use at least 1 x 1.
+        let resolution = resolution.map(|(w, h)| (w.max(1), h.max(1)));
         let current = self.canvas.as_ref().map(|c| (c.size[0], c.size[1]));
         if current == resolution {
             return;

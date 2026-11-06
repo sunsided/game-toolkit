@@ -30,6 +30,17 @@ pub enum ScaleFilter {
     Linear,
 }
 
+impl ScaleFilter {
+    /// Position in the `[nearest, linear]` sampler and bind-group arrays. A match rather than
+    /// `as usize`, so a new variant fails to compile here instead of picking the wrong one.
+    pub(crate) const fn index(self) -> usize {
+        match self {
+            Self::Nearest => 0,
+            Self::Linear => 1,
+        }
+    }
+}
+
 /// Where the canvas lands in the window, in physical window pixels.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct CanvasRect {
@@ -94,7 +105,9 @@ pub(crate) struct Canvas {
 }
 
 impl Canvas {
+    /// A zero width or height is raised to 1, so the cameras and text never see a zero size.
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat, size: [u32; 2]) -> Self {
+        let size = [size[0].max(1), size[1].max(1)];
         let blit = Blit::new(device, format);
         let view = make_texture(device, format, size);
         let bind_groups = blit.bind_groups(device, &view);
@@ -115,7 +128,7 @@ impl Canvas {
         filter: ScaleFilter,
         border: wgpu::Color,
     ) {
-        let bg = &self.bind_groups[filter as usize];
+        let bg = &self.bind_groups[filter.index()];
         self.blit.draw(encoder, bg, dst, rect, border);
     }
 }
@@ -228,7 +241,7 @@ impl Blit {
     }
 
     /// Bind groups sampling `src` with the nearest and the linear sampler, indexed by
-    /// `ScaleFilter as usize`.
+    /// [`ScaleFilter::index`].
     pub fn bind_groups(
         &self,
         device: &wgpu::Device,
