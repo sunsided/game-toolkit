@@ -434,6 +434,9 @@ impl<G: Game> AppRunner<G> {
                 let mut updated = false;
                 while self.accumulator >= step {
                     state.game.update(&mut state.ctx, step.as_secs_f32());
+                    // `update` may have changed the virtual resolution or scale mode: the
+                    // next step and `render` read the pointer in the new canvas pixels.
+                    state.ctx.sync_pointer_mapping();
                     self.accumulator -= step;
                     // Edges belong to the first step; later steps this frame shouldn't see
                     // the same press again. With no step at all they wait for the next frame.
@@ -446,6 +449,7 @@ impl<G: Game> AppRunner<G> {
             }
             None => {
                 state.game.update(&mut state.ctx, delta.as_secs_f32());
+                state.ctx.sync_pointer_mapping();
                 state.ctx.input.end_frame();
             }
         }

@@ -130,14 +130,7 @@ impl Context {
 
     /// Point the input's mouse and touch mapping at where the canvas lands in the window.
     pub(crate) fn sync_pointer_mapping(&mut self) {
-        let mapping = self.gfx.canvas_rect().map(|rect| {
-            let (w, h) = self.gfx.size();
-            let scale = rect.canvas_per_window([w, h]);
-            game_toolkit_input::PointerMapping {
-                origin: (rect.origin[0], rect.origin[1]),
-                scale: (scale[0], scale[1]),
-            }
-        });
+        let mapping = pointer_mapping(self.gfx.canvas_rect(), self.gfx.size());
         self.input.set_pointer_mapping(mapping);
     }
 
@@ -288,5 +281,68 @@ impl Context {
                 self.start_audio();
             }
         }
+    }
+}
+
+/// The input mapping from window to canvas pixels for a canvas of `size` placed at `rect`
+/// (`None`: no virtual resolution, positions stay in window pixels).
+fn pointer_mapping(
+    rect: Option<game_toolkit_gfx::CanvasRect>,
+    size: (u32, u32),
+) -> Option<game_toolkit_input::PointerMapping> {
+    rect.map(|rect| {
+        let scale = rect.canvas_per_window([size.0, size.1]);
+        game_toolkit_input::PointerMapping {
+            origin: (rect.origin[0], rect.origin[1]),
+            scale: (scale[0], scale[1]),
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use game_toolkit_gfx::CanvasRect;
+    use game_toolkit_input::Input;
+
+    use super::pointer_mapping;
+
+    fn close(a: (f32, f32), b: (f32, f32)) -> bool {
+        (a.0 - b.0).abs() < 1e-3 && (a.1 - b.1).abs() < 1e-3
+    }
+
+    /// After a runtime switch from 640 x 360 (integer x3) to 800 x 600 (fractional fit) on a
+    /// 1080p window, the pointer maps to the new canvas as soon as the mapping is synced:
+    /// `Input` applies the mapping when read, not when the cursor moved.
+    #[test]
+    fn pointer_follows_a_runtime_resolution_change() {
+        let mut input = Input::new();
+        input.handle_window_event(&winit::event::WindowEvent::CursorMoved {
+            device_id: winit::event::DeviceId::dummy(),
+            position: winit::dpi::PhysicalPosition::new(960.0, 540.0),
+        });
+
+        // 640 x 360 scaled by 3 fills the window.
+        let rect = CanvasRect {
+            origin: [0.0, 0.0],
+            size: [1920.0, 1080.0],
+        };
+        input.set_pointer_mapping(pointer_mapping(Some(rect), (640, 360)));
+        assert!(close(input.mouse_pos(), (320.0, 180.0)));
+
+        // 800 x 600 fit at 1.8x: 1440 x 1080, centred with 240-pixel bars.
+        let rect = CanvasRect {
+            origin: [240.0, 0.0],
+            size: [1440.0, 1080.0],
+        };
+        input.set_pointer_mapping(pointer_mapping(Some(rect), (800, 600)));
+        assert!(
+            close(input.mouse_pos(), (400.0, 300.0)),
+            "{:?}",
+            input.mouse_pos()
+        );
+
+        // Back to drawing straight into the window.
+        input.set_pointer_mapping(pointer_mapping(None, (1920, 1080)));
+        assert_eq!(input.mouse_pos(), (960.0, 540.0));
     }
 }

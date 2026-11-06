@@ -57,6 +57,9 @@ All notable changes to this project are documented here. The format is based on
   virtual resolution is set (the toolkit installs a `PointerMapping` each frame);
   `Input::mouse_pos_window()` keeps the raw window position.
 - `Graphics::window_size()`: the window's size, whatever the drawing size is.
+- The pointer mapping is re-synced after every `update` step, so a virtual resolution or scale
+  mode changed in `update` applies to the next step's and `render`'s `mouse_pos` and touches
+  rather than a frame later.
 
 - Post-processing (#89): `Graphics::add_post_effect(stage, effect)` runs full-screen effects
   after the scene, in `PostStage::Canvas` (at the virtual resolution, before the upscale) or

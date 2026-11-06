@@ -440,6 +440,12 @@ impl Graphics {
     /// window, or (`None`) straight into the window again. Usually set once through
     /// `AppConfig::virtual_resolution`; changing it at runtime reallocates the canvas.
     /// See [`GraphicsConfig::virtual_resolution`].
+    ///
+    /// The toolkit's input follows right after the `update` that changed it: the next
+    /// `update` step and `render` already read `mouse_pos` and touches in the new canvas
+    /// pixels. With [`ScaleMode::Integer`], a canvas larger than the window is scaled down to
+    /// fit (fractionally) rather than cropped; use [`Self::set_scale_mode`] for per-resolution
+    /// choices, e.g. `Fit` for 800 x 600 on a 1080p screen.
     pub fn set_virtual_resolution(&mut self, resolution: Option<(u32, u32)>) {
         // A zero-sized canvas would give the cameras a zero viewport; use at least 1 x 1.
         let resolution = resolution.map(|(w, h)| (w.max(1), h.max(1)));
