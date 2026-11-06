@@ -25,6 +25,46 @@ impl<F: FnMut(&mut [f32]) + Send + 'static> AudioStream for F {
     }
 }
 
+/// A source of stereo frames (`[left, right]`), produced on demand at its own sample rate.
+///
+/// Implemented for any `FnMut(&mut [[f32; 2]]) + Send + 'static`; played with
+/// [`crate::Audio::play_stereo_stream`]. Otherwise behaves like [`AudioStream`].
+pub trait StereoStream: Send + 'static {
+    /// Overwrite `out` with the next frames, each channel in `-1.0..=1.0`.
+    fn fill(&mut self, out: &mut [[f32; 2]]);
+}
+
+impl<F: FnMut(&mut [[f32; 2]]) + Send + 'static> StereoStream for F {
+    fn fill(&mut self, out: &mut [[f32; 2]]) {
+        self(out);
+    }
+}
+
+/// Either kind of stream; mono samples are played on both channels.
+pub(crate) enum Source {
+    Mono(Box<dyn AudioStream>, Vec<f32>),
+    Stereo(Box<dyn StereoStream>),
+}
+
+impl Source {
+    pub(crate) fn mono(stream: Box<dyn AudioStream>) -> Self {
+        Source::Mono(stream, Vec::new())
+    }
+
+    fn fill(&mut self, out: &mut [[f32; 2]]) {
+        match self {
+            Source::Mono(stream, buf) => {
+                buf.resize(out.len(), 0.0);
+                stream.fill(buf);
+                for (o, &s) in out.iter_mut().zip(buf.iter()) {
+                    *o = [s, s];
+                }
+            }
+            Source::Stereo(stream) => stream.fill(out),
+        }
+    }
+}
+
 /// Samples requested from a stream at once.
 const CHUNK: usize = 512;
 
@@ -119,14 +159,14 @@ impl StreamHandle {
 
 /// A stream ready to hand to kira.
 pub(crate) struct StreamData {
-    stream: Box<dyn AudioStream>,
+    stream: Source,
     sample_rate: u32,
     handle: StreamHandle,
 }
 
 impl StreamData {
     pub(crate) fn new(
-        stream: Box<dyn AudioStream>,
+        stream: Source,
         sample_rate: u32,
         volume: f32,
         pending: bool,
@@ -158,14 +198,14 @@ impl SoundData for StreamData {
 /// The kira side: pulls chunks from the stream and resamples them linearly to the output
 /// rate.
 struct StreamSound {
-    stream: Box<dyn AudioStream>,
+    stream: Source,
     sample_rate: f64,
     shared: Arc<Shared>,
-    chunk: Vec<f32>,
+    chunk: Vec<[f32; 2]>,
     next_in_chunk: usize,
-    /// The two stream samples the output position lies between, and how far along it is.
-    previous: f32,
-    current: f32,
+    /// The two stream frames the output position lies between, and how far along it is.
+    previous: [f32; 2],
+    current: [f32; 2],
     phase: f64,
     /// Whether `previous` and `current` hold the first two samples yet.
     primed: bool,
@@ -174,7 +214,7 @@ struct StreamSound {
 }
 
 impl StreamSound {
-    fn new(stream: Box<dyn AudioStream>, sample_rate: u32, shared: Arc<Shared>) -> Self {
+    fn new(stream: Source, sample_rate: u32, shared: Arc<Shared>) -> Self {
         // Start at the target volume (or silence if paused) so playback does not fade in.
         let applied_volume = if shared.paused.load(Ordering::Relaxed) {
             0.0
@@ -185,17 +225,17 @@ impl StreamSound {
             stream,
             sample_rate: f64::from(sample_rate),
             shared,
-            chunk: vec![0.0; CHUNK],
+            chunk: vec![[0.0; 2]; CHUNK],
             next_in_chunk: CHUNK,
-            previous: 0.0,
-            current: 0.0,
+            previous: [0.0; 2],
+            current: [0.0; 2],
             phase: 0.0,
             primed: false,
             applied_volume,
         }
     }
 
-    fn next_sample(&mut self) -> f32 {
+    fn next_sample(&mut self) -> [f32; 2] {
         if self.next_in_chunk == self.chunk.len() {
             self.stream.fill(&mut self.chunk);
             self.next_in_chunk = 0;
@@ -229,8 +269,10 @@ impl StreamSound {
         for (i, frame) in out.iter_mut().enumerate() {
             // Linear ramp that lands exactly on `target` at the block's last frame.
             let volume = from + (target - from) * ((i + 1) as f32 / len);
-            let s = self.previous + (self.current - self.previous) * self.phase as f32;
-            *frame = Frame::from_mono(s * volume);
+            let t = self.phase as f32;
+            let l = self.previous[0] + (self.current[0] - self.previous[0]) * t;
+            let r = self.previous[1] + (self.current[1] - self.previous[1]) * t;
+            *frame = Frame::new(l * volume, r * volume);
             self.phase += step;
             while self.phase >= 1.0 {
                 self.phase -= 1.0;
@@ -264,7 +306,7 @@ mod tests {
     }
 
     fn sound_at(stream: impl AudioStream, rate: u32, volume: f32) -> (StreamSound, StreamHandle) {
-        let (data, handle) = StreamData::new(Box::new(stream), rate, volume, false);
+        let (data, handle) = StreamData::new(Source::mono(Box::new(stream)), rate, volume, false);
         let sound = StreamSound::new(data.stream, data.sample_rate, handle.shared.clone());
         (sound, handle)
     }
@@ -361,7 +403,7 @@ mod tests {
             ..AudioManagerSettings::default()
         })
         .unwrap();
-        let (data, handle) = StreamData::new(Box::new(stream), 100, 1.0, false);
+        let (data, handle) = StreamData::new(Source::mono(Box::new(stream)), 100, 1.0, false);
         manager.play(data).unwrap();
         handle.mark_started();
         manager.backend_mut().on_start_processing();
@@ -405,5 +447,22 @@ mod tests {
         let mut out = [Frame::ZERO; 3];
         s.render(&mut out, 0.01);
         assert!(out.iter().all(|f| f.left == 0.5));
+    }
+
+    #[test]
+    fn stereo_frames_keep_their_channels() {
+        let mut n = 0u32;
+        let stream = move |out: &mut [[f32; 2]]| {
+            for f in out {
+                *f = [n as f32, -(n as f32)];
+                n += 1;
+            }
+        };
+        let (data, handle) = StreamData::new(Source::Stereo(Box::new(stream)), 50, 1.0, false);
+        let mut s = StreamSound::new(data.stream, data.sample_rate, handle.shared.clone());
+        let mut out = [Frame::ZERO; 4];
+        s.render(&mut out, 1.0 / 100.0);
+        let lr: Vec<(f32, f32)> = out.iter().map(|f| (f.left, f.right)).collect();
+        assert_eq!(lr, [(0.0, 0.0), (0.5, -0.5), (1.0, -1.0), (1.5, -1.5)]);
     }
 }

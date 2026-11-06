@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- Stereo streams: `StereoStream` (implemented for `FnMut(&mut [[f32; 2]])`) and
+  `Audio::play_stereo_stream` / `play_stereo_stream_with` play audio generated while it plays
+  with separate left and right channels, resampled like `Audio::play_stream`. Mono streams
+  behave as before (the same sample on both channels).
+
 ## [0.11.0] - 2026-11-06
 
 ### Added
