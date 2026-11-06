@@ -3,7 +3,7 @@
 //! This is the umbrella entry-point crate. Depend on `game-toolkit` and write
 //! `use game_toolkit::prelude::*;` to pull in the runtime types from the `game-toolkit-*`
 //! crates behind one dependency. Optional features: `ui`, `aseprite`, `ecs`, `synth`,
-//! `vector`, `crt`.
+//! `vector`, `crt`, `compute`.
 //!
 //! New here? The [`guide`] walks through the whole API on one page.
 
@@ -13,6 +13,13 @@
 mod aseprite_ext;
 
 pub mod guide;
+
+/// GPU compute helpers (feature `compute`): [`Kernel`](compute::Kernel),
+/// [`PingPong`](compute::PingPong), [`ReadbackRing`](compute::ReadbackRing),
+/// [`StorageTexture`](compute::StorageTexture) and
+/// [`ComputeSubmitter`](compute::ComputeSubmitter). The main types are also in the prelude.
+#[cfg(feature = "compute")]
+pub use game_toolkit_compute as compute;
 
 /// Everything you need to write a game: `use game_toolkit::prelude::*;`.
 pub mod prelude {
@@ -57,4 +64,10 @@ pub mod prelude {
 
     #[cfg(feature = "crt")]
     pub use game_toolkit_gfx::{CrtEffect, CrtMask, CrtSettings};
+
+    #[cfg(feature = "compute")]
+    pub use game_toolkit_compute::{
+        self, Binding, ComputeSubmitter, Kernel, PingPong, PingPongBindGroups, ReadbackRing,
+        StorageTexture,
+    };
 }

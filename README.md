@@ -150,10 +150,11 @@ template-specific commands and conventions.
 | `game-toolkit-aseprite` | Load native `.aseprite` files and exported PNG + JSON sheets into a GPU-ready `SpriteSheet` with animation playback. |
 | `game-toolkit-ecs` | Small glue (component data, command queue) for the `sillyecs` compile-time archetype ECS. |
 | `game-toolkit-ui` | egui overlay integration for debug tooling (feature-gated). |
-| `game-toolkit` | Umbrella crate - depend on this one and `use game_toolkit::prelude::*;`. Features: `ui`, `aseprite`, `ecs`, `synth`, `vector`. |
+| `game-toolkit-compute` | GPU compute helpers (feature `compute`): WGSL kernels dispatched over a grid, ping-pong storage buffers, non-blocking read-back ring, storage textures drawn by the `Painter`. |
+| `game-toolkit` | Umbrella crate - depend on this one and `use game_toolkit::prelude::*;`. Features: `ui`, `aseprite`, `ecs`, `synth`, `vector`, `compute`. |
 
-The dependency direction is one-way: `game-toolkit-aseprite` depends on `game-toolkit-gfx`, never the
-reverse, so the renderer stays unaware of asset formats.
+The dependency direction is one-way: `game-toolkit-aseprite` and `game-toolkit-compute` depend on
+`game-toolkit-gfx`, never the reverse, so the renderer stays unaware of asset formats and compute.
 
 ## Companion crates
 
@@ -185,6 +186,7 @@ Run any example with `cargo run -p <package>`.
 | `13_web` | `ex_13_web` | Same code natively and in the browser: sprite, text, sound on click, synth music, gamepad. `task web`. |
 | `14_framebuffer` | `ex_14_framebuffer` | A CPU-rendered plasma uploaded every frame with `update_texture_rgba`. |
 | `15_touch` | `ex_15_touch` | Every finger as a ring, taps vs. swipes, counters, touch-as-mouse toggle. Best on a phone: `task web:lan WEB_DIR=examples/15_touch`. |
+| `16_compute` | `ex_16_compute` | Game of Life offloaded to the GPU (`compute` feature): `update` submits generations through a `ComputeSubmitter`, a ping-pong kernel paints a storage texture, the live-cell count comes back via a non-blocking read-back ring. |
 | `17_virtual_resolution` | `ex_17_virtual_resolution` | A 320 × 180 scene scaled onto the window: integer, fit and stretch modes, nearest vs. linear, mouse in canvas pixels, built-in pixel font. |
 | `18_post` | `ex_18_post` | Post-processing: the `crt` feature's CRT filter (presets, afterglow, curvature) and a custom WGSL posterize effect on the canvas. |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
@@ -337,6 +339,44 @@ p.vector(|scene| {
                &Circle::new((400.0, 300.0), 120.0));
 });
 ```
+
+## GPU compute
+
+The optional `compute` feature (`game_toolkit::compute`, crate `game-toolkit-compute`) wraps the
+wgpu plumbing GPU simulations repeat. A `Kernel` is a WGSL compute shader with its `@group(0)`
+layout; `PingPong<T>` holds two storage buffers with bind groups prebuilt for both orderings;
+`ReadbackRing<T>` copies small results into a ring of staging buffers and returns them a few
+frames later without blocking (so it works on WebGPU); `StorageTexture` is written by a kernel
+and drawn like any texture. `ComputeSubmitter` offloads a simulation: it submits steps from
+`update` in their own submissions at the simulation's rate, separate from the frame, and skips
+a step while the GPU is still busy with earlier ones, so simulation load can't stall
+rendering. Rendering stays on the GPU too: draw the `StorageTexture`, or use a `PingPong`
+buffer directly as a vertex/instance buffer in your own pass.
+
+```rust
+// init
+let kernel = Kernel::builder("life", include_str!("life.wgsl"))
+    .workgroup_size([8, 8, 1]) // the shader can use @workgroup_size(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y)
+    .bindings(&[Binding::StorageRead, Binding::StorageReadWrite, Binding::StorageTextureWrite(StorageTexture::FORMAT)])
+    .build(ctx.gfx.device());
+let tex = StorageTexture::new(&mut ctx.gfx, 256, 256, "life");
+let groups = cells.bind_groups(ctx.gfx.device(), &kernel, &[tex.binding()]);
+let sim = ComputeSubmitter::new("life", 2);
+
+// update: offload a step, unless the GPU still has two in flight
+sim.try_submit(ctx.gfx.device(), ctx.gfx.queue(), |encoder| {
+    kernel.dispatch_for(encoder, groups.current(&cells), 256, 256);
+    cells.swap();
+});
+
+// render: draws the latest submitted state (`frame.encoder_mut()` also works for
+// per-frame compute)
+p.sprite(tex.id(), [0.0, 0.0], [512.0, 512.0]);
+```
+
+There is no compute on WebGL2 (the browser fallback without WebGPU): check
+`ctx.gfx.supports_compute()` first. `examples/16_compute` is the full version.
+`Graphics::register_texture` makes any wgpu texture of your own drawable as a `TextureId`.
 
 ## Web (wasm32)
 

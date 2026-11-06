@@ -635,8 +635,31 @@ impl Graphics {
     /// [`Self::create_texture_rgba`]. Unknown ids and size mismatches are logged and ignored.
     pub fn update_texture_rgba(&mut self, id: TextureId, rgba: &[u8]) {
         if !self.textures.write_rgba(&self.queue, id, rgba) {
-            log::warn!("update_texture_rgba: unknown {id:?} or wrong data size");
+            log::warn!("update_texture_rgba: unknown or unwritable {id:?}, or wrong data size");
         }
+    }
+
+    /// Make a texture the game created itself drawable like any other [`TextureId`]: the
+    /// output of a compute shader, a render target, a video frame decoded on the GPU. The
+    /// registry takes ownership of `texture` and samples it through `view` (nearest filtering,
+    /// [`TextureWrap::Clamp`] until changed with [`Self::set_texture_wrap`]).
+    ///
+    /// `texture` needs [`wgpu::TextureUsages::TEXTURE_BINDING`] and `view` a filterable float
+    /// format with a 2D dimension. The sprite shader reads `view` as linear color, so use an
+    /// sRGB view (e.g. `Rgba8UnormSrgb`) for content authored in sRGB like PNG pixels. To
+    /// write such a texture from a compute shader, create it as `Rgba8Unorm` with
+    /// `STORAGE_BINDING` and `view_formats: &[Rgba8UnormSrgb]`, store through an `Rgba8Unorm`
+    /// view and register an `Rgba8UnormSrgb` one created with `usage:
+    /// Some(TEXTURE_BINDING)` (an sRGB view can't carry `STORAGE_BINDING`).
+    /// [`Self::update_texture_rgba`] only writes textures with `COPY_DST` and 4 bytes per
+    /// texel; others are logged and skipped.
+    pub fn register_texture(
+        &mut self,
+        texture: wgpu::Texture,
+        view: wgpu::TextureView,
+        label: Option<&str>,
+    ) -> TextureId {
+        self.textures.register(&self.device, texture, view, label)
     }
 
     pub fn white_texture(&self) -> TextureId {
