@@ -457,6 +457,8 @@ impl Graphics {
     /// [`PaletteCycle`](crate::PaletteCycle)s and rows, reset by [`Self::disable_indexed`].
     #[cfg(feature = "indexed")]
     pub fn enable_indexed(&mut self, palette: &crate::Palette) {
+        // The latest call wins: cancel a `disable_indexed` deferred earlier in this frame.
+        self.disable_indexed_after_frame = false;
         let format = self.surface_format();
         let state = self.indexed.get_or_insert_with(|| {
             crate::indexed::IndexedState::new(&self.device, &self.queue, format)
