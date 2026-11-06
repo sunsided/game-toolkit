@@ -24,11 +24,10 @@ impl CustomPasses {
 
     /// Take this layer's passes, in the order they were queued.
     pub fn take_layer(&mut self, layer: i16) -> Vec<CustomFn> {
-        let (this, rest) = std::mem::take(&mut self.pending)
-            .into_iter()
-            .partition(|(l, _)| *l == layer);
-        self.pending = rest;
-        this.into_iter().map(|(_, f)| f).collect()
+        self.pending
+            .extract_if(.., |(l, _)| *l == layer)
+            .map(|(_, f)| f)
+            .collect()
     }
 
     pub fn clear(&mut self) {
