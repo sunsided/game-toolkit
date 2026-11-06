@@ -12,7 +12,21 @@ use crate::color::Color;
 ///
 /// Whatever the hook asks for is passed to `request_device` as is, without the clear
 /// "missing limit" error the config fields get.
-pub type DeviceHook = fn(&wgpu::Adapter, &mut wgpu::DeviceDescriptor<'_>);
+///
+/// A closure can capture runtime settings (a user's quality preset, a command-line flag):
+///
+/// ```
+/// # use std::sync::Arc;
+/// # use game_toolkit_gfx::{DeviceHook, wgpu};
+/// let want_f16 = true; // e.g. from a settings file
+/// let hook: DeviceHook = Arc::new(move |adapter, desc| {
+///     if want_f16 && adapter.features().contains(wgpu::Features::SHADER_F16) {
+///         desc.required_features |= wgpu::Features::SHADER_F16;
+///     }
+/// });
+/// ```
+pub type DeviceHook =
+    std::sync::Arc<dyn Fn(&wgpu::Adapter, &mut wgpu::DeviceDescriptor<'_>) + Send + Sync>;
 
 /// Settings for [`Graphics::new`](crate::Graphics::new).
 ///

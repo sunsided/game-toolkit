@@ -56,7 +56,8 @@ aspect) or `ScaleMode::Stretch`; `scale_filter`: `ScaleFilter::Nearest` (default
 With a canvas, `ctx.gfx.size()`, the cameras, `ctx.input.mouse_pos()`/`mouse_delta()` and touch
 positions are all in canvas pixels, so layout code is unchanged; `ctx.gfx.window_size()` and
 `ctx.input.mouse_pos_window()` give the window's. All change at runtime:
-`ctx.gfx.set_virtual_resolution(..)`, `set_scale_mode`, `set_scale_filter`, `set_border_color`.
+`ctx.gfx.set_virtual_resolution(..)`, `ctx.gfx.set_scale_mode(..)`, `ctx.gfx.set_scale_filter(..)`,
+`ctx.gfx.set_border_color(..)`.
 Text is drawn at canvas resolution too. For own passes into the canvas use
 `ctx.gfx.canvas_view()` after the painter has flushed; `ctx.gfx.flush_pending(frame)` (or the end
 of the frame) scales it onto the window, after which overlays like egui draw at window resolution.
