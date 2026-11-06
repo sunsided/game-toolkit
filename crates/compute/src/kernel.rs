@@ -91,8 +91,9 @@ impl<'a> KernelBuilder<'a> {
     }
 
     /// Compile the WGSL and create the pipeline. Shader errors surface as wgpu validation
-    /// errors (a panic by default, with the WGSL diagnostic); line numbers are one higher than
-    /// in your source because of the injected `WORKGROUP_SIZE_*` line.
+    /// errors (a panic by default, with the WGSL diagnostic); lines after your global
+    /// directives (`enable`, ...) are one higher than in your source because of the injected
+    /// `WORKGROUP_SIZE_*` line.
     pub fn build(self, device: &wgpu::Device) -> Kernel {
         let [x, y, z] = self.workgroup_size;
         assert!(
@@ -100,7 +101,7 @@ impl<'a> KernelBuilder<'a> {
             "workgroup size {:?} has a zero component",
             self.workgroup_size
         );
-        let source = format!("{}{}", workgroup_prelude(self.workgroup_size), self.source);
+        let source = with_workgroup_prelude(self.source, self.workgroup_size);
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some(self.label),
             source: wgpu::ShaderSource::Wgsl(source.into()),
@@ -148,6 +149,36 @@ fn workgroup_prelude([x, y, z]: [u32; 3]) -> String {
         "const WORKGROUP_SIZE_X: u32 = {x}u; const WORKGROUP_SIZE_Y: u32 = {y}u; \
          const WORKGROUP_SIZE_Z: u32 = {z}u;\n"
     )
+}
+
+/// `source` with the `WORKGROUP_SIZE_*` line inserted after any leading global directives
+/// (`enable`, `requires`, `diagnostic`), which WGSL requires before every declaration.
+/// Blank and `//` comment lines among the directives stay with them.
+fn with_workgroup_prelude(source: &str, size: [u32; 3]) -> String {
+    let mut split = 0;
+    let mut offset = 0;
+    for line in source.split_inclusive('\n') {
+        offset += line.len();
+        let t = line.trim();
+        let is_directive = ["enable", "requires", "diagnostic"].iter().any(|d| {
+            t.strip_prefix(d)
+                .is_some_and(|r| r.starts_with([' ', '\t', '(']))
+        });
+        if is_directive {
+            split = offset;
+        } else if !(t.is_empty() || t.starts_with("//")) {
+            break;
+        }
+    }
+    let (head, tail) = source.split_at(split);
+    let mut out = String::with_capacity(source.len() + 96);
+    out.push_str(head);
+    if !head.is_empty() && !head.ends_with('\n') {
+        out.push('\n');
+    }
+    out.push_str(&workgroup_prelude(size));
+    out.push_str(tail);
+    out
 }
 
 /// A compute shader with its pipeline and `@group(0)` layout, ready to dispatch into a frame's
@@ -293,6 +324,23 @@ mod tests {
     #[should_panic(expected = "at least 1")]
     fn zero_workgroup_size_panics() {
         let _ = workgroups(4, 0);
+    }
+
+    #[test]
+    fn prelude_goes_after_global_directives() {
+        let src = "// header\nenable f16;\ndiagnostic(off, derivative_uniformity);\n\n@compute fn main() {}\n";
+        let out = with_workgroup_prelude(src, [8, 8, 1]);
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines[1], "enable f16;");
+        assert_eq!(lines[2], "diagnostic(off, derivative_uniformity);");
+        assert!(lines[3].starts_with("const WORKGROUP_SIZE_X"));
+        assert!(out.ends_with("@compute fn main() {}\n"));
+        // Without directives the line goes first.
+        let plain = with_workgroup_prelude("@compute fn main() {}", [1, 1, 1]);
+        assert!(plain.starts_with("const WORKGROUP_SIZE_X"));
+        // An identifier merely starting with a directive name is not one.
+        let ident = with_workgroup_prelude("enabled_flag();", [1, 1, 1]);
+        assert!(ident.starts_with("const WORKGROUP_SIZE_X"));
     }
 
     #[test]

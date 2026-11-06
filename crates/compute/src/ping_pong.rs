@@ -87,7 +87,13 @@ impl<T: Pod> PingPong<T> {
             data.len(),
             self.len
         );
-        let byte_offset = (offset * size_of::<T>()) as wgpu::BufferAddress;
+        let byte_offset = offset * size_of::<T>();
+        let byte_len = size_of_val(data);
+        assert!(
+            byte_offset.is_multiple_of(4) && byte_len.is_multiple_of(4),
+            "PingPong::write: byte offset {byte_offset} and size {byte_len} must be multiples of 4"
+        );
+        let byte_offset = byte_offset as wgpu::BufferAddress;
         queue.write_buffer(self.front(), byte_offset, bytemuck::cast_slice(data));
     }
 
