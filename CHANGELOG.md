@@ -92,7 +92,7 @@ All notable changes to this project are documented here. The format is based on
 - Indexed colour (#90), feature `indexed`: `Graphics::enable_indexed(&Palette)` makes the
   canvas hold palette indices, resolved through a palette lookup texture (`Rgba8UnormSrgb`, so
   authored colours come out exactly) before post effects and the upscale. `PALETTE_ROWS`
-  palette rows with `set_palette` and `set_palette_blend` for crossfades; `PaletteCycle`
+  (16) palette rows with `set_palette` and `set_palette_blend` for crossfades; `PaletteCycle`
   rotates index ranges over time (`add_palette_cycle`). Draw indices with `Color::index` and
   textures from indexed PNGs, decoded without RGBA conversion (`IndexedImage::from_png`,
   `Graphics::load_indexed_texture`, `Context::load_indexed_texture`). New example `19_palette`.

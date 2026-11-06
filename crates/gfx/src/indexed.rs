@@ -16,11 +16,12 @@ use crate::canvas::RenderTexture;
 use crate::post::StageRun;
 
 /// How many palette rows the lookup texture holds: [`Graphics::set_palette`] fills them,
-/// [`Graphics::set_palette_blend`] crossfades between two.
+/// [`Graphics::set_palette_blend`] crossfades between two. Sixteen covers a base palette with
+/// times of day and eras or biomes; the lookup texture is only 16 KiB.
 ///
 /// [`Graphics::set_palette`]: crate::Graphics::set_palette
 /// [`Graphics::set_palette_blend`]: crate::Graphics::set_palette_blend
-pub const PALETTE_ROWS: u32 = 8;
+pub const PALETTE_ROWS: u32 = 16;
 
 /// WGSL for passes that write or read the indexed canvas themselves, e.g. a
 /// [`Painter::custom`](crate::Painter::custom) background or a post effect sampling
