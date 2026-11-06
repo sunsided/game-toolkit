@@ -79,8 +79,12 @@ fn sky_pipeline(gfx: &Graphics) -> wgpu::RenderPipeline {
             module: &module,
             entry_point: Some("fs_main"),
             compilation_options: Default::default(),
-            // No blending: indices must never be mixed.
-            targets: &[Some(gfx.surface_format().into())],
+            targets: &[Some(wgpu::ColorTargetState {
+                format: gfx.surface_format(),
+                // No blending: indices must never be mixed.
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
         }),
         primitive: Default::default(),
         depth_stencil: gfx.depth_stencil(),
