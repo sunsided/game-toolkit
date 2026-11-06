@@ -396,6 +396,9 @@ pub struct ShaderEffect {
     params: Option<Params>,
     history: bool,
     source: Option<TextureId>,
+    /// Whether the missing `source` has been reported, so it is logged once rather than
+    /// every frame; cleared when it resolves or changes.
+    source_warned: bool,
 }
 
 struct Params {
@@ -565,6 +568,7 @@ impl ShaderEffect {
             params: params.map(|(_, p)| p),
             history: false,
             source: None,
+            source_warned: false,
         }
     }
 
@@ -584,12 +588,14 @@ impl ShaderEffect {
     #[must_use]
     pub fn with_source(mut self, source: TextureId) -> Self {
         self.source = Some(source);
+        self.source_warned = false;
         self
     }
 
     /// Change or (`None`) drop the source texture; see [`Self::with_source`].
     pub fn set_source(&mut self, source: Option<TextureId>) {
         self.source = source;
+        self.source_warned = false;
     }
 
     /// The source texture set with [`Self::with_source`] or [`Self::set_source`].
@@ -624,8 +630,13 @@ impl ShaderEffect {
 impl PostEffect for ShaderEffect {
     fn apply(&mut self, pass: &mut PostPass<'_>) {
         let source = self.source.and_then(|id| pass.texture(id));
-        if self.source.is_some() && source.is_none() {
-            log::warn!("ShaderEffect: unknown source texture {:?}", self.source);
+        match (self.source, source) {
+            (Some(id), None) if !self.source_warned => {
+                log::warn!("ShaderEffect: unknown source texture {id:?}; using the input");
+                self.source_warned = true;
+            }
+            (_, Some(_)) => self.source_warned = false,
+            _ => {}
         }
         let globals = PostGlobals {
             source: u32::from(source.is_some()),
