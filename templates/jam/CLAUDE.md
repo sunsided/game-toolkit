@@ -287,6 +287,7 @@ let tex = ctx.load_texture("player.png")?;            // -> TextureId (relative 
 let mesh = ctx.gfx.create_mesh(&vertices, &indices);  // &[MeshVertex], &[u16] -> MeshId
 ctx.gfx.camera3d.eye = [2.5, 2.0, 3.5];               // perspective Camera3D (3D path)
 ctx.gfx.request_screenshot("shot.png");               // saves the next presented frame (native only)
+let rt = ctx.gfx.register_texture(texture, view, Some("rt")); // your own wgpu::Texture + view -> TextureId
 // ctx.gfx.camera is the 2D Camera2D.
 ```
 
@@ -335,6 +336,7 @@ All optional features and what they add to the prelude:
 | `synth` | `Synth`, `SynthHandle`, `synth` (`Song`, `Tempo`, `Preset`, ...), `synthie` | chiptune music (`audio.play_synth`) and effects |
 | `vector` | `vello` | high-quality 2D vector graphics (WebGPU only: skipped on WebGL2) |
 | `crt` | `CrtEffect`, `CrtSettings`, `CrtMask` | built-in CRT post-processing filter (see Post-processing) |
+| `compute` | `Kernel`, `Binding`, `PingPong`, `PingPongBindGroups`, `ReadbackRing`, `StorageTexture`, `ComputeSubmitter` | GPU simulations offloaded from `update` (`ComputeSubmitter::try_submit`, throttled by in-flight work) or recorded into `frame.encoder_mut()`; read/write buffer pairs drawable as vertex buffers, non-blocking read-back a few frames late (WebGPU only: check `ctx.gfx.supports_compute()`) |
 
 Enable in `Cargo.toml`: `game-toolkit = { ..., features = ["ui", "aseprite"] }`.
 
@@ -412,4 +414,5 @@ Plain `cargo run` works too. `task check` here enforces `rustfmt` - keep code fo
 Browse the [game-toolkit repo](https://github.com/sunsided/game-toolkit) `examples/` for runnable
 references: `01_window`, `02_sprite`, `03_primitives`, `04_text`, `05_tilemap`, `06_egui`,
 `07_3d`, `07_audio`, `08_hot_reload`, `09_aseprite`, `10_gamepad`, `11_ecs`, `12_vector`,
-`13_web` (runs natively and in the browser), `bouncing_ball`.
+`13_web` (runs natively and in the browser), `16_compute` (GPU Game of Life, `compute` feature),
+`bouncing_ball`.
