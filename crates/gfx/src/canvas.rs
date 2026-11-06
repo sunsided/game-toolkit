@@ -102,7 +102,7 @@ pub(crate) struct RenderTexture {
     pub size: [u32; 2],
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
-    /// Indexed by `ScaleFilter as usize`.
+    /// Indexed by [`ScaleFilter::index`].
     pub blit_bind_groups: [wgpu::BindGroup; 2],
 }
 

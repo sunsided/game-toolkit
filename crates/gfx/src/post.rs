@@ -1,7 +1,7 @@
 //! Full-screen post-processing after the scene is drawn: effects that read the finished frame
 //! as a texture and write a new one.
 
-use std::any::Any;
+use std::any::{Any, TypeId};
 
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
@@ -19,6 +19,17 @@ pub enum PostStage {
     /// At window resolution, after the canvas has been scaled onto the window, border
     /// included (scanlines, shadow masks, curvature, bloom).
     Window,
+}
+
+impl PostStage {
+    /// Position in the chain's stage array; a match rather than `as usize`, so adding a
+    /// variant fails to compile here instead of indexing the wrong stage.
+    const fn index(self) -> usize {
+        match self {
+            Self::Canvas => 0,
+            Self::Window => 1,
+        }
+    }
 }
 
 /// Handle to an effect added with [`Graphics::add_post_effect`](crate::Graphics::add_post_effect).
@@ -98,6 +109,7 @@ struct Entry {
 
 /// Ping-pong targets (and the history copy) for one stage, at that stage's size.
 struct Targets {
+    format: wgpu::TextureFormat,
     ping: [RenderTexture; 2],
     history: Option<RenderTexture>,
 }
@@ -134,15 +146,15 @@ impl Stage {
         label: &str,
     ) {
         let history = self.wants_history();
-        let fits = self
-            .targets
-            .as_ref()
-            .is_some_and(|t| t.ping[0].size == size && t.history.is_some() == history);
+        let fits = self.targets.as_ref().is_some_and(|t| {
+            t.ping[0].size == size && t.format == format && t.history.is_some() == history
+        });
         if fits {
             return;
         }
         let make = |l: &str| RenderTexture::new(device, blit, format, size, l);
         self.targets = Some(Targets {
+            format,
             ping: [make(label), make(label)],
             // Fresh textures are zeroed: black history on the first frame.
             history: history.then(|| make(label)),
@@ -171,13 +183,13 @@ impl PostChain {
     }
 
     pub fn active(&self, stage: PostStage) -> bool {
-        self.stages[stage as usize].active()
+        self.stages[stage.index()].active()
     }
 
     pub fn add(&mut self, stage: PostStage, effect: Box<dyn AnyPostEffect>) -> PostEffectId {
         self.next_id += 1;
         let id = PostEffectId(self.next_id);
-        self.stages[stage as usize].effects.push(Entry {
+        self.stages[stage.index()].effects.push(Entry {
             id,
             enabled: true,
             effect,
@@ -185,7 +197,7 @@ impl PostChain {
         id
     }
 
-    fn find(&mut self, id: PostEffectId) -> Option<(usize, usize)> {
+    fn find(&self, id: PostEffectId) -> Option<(usize, usize)> {
         self.stages.iter().enumerate().find_map(|(s, stage)| {
             stage
                 .effects
@@ -215,7 +227,7 @@ impl PostChain {
         }
     }
 
-    pub fn is_enabled(&mut self, id: PostEffectId) -> Option<bool> {
+    pub fn is_enabled(&self, id: PostEffectId) -> Option<bool> {
         self.find(id)
             .map(|(s, i)| self.stages[s].effects[i].enabled)
     }
@@ -235,7 +247,7 @@ impl PostChain {
         input: &wgpu::TextureView,
         size: [u32; 2],
     ) -> Option<StageOutput> {
-        let st = &mut self.stages[stage as usize];
+        let st = &mut self.stages[stage.index()];
         if !st.active() {
             return None;
         }
@@ -279,7 +291,7 @@ impl PostChain {
 
     /// The texture a stage's result is in.
     pub fn output(&self, stage: PostStage, out: StageOutput) -> Option<&RenderTexture> {
-        let targets = self.stages[stage as usize].targets.as_ref()?;
+        let targets = self.stages[stage.index()].targets.as_ref()?;
         match out {
             StageOutput::Ping(i) => targets.ping.get(i),
         }
@@ -329,6 +341,8 @@ struct Params {
     buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     bytes: Vec<u8>,
+    /// The Rust type the block was created from; `set_params` must pass the same.
+    type_id: TypeId,
     dirty: bool,
 }
 
@@ -348,7 +362,7 @@ impl ShaderEffect {
             gfx.surface_format(),
             label,
             wgsl,
-            Some(bytemuck::bytes_of(params)),
+            Some((bytemuck::bytes_of(params), TypeId::of::<T>())),
         )
     }
 
@@ -357,7 +371,7 @@ impl ShaderEffect {
         format: wgpu::TextureFormat,
         label: &str,
         wgsl: &str,
-        params: Option<&[u8]>,
+        params: Option<(&[u8], TypeId)>,
     ) -> Self {
         let source = format!("{SHADER_PRELUDE}\n{wgsl}");
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -394,7 +408,7 @@ impl ShaderEffect {
             label: Some("post.bgl"),
             entries: &[tex(0), sampler(1), sampler(2), uniform(3), tex(4)],
         });
-        let params = params.map(|bytes| {
+        let params = params.map(|(bytes, type_id)| {
             let params_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("post.params.bgl"),
                 entries: &[uniform(0)],
@@ -418,6 +432,7 @@ impl ShaderEffect {
                     buffer,
                     bind_group,
                     bytes: bytes.to_vec(),
+                    type_id,
                     dirty: false,
                 },
             )
@@ -491,15 +506,18 @@ impl ShaderEffect {
     }
 
     /// Replace the parameter block; uploaded before the next run. Ignored (with a warning)
-    /// for an effect created without params or with a different size.
+    /// for an effect created without params or with params of another type.
     pub fn set_params<T: Pod>(&mut self, params: &T) {
         let bytes = bytemuck::bytes_of(params);
         match &mut self.params {
-            Some(p) if p.bytes.len() == bytes.len() => {
+            Some(p) if p.type_id == TypeId::of::<T>() => {
                 p.bytes.copy_from_slice(bytes);
                 p.dirty = true;
             }
-            _ => log::warn!("ShaderEffect::set_params: no params block of that size"),
+            _ => log::warn!(
+                "ShaderEffect::set_params: effect has no params of type {}",
+                std::any::type_name::<T>()
+            ),
         }
     }
 }
