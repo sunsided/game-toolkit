@@ -2,7 +2,7 @@
 //!
 //! Keys: `1` integer scaling, `2` fractional fit, `3` stretch, `L` toggles linear filtering,
 //! `V` toggles the virtual resolution off and on. The crosshair follows the mouse in canvas
-//! pixels; resize the window to see the border change.
+//! pixels; resize the window to see the border change. Text uses the built-in pixel font.
 
 use game_toolkit::prelude::*;
 
@@ -100,12 +100,19 @@ impl Game for App {
         let y = ground_y - 16.0 - (t * 3.0).sin().abs() * 40.0;
         p.rect([x.round(), y.round()], [16.0, 16.0], [0.9, 0.3, 0.3, 1.0]);
 
-        p.text([4.0, 4.0], &status, 10.0, Color::WHITE);
-        p.text(
-            [4.0, 16.0],
+        // Pixel text from the built-in 5x7 font stays on the canvas grid.
+        p.pixel_text([4.0, 4.0], &status, 1, Color::WHITE);
+        p.pixel_text(
+            [4.0, 14.0],
             "1/2/3 scale  L filter  V canvas",
-            10.0,
+            1,
             [1.0, 1.0, 1.0, 0.7],
+        );
+        p.pixel_text(
+            [4.0, h - 60.0],
+            "PIXEL TEXT x2",
+            2,
+            Color::rgb(1.0, 0.9, 0.4),
         );
 
         // Crosshair at the mouse, in canvas pixels.

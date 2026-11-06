@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
+use crate::bitmap_font::BitmapFont;
 use crate::camera::{Camera2D, CameraUniform};
 use crate::camera3d::{Camera, Camera3D};
 use crate::canvas::{self, Blit, Canvas, CanvasRect, RenderTexture, ScaleFilter, ScaleMode};
@@ -71,6 +72,8 @@ pub struct Graphics {
     window_scratch: Option<RenderTexture>,
     start: web_time::Instant,
     frame_count: u32,
+    /// The built-in pixel font, uploaded on first use.
+    pub(crate) builtin_font: Option<BitmapFont>,
     scale_mode: ScaleMode,
     scale_filter: ScaleFilter,
     border_color: Color,
@@ -328,6 +331,7 @@ impl Graphics {
             window_scratch: None,
             start: web_time::Instant::now(),
             frame_count: 0,
+            builtin_font: None,
             scale_mode,
             scale_filter,
             border_color,
@@ -567,6 +571,16 @@ impl Graphics {
     /// drawing the same string shapes it once.
     pub fn measure_text(&mut self, s: &str, size_px: f32) -> [f32; 2] {
         self.text.measure(s, size_px)
+    }
+
+    /// The built-in 5 × 7 pixel font (6 × 8 cells, printable ASCII), uploaded on first use.
+    /// [`Painter::pixel_text`](crate::Painter::pixel_text) draws with it; use this to
+    /// [`measure`](BitmapFont::measure) text.
+    pub fn builtin_font(&mut self) -> &BitmapFont {
+        if self.builtin_font.is_none() {
+            self.builtin_font = Some(BitmapFont::builtin(self));
+        }
+        self.builtin_font.as_ref().expect("just created")
     }
 
     /// Register an extra font face (TTF/OTF bytes) as a glyph fallback for text rendering.

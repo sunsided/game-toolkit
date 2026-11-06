@@ -85,7 +85,9 @@ For pixel art, `virtual_resolution: Some((320, 180))` makes the painter draw int
 that size, scaled onto the window by `scale_mode` (`ScaleMode::Integer` by default: whole
 multiples, the rest of the window is `border_color`; or `Fit` / `Stretch`). `ctx.gfx.size()`
 and `ctx.input.mouse_pos()` are then in canvas pixels; `ctx.gfx.window_size()` and
-`ctx.input.mouse_pos_window()` keep the window's. Full-screen post effects run after the scene:
+`ctx.input.mouse_pos_window()` keep the window's. Pixel fonts keep text on that grid: `p.pixel_text(pos, s, scale, color)` uses the built-in
+5 × 7 font, `p.bitmap_text(&font, ..)` a `BitmapFont` loaded from a glyph sheet
+(`ctx.load_bitmap_font`) or a BMFont `.fnt` (`ctx.load_bmfont`). Full-screen post effects run after the scene:
 `ctx.gfx.add_post_effect(PostStage::Window, effect)` takes a `ShaderEffect` (one WGSL fragment
 shader) or any `PostEffect`; the `crt` feature adds `CrtEffect` with presets.
 `AppConfig::random_seed` seeds the deterministic
@@ -185,7 +187,7 @@ Run any example with `cargo run -p <package>`.
 | `14_framebuffer` | `ex_14_framebuffer` | A CPU-rendered plasma uploaded every frame with `update_texture_rgba`. |
 | `15_touch` | `ex_15_touch` | Every finger as a ring, taps vs. swipes, counters, touch-as-mouse toggle. Best on a phone: `task web:lan WEB_DIR=examples/15_touch`. |
 | `16_compute` | `ex_16_compute` | Game of Life offloaded to the GPU (`compute` feature): `update` submits generations through a `ComputeSubmitter`, a ping-pong kernel paints a storage texture, the live-cell count comes back via a non-blocking read-back ring. |
-| `17_virtual_resolution` | `ex_17_virtual_resolution` | A 320 × 180 scene scaled onto the window: integer, fit and stretch modes, nearest vs. linear, mouse in canvas pixels. |
+| `17_virtual_resolution` | `ex_17_virtual_resolution` | A 320 × 180 scene scaled onto the window: integer, fit and stretch modes, nearest vs. linear, mouse in canvas pixels, built-in pixel font. |
 | `18_post` | `ex_18_post` | Post-processing: the `crt` feature's CRT filter (presets, afterglow, curvature) and a custom WGSL posterize effect on the canvas. |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
 

@@ -33,10 +33,11 @@ pub mod prelude {
     };
     pub use game_toolkit_core::{AppConfig, Context, Game, GameEvent, Rng, Time, asset_root, run};
     pub use game_toolkit_gfx::{
-        Align, BlendMode, Camera, Camera2D, Camera3D, CircleInstance, Color,
-        DeviceRequirementsError, Frame, Graphics, Layer, Mat4, MeshId, MeshInstance, MeshVertex,
-        Painter, PostEffect, PostEffectId, PostPass, PostStage, ScaleFilter, ScaleMode,
-        ShaderEffect, SpriteInstance, TextureId, TextureWrap, Tilemap, transform, wgpu,
+        Align, BitmapFont, BlendMode, Camera, Camera2D, Camera3D, CircleInstance, Color,
+        DeviceRequirementsError, Frame, Glyph, Graphics, GridLayout, Layer, Mat4, MeshId,
+        MeshInstance, MeshVertex, Painter, PostEffect, PostEffectId, PostPass, PostStage,
+        ScaleFilter, ScaleMode, ShaderEffect, SpriteInstance, TextureId, TextureWrap, Tilemap,
+        transform, wgpu,
     };
     pub use game_toolkit_input::{
         Axis, Button, Gamepad, GamepadId, Input, Key, MouseButton, PointerMapping, Touch,

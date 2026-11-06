@@ -1,3 +1,4 @@
+use crate::bitmap_font::BitmapFont;
 use crate::color::{Color, Layer};
 use crate::draw::{RectDraw, SpriteDraw, TextDraw};
 use crate::frame::Frame;
@@ -484,6 +485,83 @@ impl<'a> Painter<'a> {
         self.gfx
             .text
             .queue(s, pos, size_px, color.into().to_array(), None);
+    }
+
+    /// Draw `s` with a pixel font at a whole-number `scale` (`1` = the font's native size),
+    /// top-left at `pos` rounded to whole pixels, tinted by `color` (layer 0). `\n` starts a
+    /// new line. Glyphs are sprites, so the text sorts with sprites by layer; see
+    /// [`BitmapFont::measure`] for its size.
+    pub fn bitmap_text(
+        &mut self,
+        font: &BitmapFont,
+        pos: [f32; 2],
+        s: &str,
+        scale: u32,
+        color: impl Into<Color>,
+    ) {
+        self.bitmap_text_ex(font, pos, s, scale, color, 0);
+    }
+
+    /// [`Painter::bitmap_text`] on an explicit layer.
+    pub fn bitmap_text_ex(
+        &mut self,
+        font: &BitmapFont,
+        pos: [f32; 2],
+        s: &str,
+        scale: u32,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
+    ) {
+        let color = color.into();
+        let layer = layer.into().0;
+        let scale = scale.max(1) as f32;
+        let origin = [pos[0].round(), pos[1].round()];
+        let tex = font.texture();
+        let tex_size = font.texture_size();
+        let line_h = font.line_height() as f32 * scale;
+        let sprites = &mut self.gfx.sprites;
+        for (row, line) in crate::bitmap_font::text_lines(s).enumerate() {
+            let y = origin[1] + row as f32 * line_h;
+            font.layout_line(line, |g, x| {
+                if g.src_size[0] == 0 || g.src_size[1] == 0 {
+                    return;
+                }
+                let p = [
+                    origin[0] + (x + g.offset[0]) as f32 * scale,
+                    y + g.offset[1] as f32 * scale,
+                ];
+                let size = [g.src_size[0] as f32 * scale, g.src_size[1] as f32 * scale];
+                let src_pos = [g.src_pos[0] as f32, g.src_pos[1] as f32];
+                let src_size = [g.src_size[0] as f32, g.src_size[1] as f32];
+                let inst = SpriteInstance::at(p, size)
+                    .with_region(src_pos, src_size, tex_size)
+                    .with_color(color);
+                sprites.draw(tex, layer, BlendMode::Alpha, inst);
+            });
+        }
+    }
+
+    /// [`Painter::bitmap_text`] with the built-in 5 × 7 pixel font
+    /// ([`Graphics::builtin_font`]): crisp HUD text for a virtual-resolution canvas without
+    /// loading anything. `scale` 1 draws 8-pixel lines.
+    pub fn pixel_text(&mut self, pos: [f32; 2], s: &str, scale: u32, color: impl Into<Color>) {
+        self.pixel_text_ex(pos, s, scale, color, 0);
+    }
+
+    /// [`Painter::pixel_text`] on an explicit layer.
+    pub fn pixel_text_ex(
+        &mut self,
+        pos: [f32; 2],
+        s: &str,
+        scale: u32,
+        color: impl Into<Color>,
+        layer: impl Into<Layer>,
+    ) {
+        self.gfx.builtin_font();
+        if let Some(font) = self.gfx.builtin_font.take() {
+            self.bitmap_text_ex(&font, pos, s, scale, color, layer);
+            self.gfx.builtin_font = Some(font);
+        }
     }
 
     /// [`Painter::text`] on an explicit layer, sorted with the other 2D content: it covers
