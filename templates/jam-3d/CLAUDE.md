@@ -294,7 +294,7 @@ All optional features and what they add to the prelude:
 | `ecs` | `ChannelQueue`, `Vec2` (sillyecs glue) | archetype ECS |
 | `synth` | `Synth`, `SynthHandle`, `synth` (`Song`, `Tempo`, `Preset`, ...), `synthie` | chiptune music (`audio.play_synth`) and effects |
 | `vector` | `vello` | high-quality 2D vector graphics (WebGPU only: skipped on WebGL2) |
-| `compute` | `Kernel`, `Binding`, `PingPong`, `PingPongBindGroups`, `ReadbackRing`, `StorageTexture` | GPU simulations: WGSL compute kernels recorded into `frame.encoder_mut()`, read/write buffer pairs, non-blocking read-back a few frames late (WebGPU only: check `ctx.gfx.supports_compute()`) |
+| `compute` | `Kernel`, `Binding`, `PingPong`, `PingPongBindGroups`, `ReadbackRing`, `StorageTexture`, `ComputeSubmitter` | GPU simulations offloaded from `update` (`ComputeSubmitter::try_submit`, throttled by in-flight work) or recorded into `frame.encoder_mut()`; read/write buffer pairs drawable as vertex buffers, non-blocking read-back a few frames late (WebGPU only: check `ctx.gfx.supports_compute()`) |
 
 Enable in `Cargo.toml`: `game-toolkit = { ..., features = ["ui", "aseprite"] }`.
 

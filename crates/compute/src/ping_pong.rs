@@ -9,8 +9,11 @@ use crate::Kernel;
 /// write the next: a step reads the [front](Self::front) and writes the [back](Self::back),
 /// then [`swap`](Self::swap) makes the result the new front.
 ///
-/// Both buffers have `STORAGE | COPY_SRC | COPY_DST` usage, so they can be bound, read back
-/// with a [`ReadbackRing`](crate::ReadbackRing) and written from the CPU.
+/// Both buffers have `STORAGE | VERTEX | COPY_SRC | COPY_DST` usage: kernels bind them, the
+/// game's own render passes can draw straight from the [front](Self::front) as a
+/// vertex/instance buffer (or bind it as `var<storage, read>`, where the adapter allows
+/// storage buffers in vertex shaders), a [`ReadbackRing`](crate::ReadbackRing) reads them
+/// back, and the CPU writes them. Simulation state never has to leave the GPU to be drawn.
 #[derive(Debug)]
 pub struct PingPong<T: Pod> {
     buffers: [wgpu::Buffer; 2],
@@ -31,6 +34,7 @@ impl<T: Pod> PingPong<T> {
             "PingPong `{label}` needs at least one element"
         );
         let usage = wgpu::BufferUsages::STORAGE
+            | wgpu::BufferUsages::VERTEX
             | wgpu::BufferUsages::COPY_SRC
             | wgpu::BufferUsages::COPY_DST;
         let make = |suffix: &str| {

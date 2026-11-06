@@ -15,8 +15,9 @@ mod aseprite_ext;
 pub mod guide;
 
 /// GPU compute helpers (feature `compute`): [`Kernel`](compute::Kernel),
-/// [`PingPong`](compute::PingPong), [`ReadbackRing`](compute::ReadbackRing) and
-/// [`StorageTexture`](compute::StorageTexture). The main types are also in the prelude.
+/// [`PingPong`](compute::PingPong), [`ReadbackRing`](compute::ReadbackRing),
+/// [`StorageTexture`](compute::StorageTexture) and
+/// [`ComputeSubmitter`](compute::ComputeSubmitter). The main types are also in the prelude.
 #[cfg(feature = "compute")]
 pub use game_toolkit_compute as compute;
 
@@ -61,6 +62,7 @@ pub mod prelude {
 
     #[cfg(feature = "compute")]
     pub use game_toolkit_compute::{
-        self, Binding, Kernel, PingPong, PingPongBindGroups, ReadbackRing, StorageTexture,
+        self, Binding, ComputeSubmitter, Kernel, PingPong, PingPongBindGroups, ReadbackRing,
+        StorageTexture,
     };
 }

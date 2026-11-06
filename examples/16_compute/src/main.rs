@@ -3,8 +3,11 @@
 //! - The grid lives in a `PingPong<u32>`: each generation reads one buffer and writes the
 //!   other, then `swap()`s. Its bind groups for both orderings are built once in `init`.
 //! - One `Kernel` steps the grid, paints a `StorageTexture` (drawn as an ordinary sprite) and
-//!   counts the live cells with an atomic. It is dispatched into the frame's encoder, so it
-//!   runs right before the frame is drawn.
+//!   counts the live cells with an atomic.
+//! - The simulation is offloaded: `update` submits generations through a `ComputeSubmitter`
+//!   at the simulation's own rate, separately from the frame, and skips a batch while the GPU
+//!   is still working on earlier ones. `render` only draws the texture, on the GPU as well,
+//!   without the cells ever coming back to the CPU.
 //! - A `ReadbackRing` brings the count back to the CPU. It never waits for the GPU, so the
 //!   number on screen is a frame or a few old; the "in flight" figure shows how many requests
 //!   are still on their way.
@@ -37,12 +40,16 @@ struct Sim {
 
 struct Life {
     sim: Option<Sim>,
+    /// Submits generations separately from the frame, at most two batches in flight.
+    submitter: ComputeSubmitter,
     backend: wgpu::Backend,
     paused: bool,
     generations_per_second: f32,
-    /// Generations owed, accumulated in `update` and run in `render`.
+    /// Generations owed, accumulated and submitted in `update`.
     pending: f32,
     live_count: Option<u32>,
+    /// Batches skipped because the GPU was still busy (shows the throttle working).
+    skipped: u32,
 }
 
 impl Sim {
@@ -139,12 +146,14 @@ impl Game for Life {
         };
         Ok(Self {
             sim,
+            submitter: ComputeSubmitter::new("life.step", 2),
             backend,
             paused: false,
             generations_per_second: 20.0,
             // One generation right away, so the texture is filled even when paused.
             pending: 1.0,
             live_count: None,
+            skipped: 0,
         })
     }
 
@@ -185,7 +194,29 @@ impl Game for Life {
             );
         }
 
-        // Results of earlier frames' requests; keep the newest.
+        // Offload: submit the generations owed in their own submission, independent of the
+        // frame. At most a few per batch so a hitch doesn't snowball; while the GPU still has
+        // two batches in flight, skip and try again next update.
+        let steps = (self.pending.floor() as u32).min(4);
+        if steps > 0 {
+            let submitted =
+                self.submitter
+                    .try_submit(ctx.gfx.device(), ctx.gfx.queue(), |encoder| {
+                        for _ in 0..steps {
+                            sim.step(encoder);
+                        }
+                        // Skipped (returns false) while every slot is still in flight.
+                        sim.readback.request(encoder, &sim.live, 0..1);
+                    });
+            if submitted {
+                self.pending = (self.pending - steps as f32).min(1.0);
+            } else {
+                self.skipped += 1;
+                self.pending = self.pending.min(4.0);
+            }
+        }
+
+        // Results of earlier requests; keep the newest.
         while let Some(values) = sim.readback.try_take(ctx.gfx.device()) {
             self.live_count = Some(values[0]);
         }
@@ -208,20 +239,7 @@ impl Game for Life {
             return;
         };
 
-        // Run the generations owed (at most a few, so a hitch doesn't snowball), then ask for
-        // the live count of the last one.
-        let steps = (self.pending.floor() as u32).min(4);
-        self.pending = (self.pending - steps as f32).min(1.0);
-        if steps > 0
-            && let Some(encoder) = frame.encoder_mut()
-        {
-            for _ in 0..steps {
-                sim.step(encoder);
-            }
-            // Skipped (returns false) while every slot is still in flight.
-            sim.readback.request(encoder, &sim.live, 0..1);
-        }
-
+        // The simulation was submitted in `update`; drawing just samples its texture.
         let mut p = frame.painter(&mut ctx.gfx);
         p.clear([0.0, 0.0, 0.0, 1.0]);
         p.sprite(
@@ -246,9 +264,10 @@ impl Game for Life {
         p.text(
             [12.0, 12.0],
             &format!(
-                "live cells: {count}  (read back, {} in flight)   {:.0} gen/s{}",
+                "live cells: {count}  (read back, {} in flight)   {:.0} gen/s   {} skipped{}",
                 sim.readback.in_flight(),
                 self.generations_per_second,
+                self.skipped,
                 if self.paused { "  [paused]" } else { "" },
             ),
             18.0,

@@ -21,8 +21,12 @@ All notable changes to this project are documented here. The format is based on
   `PingPong<T>` holds a read/write pair of storage buffers with bind groups for both
   orderings; `ReadbackRing<T>` reads small results back through a ring of staging buffers a
   few frames later without blocking, so it works on WebGPU; `StorageTexture` is an RGBA
-  texture a kernel writes and the `Painter` draws. New example `16_compute`: Game of Life on
-  the GPU with a live-cell count read back (#92).
+  texture a kernel writes and the `Painter` draws. `ComputeSubmitter` offloads a simulation:
+  steps go in their own submissions from `update`, decoupled from the frame, and are skipped
+  while the GPU still has `max_in_flight` of them running, so a heavy simulation can't stall
+  rendering; `PingPong` buffers carry `VERTEX` usage so render passes can draw straight from
+  simulation state. New example `16_compute`: Game of Life offloaded to the GPU with a
+  live-cell count read back (#92).
 - `Graphics::register_texture` makes a game's own `wgpu::Texture` (a compute output, a render
   target) drawable as a `TextureId` (#92).
 

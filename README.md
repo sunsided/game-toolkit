@@ -336,7 +336,11 @@ wgpu plumbing GPU simulations repeat. A `Kernel` is a WGSL compute shader with i
 layout; `PingPong<T>` holds two storage buffers with bind groups prebuilt for both orderings;
 `ReadbackRing<T>` copies small results into a ring of staging buffers and returns them a few
 frames later without blocking (so it works on WebGPU); `StorageTexture` is written by a kernel
-and drawn like any texture. Everything records into the frame's encoder:
+and drawn like any texture. `ComputeSubmitter` offloads a simulation: it submits steps from
+`update` in their own submissions at the simulation's rate, separate from the frame, and skips
+a step while the GPU is still busy with earlier ones, so simulation load can't stall
+rendering. Rendering stays on the GPU too: draw the `StorageTexture`, or use a `PingPong`
+buffer directly as a vertex/instance buffer in your own pass.
 
 ```rust
 // init
@@ -346,12 +350,16 @@ let kernel = Kernel::builder("life", include_str!("life.wgsl"))
     .build(ctx.gfx.device());
 let tex = StorageTexture::new(&mut ctx.gfx, 256, 256, "life");
 let groups = cells.bind_groups(ctx.gfx.device(), &kernel, &[tex.binding()]);
+let sim = ComputeSubmitter::new("life", 2);
 
-// render
-if let Some(encoder) = frame.encoder_mut() {
+// update: offload a step, unless the GPU still has two in flight
+sim.try_submit(ctx.gfx.device(), ctx.gfx.queue(), |encoder| {
     kernel.dispatch_for(encoder, groups.current(&cells), 256, 256);
     cells.swap();
-}
+});
+
+// render: draws the latest submitted state (`frame.encoder_mut()` also works for
+// per-frame compute)
 p.sprite(tex.id(), [0.0, 0.0], [512.0, 512.0]);
 ```
 

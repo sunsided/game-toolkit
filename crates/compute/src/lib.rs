@@ -8,9 +8,21 @@
 //! - [`ReadbackRing`]: copies small results into a ring of staging buffers and hands them
 //!   back a few frames later, without ever blocking (so it works on WebGPU).
 //! - [`StorageTexture`]: an RGBA texture a kernel writes and the `Painter` draws.
+//! - [`ComputeSubmitter`]: runs simulation steps in their own submissions, from `update` at
+//!   the simulation's own rate, and skips steps while the GPU is still busy with earlier ones.
 //!
-//! Everything records into the frame's encoder, so the compute work runs right before the
-//! frame's drawing in the same submission:
+//! # Offloading a simulation while the game renders
+//!
+//! The usual setup: the simulation steps on the GPU through a [`ComputeSubmitter`] in
+//! `update` (fixed tick or as fast as the GPU keeps up), and rendering draws its state on the
+//! GPU too, from a [`StorageTexture`] sprite or straight from a [`PingPong`] buffer in a
+//! custom pass (`VERTEX` usage is set). Submissions share the device queue in order, so every
+//! frame draws the latest submitted state; nothing waits on the CPU, and the in-flight cap
+//! keeps a heavy simulation from delaying frames. Small results come back to the game logic
+//! through a [`ReadbackRing`], a few frames late. See `examples/16_compute`.
+//!
+//! For work that belongs to one frame, record into the frame's encoder instead; it then runs
+//! right before that frame's drawing in the same submission:
 //!
 //! ```no_run
 //! # use game_toolkit_compute::{Kernel, PingPong, PingPongBindGroups};
@@ -38,9 +50,11 @@
 mod kernel;
 mod ping_pong;
 mod readback;
+mod submit;
 mod texture;
 
 pub use kernel::{Binding, Kernel, KernelBuilder, workgroups};
 pub use ping_pong::{PingPong, PingPongBindGroups};
 pub use readback::ReadbackRing;
+pub use submit::ComputeSubmitter;
 pub use texture::StorageTexture;
