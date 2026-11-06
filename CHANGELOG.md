@@ -74,6 +74,16 @@ All notable changes to this project are documented here. The format is based on
 - `bayer4` / `bayer8` ordered-dithering helpers in the post-effect shader prelude, also as
   `BAYER_WGSL` for games' own shaders.
 
+- `Painter::custom(layer, |pass| ...)` records a game's own GPU work at a painter layer: it
+  runs after the clear and the layers below and before that layer's sprites, shapes and text,
+  so a shader-generated background (a map, a sky) can sit under painter content in the same
+  encoder and submission. `CustomPass::begin_render_pass` attaches the target the way the
+  painter does (load, MSAA resolve, depth); `Graphics::multisample()` and
+  `Graphics::depth_stencil()` give the matching pipeline state.
+- `INDEX_WGSL` (feature `indexed`): `index_out(i)` / `index_in(texel)`, the documented way for
+  custom passes and post effects to write and read indices on the indexed canvas. The resolve
+  pass uses the same helpers. `19_palette` now draws its dithered sky in a custom pass.
+
 ### Changed
 
 - `Graphics::size()` is the size the painter draws at: the virtual resolution when one is set,

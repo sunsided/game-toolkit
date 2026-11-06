@@ -12,6 +12,7 @@ use crate::camera3d::{Camera, Camera3D};
 use crate::canvas::{self, Blit, Canvas, CanvasRect, RenderTexture, ScaleFilter, ScaleMode};
 use crate::color::Color;
 use crate::config::{self, GraphicsConfig};
+use crate::custom::CustomPass;
 use crate::frame::Frame;
 use crate::mesh::{MeshBatcher, MeshId, MeshInstance, MeshRegistry, MeshVertex};
 use crate::post::{self, PostChain, PostEffect, PostEffectId, PostStage, StageRun};
@@ -38,6 +39,8 @@ pub struct Graphics {
     pub(crate) shapes: ShapeBatcher,
     pub(crate) text: TextSystem,
     pub(crate) textures: TextureRegistry,
+    /// Passes queued with `Painter::custom`, run at their layer.
+    pub(crate) custom: crate::custom::CustomPasses,
     pub(crate) clear_color: [f32; 4],
     texture_paths: HashMap<PathBuf, TextureId>,
     sample_count: u32,
@@ -314,6 +317,7 @@ impl Graphics {
             shapes,
             text,
             textures,
+            custom: crate::custom::CustomPasses::default(),
             clear_color: [0.0, 0.0, 0.0, 1.0],
             texture_paths: HashMap::new(),
             sample_count,
@@ -638,6 +642,19 @@ impl Graphics {
     /// non-sRGB surface. Build render pipelines that draw into a [`Frame`] with this.
     pub fn surface_format(&self) -> wgpu::TextureFormat {
         render_format(&self.surface_config)
+    }
+
+    /// Multisample state matching the painter's render target (`AppConfig::msaa_samples`),
+    /// for pipelines that draw in a [`Painter::custom`](crate::Painter::custom) pass.
+    pub fn multisample(&self) -> wgpu::MultisampleState {
+        crate::target::multisample(self.sample_count)
+    }
+
+    /// Depth-stencil state matching the painter's render target, for pipelines that draw in
+    /// a [`Painter::custom`](crate::Painter::custom) pass: `None` without a depth buffer, else
+    /// one that neither tests nor writes depth.
+    pub fn depth_stencil(&self) -> Option<wgpu::DepthStencilState> {
+        self.depth_format.map(crate::target::no_write_depth)
     }
 
     pub fn device(&self) -> &wgpu::Device {
@@ -1095,6 +1112,7 @@ impl Graphics {
         self.shapes.collect_layers(&mut layers);
         self.primitives.collect_layers(&mut layers);
         self.text.collect_layers(&mut layers);
+        self.custom.collect_layers(&mut layers);
 
         // Upload each batcher's instances exactly once before drawing: `queue.write_buffer`
         // is not part of the encoder command stream, so writing per layer pass would clobber
@@ -1146,7 +1164,24 @@ impl Graphics {
             &self.camera3d_bg,
         );
 
+        let size = frame.canvas.as_ref().map_or(
+            [self.surface_config.width, self.surface_config.height],
+            |_| frame.canvas_size,
+        );
         for &layer in &layers {
+            // Custom passes first: within a layer they draw under the painter's own content.
+            for f in self.custom.take_layer(layer) {
+                f(&mut CustomPass {
+                    device: &self.device,
+                    queue: &self.queue,
+                    encoder,
+                    targets,
+                    format: self.surface_format(),
+                    sample_count: self.sample_count,
+                    depth_format: self.depth_format,
+                    size,
+                });
+            }
             self.sprites
                 .draw_layer(layer, encoder, &targets, &self.camera_bg, &self.textures);
             self.shapes
@@ -1169,6 +1204,7 @@ impl Graphics {
         self.shapes.clear();
         self.primitives.clear();
         self.mesh_batcher.clear();
+        self.custom.clear();
         frame.flushed = true;
     }
 }
@@ -1233,7 +1269,7 @@ fn render_format(config: &wgpu::SurfaceConfiguration) -> wgpu::TextureFormat {
 }
 
 /// Decode one sRGB color component to linear, as the shaders do for painter colors.
-fn srgb_to_linear(c: f32) -> f64 {
+pub(crate) fn srgb_to_linear(c: f32) -> f64 {
     let c = f64::from(c);
     if c <= 0.04045 {
         c / 12.92

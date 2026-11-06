@@ -38,6 +38,7 @@ pub(crate) fn multisample(sample_count: u32) -> wgpu::MultisampleState {
 
 /// Borrowed render targets for a frame: the color view drawn into, an optional MSAA resolve
 /// target, and an optional depth view.
+#[derive(Clone, Copy)]
 pub(crate) struct Targets<'a> {
     /// The color attachment drawn into - the MSAA texture when multisampling, else the
     /// surface view.

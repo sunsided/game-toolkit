@@ -22,6 +22,18 @@ use crate::post::StageRun;
 /// [`Graphics::set_palette_blend`]: crate::Graphics::set_palette_blend
 pub const PALETTE_ROWS: u32 = 8;
 
+/// WGSL for passes that write or read the indexed canvas themselves, e.g. a
+/// [`Painter::custom`](crate::Painter::custom) background or a post effect sampling
+/// [`PostPass::indices`](crate::PostPass::indices):
+///
+/// - `index_out(i: u32) -> vec4<f32>`: return it from a fragment shader to store index `i`;
+/// - `index_in(texel: vec4<f32>) -> u32`: the index of a texel loaded from the canvas.
+///
+/// This is the contract for custom passes: the canvas stores the index in the red channel
+/// of an sRGB colour format, and these two hide the encoding. Draw indices with blending off
+/// (or alpha 1) so they are never mixed. Prepend it to your shader source.
+pub const INDEX_WGSL: &str = include_str!("index.wgsl");
+
 /// Most palette cycles active at once.
 pub const MAX_PALETTE_CYCLES: usize = 16;
 
@@ -268,7 +280,13 @@ impl IndexedState {
         });
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("palette_resolve.wgsl"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("palette_resolve.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                concat!(
+                    include_str!("index.wgsl"),
+                    include_str!("palette_resolve.wgsl")
+                )
+                .into(),
+            ),
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("palette.resolve.layout"),

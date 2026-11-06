@@ -2,6 +2,10 @@
 //! waterfall and a sign animate by palette cycling, `Space` crossfades day into night by
 //! blending two palette rows, and a canvas-stage effect shades the corners with ordered
 //! (Bayer) dithering anchored to the scene. `D` toggles the dithering, `Esc` quits.
+//!
+//! The sky is not drawn by the painter: a custom pass (`Painter::custom`) on the bottom
+//! layer runs a fragment shader that writes a dithered gradient of palette indices with
+//! `index_out`, and the painter's hills, waterfall, text and sprite draw on top of it.
 
 use game_toolkit::prelude::*;
 
@@ -14,6 +18,8 @@ const ROCK: u8 = 3;
 const TEXT: u8 = 4;
 const SPRITE_BODY: u8 = 5;
 const SPRITE_EYE: u8 = 6;
+/// The sky towards the top; the custom pass dithers from it down to `SKY`.
+const SKY_HIGH: u8 = 7;
 /// Eight blues for the waterfall, rotated by a palette cycle.
 const WATER: u8 = 16;
 /// Four sign colours, rotated faster the other way.
@@ -33,7 +39,59 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 ";
 
+/// The sky: a vertical gradient from `SKY_HIGH` to `SKY`, two palette indices dithered with
+/// `bayer4`. Prepended with `INDEX_WGSL` (for `index_out`) and `BAYER_WGSL`.
+const SKY_SHADER: &str = r"
+@vertex
+fn vs_main(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
+    let p = vec2<f32>(f32((i << 1u) & 2u), f32(i & 2u));
+    return vec4<f32>(p * vec2<f32>(2.0, -2.0) + vec2<f32>(-1.0, 1.0), 0.0, 1.0);
+}
+
+@fragment
+fn fs_main(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+    let t = clamp(pos.y / 70.0, 0.0, 1.0);
+    let lower = t > bayer4(vec2<i32>(pos.xy));
+    return index_out(select(SKY_HIGH, SKY, lower));
+}
+";
+
+/// A render pipeline for the sky pass, matching the painter's target.
+fn sky_pipeline(gfx: &Graphics) -> wgpu::RenderPipeline {
+    let device = gfx.device();
+    let source = format!(
+        "const SKY: u32 = {SKY}u;\nconst SKY_HIGH: u32 = {SKY_HIGH}u;\n{INDEX_WGSL}\n{BAYER_WGSL}\n{SKY_SHADER}"
+    );
+    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("sky"),
+        source: wgpu::ShaderSource::Wgsl(source.into()),
+    });
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("sky"),
+        layout: None,
+        vertex: wgpu::VertexState {
+            module: &module,
+            entry_point: Some("vs_main"),
+            compilation_options: Default::default(),
+            buffers: &[],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &module,
+            entry_point: Some("fs_main"),
+            compilation_options: Default::default(),
+            // No blending: indices must never be mixed.
+            targets: &[Some(gfx.surface_format().into())],
+        }),
+        primitive: Default::default(),
+        depth_stencil: gfx.depth_stencil(),
+        multisample: gfx.multisample(),
+        multiview_mask: None,
+        cache: None,
+    })
+}
+
 struct App {
+    sky: wgpu::RenderPipeline,
     critter: TextureId,
     dither: PostEffectId,
     night: f32,
@@ -42,10 +100,10 @@ struct App {
 
 fn palettes() -> (Palette, Palette) {
     let mut day = Palette::from_hex(&[
-        0x000000, 0x8cc8f0, 0x4a9a3a, 0x7a6a5a, 0xffffff, 0xe0703a, 0x101010,
+        0x000000, 0x8cc8f0, 0x4a9a3a, 0x7a6a5a, 0xffffff, 0xe0703a, 0x101010, 0x5a96d8,
     ]);
     let mut night = Palette::from_hex(&[
-        0x000000, 0x101838, 0x18301c, 0x2a2630, 0xd0d0ff, 0x804028, 0x101010,
+        0x000000, 0x101838, 0x18301c, 0x2a2630, 0xd0d0ff, 0x804028, 0x101010, 0x060a1c,
     ]);
     for i in 0..8u8 {
         let v = 120 + u32::from(i) * 16;
@@ -115,6 +173,7 @@ impl Game for App {
         let dither = ShaderEffect::new(&ctx.gfx, "dither_vignette", DITHER_VIGNETTE);
         let dither = ctx.gfx.add_post_effect(PostStage::Canvas, dither);
         Ok(Self {
+            sky: sky_pipeline(&ctx.gfx),
             critter,
             dither,
             night: 0.0,
@@ -145,7 +204,14 @@ impl Game for App {
         let (w, h) = (w as f32, h as f32);
         let t = ctx.time.elapsed.as_secs_f32();
         let mut p = frame.painter(&mut ctx.gfx);
-        p.clear(Color::index(SKY));
+
+        // The sky, from our own shader, under everything the painter draws.
+        let sky = self.sky.clone();
+        p.custom(Layer::BOTTOM, move |pass| {
+            let mut rp = pass.begin_render_pass("sky");
+            rp.set_pipeline(&sky);
+            rp.draw(0..3, 0..1);
+        });
 
         // Hills and a cliff.
         p.rect([0.0, h - 30.0], [w, 30.0], Color::index(HILL));

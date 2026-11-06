@@ -451,7 +451,7 @@ const BUILTIN_GLYPHS: [[u8; 7]; 95] = [
 ];
 
 /// The built-in glyphs as a 96 × 48 RGBA sheet (16 × 6 cells of 6 × 8), white on transparent.
-fn builtin_sheet() -> ([u32; 2], Vec<u8>) {
+pub(crate) fn builtin_sheet() -> ([u32; 2], Vec<u8>) {
     const COLS: u32 = 16;
     let size = [COLS * 6, 6 * 8];
     let mut rgba = vec![0u8; (size[0] * size[1] * 4) as usize];

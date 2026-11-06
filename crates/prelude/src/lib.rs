@@ -33,11 +33,11 @@ pub mod prelude {
     };
     pub use game_toolkit_core::{AppConfig, Context, Game, GameEvent, Rng, Time, asset_root, run};
     pub use game_toolkit_gfx::{
-        Align, BitmapFont, BlendMode, Camera, Camera2D, Camera3D, CircleInstance, Color,
-        DeviceRequirementsError, Frame, Glyph, Graphics, GridLayout, Layer, Mat4, MeshId,
-        MeshInstance, MeshVertex, Painter, PostEffect, PostEffectId, PostPass, PostStage,
-        ScaleFilter, ScaleMode, ShaderEffect, SpriteInstance, TextureId, TextureWrap, Tilemap,
-        transform, wgpu,
+        Align, BAYER_WGSL, BitmapFont, BlendMode, Camera, Camera2D, Camera3D, CircleInstance,
+        Color, CustomPass, DeviceRequirementsError, Frame, Glyph, Graphics, GridLayout, Layer,
+        Mat4, MeshId, MeshInstance, MeshVertex, Painter, PostEffect, PostEffectId, PostPass,
+        PostStage, ScaleFilter, ScaleMode, ShaderEffect, SpriteInstance, TextureId, TextureWrap,
+        Tilemap, transform, wgpu,
     };
     pub use game_toolkit_input::{
         Axis, Button, Gamepad, GamepadId, Input, Key, MouseButton, PointerMapping, Touch,
@@ -66,7 +66,7 @@ pub mod prelude {
     pub use game_toolkit_gfx::{CrtEffect, CrtMask, CrtSettings};
 
     #[cfg(feature = "indexed")]
-    pub use game_toolkit_gfx::{IndexedImage, Palette, PaletteCycle, PaletteCycleId};
+    pub use game_toolkit_gfx::{INDEX_WGSL, IndexedImage, Palette, PaletteCycle, PaletteCycleId};
 
     #[cfg(feature = "compute")]
     pub use game_toolkit_compute::{

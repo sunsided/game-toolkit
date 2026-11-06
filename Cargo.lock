@@ -1456,6 +1456,7 @@ dependencies = [
  "log",
  "miniscreenshot-wgpu",
  "png",
+ "pollster",
  "vello",
  "web-time",
  "wgpu",

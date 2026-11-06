@@ -26,18 +26,9 @@ fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut {
     return out;
 }
 
-// The canvas is sRGB, so loads come back decoded; encode again to get the stored byte.
-fn srgb_encode(c: f32) -> f32 {
-    if (c <= 0.0031308) {
-        return c * 12.92;
-    }
-    return 1.055 * pow(c, 1.0 / 2.4) - 0.055;
-}
-
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    let texel = textureLoad(indices, vec2<i32>(in.pos.xy), 0);
-    var i = u32(clamp(round(srgb_encode(texel.r) * 255.0), 0.0, 255.0));
+    var i = index_in(textureLoad(indices, vec2<i32>(in.pos.xy), 0));
     for (var k = 0u; k < r.cycle_count; k = k + 1u) {
         let c = r.cycles[k];
         if (i >= c.x && i < c.x + c.y) {
