@@ -167,6 +167,31 @@ impl Context {
             .load_texture_bytes(&bytes, Some(&rel.to_string_lossy()))
     }
 
+    /// Load a pixel font from a glyph sheet PNG in the asset root, laid out as `layout`
+    /// describes (e.g. `GridLayout::ascii(6, 8)`).
+    pub fn load_bitmap_font(
+        &mut self,
+        rel: impl AsRef<Path>,
+        layout: &game_toolkit_gfx::GridLayout,
+    ) -> Result<game_toolkit_gfx::BitmapFont> {
+        let bytes = self.assets.read(rel)?;
+        game_toolkit_gfx::BitmapFont::from_grid(&mut self.gfx, &bytes, layout)
+    }
+
+    /// Load an AngelCode BMFont (text `.fnt`, one page) from the asset root; its page image is
+    /// read from the file the `.fnt` names, relative to the `.fnt`. On the web, list both in
+    /// the preload manifest.
+    pub fn load_bmfont(&mut self, rel: impl AsRef<Path>) -> Result<game_toolkit_gfx::BitmapFont> {
+        let rel = rel.as_ref();
+        let fnt = String::from_utf8(self.assets.read(rel)?)
+            .map_err(|e| anyhow::anyhow!("{}: not UTF-8 ({e})", rel.display()))?;
+        let page = game_toolkit_gfx::BitmapFont::bmfont_page_file(&fnt)
+            .ok_or_else(|| anyhow::anyhow!("{}: no page file", rel.display()))?;
+        let page = rel.parent().unwrap_or(Path::new("")).join(page);
+        let png = self.assets.read(&page)?;
+        game_toolkit_gfx::BitmapFont::from_bmfont(&mut self.gfx, &fnt, &png)
+    }
+
     /// Load a sound (wav/ogg/flac/mp3) from the asset root. `Ok(None)` when audio is muted
     /// because the backend failed to initialize.
     pub fn load_sound(&mut self, rel: impl AsRef<Path>) -> Result<Option<SoundId>> {

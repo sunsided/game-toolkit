@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod bitmap_font;
 mod camera;
 mod camera3d;
 mod canvas;
@@ -35,6 +36,7 @@ pub use wgpu;
 #[cfg(feature = "vector")]
 pub use vello;
 
+pub use bitmap_font::{BitmapFont, Glyph, GridLayout};
 pub use camera::Camera2D;
 pub use camera3d::{Camera, Camera3D};
 pub use canvas::{CanvasRect, ScaleFilter, ScaleMode};

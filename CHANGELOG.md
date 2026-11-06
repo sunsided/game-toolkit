@@ -42,6 +42,14 @@ All notable changes to this project are documented here. The format is based on
   phosphor afterglow, curvature, vignette and sharp-bilinear sampling for fractional scales.
   New example `18_post`.
 
+- Bitmap pixel fonts (#91): `BitmapFont`, drawn with `Painter::bitmap_text` / `bitmap_text_ex`
+  at whole-number scales on whole pixels, through the sprite batcher so text sorts with
+  sprites by layer. Load one from a glyph sheet (`BitmapFont::from_grid` with a `GridLayout`,
+  monospaced or trimmed per glyph; `Context::load_bitmap_font`) or from an AngelCode BMFont
+  text `.fnt` with kerning (`BitmapFont::from_bmfont`, `Context::load_bmfont`).
+  `BitmapFont::measure` returns whole-pixel sizes. A built-in 5 × 7 ASCII font (6 × 8 cells,
+  drawn for the toolkit) works out of the box: `Painter::pixel_text`, `Graphics::builtin_font`.
+
 ### Changed
 
 - `Graphics::size()` is the size the painter draws at: the virtual resolution when one is set,

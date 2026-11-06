@@ -74,6 +74,23 @@ Text is drawn at canvas resolution too. For own passes into the canvas use
 `ctx.gfx.canvas_view()` after the painter has flushed; `ctx.gfx.flush_pending(frame)` (or the end
 of the frame) scales it onto the window, after which overlays like egui draw at window resolution.
 
+## Pixel fonts
+
+TrueType text (`p.text`) is anti-aliased; on a pixel-art canvas use bitmap fonts instead. They
+draw at whole-number scales on the pixel grid, as sprites (so they sort with sprites by layer):
+
+```rust
+p.pixel_text([4.0, 4.0], "SCORE 1200", 1, Color::WHITE);   // built-in 5x7 font, 8 px lines
+let size = ctx.gfx.builtin_font().measure("SCORE 1200", 1); // [w, h] in whole pixels
+let font = ctx.load_bitmap_font("font.png", &GridLayout::ascii(8, 8))?; // glyph sheet
+let fnt = ctx.load_bmfont("fonts/tiny.fnt")?;               // BMFont text .fnt + its page
+p.bitmap_text(&font, [10.0, 20.0], "Hello\nworld", 2, Color::WHITE);
+```
+
+`GridLayout { cell, chars, proportional, spacing }`: `proportional: true` trims each glyph to its
+inked columns. Draw sheets in white and colour with the tint. `bitmap_text_ex` /
+`pixel_text_ex` take a layer.
+
 ## Post-processing
 
 Full-screen effects run after the scene, in two stages: `PostStage::Canvas` (at the virtual
