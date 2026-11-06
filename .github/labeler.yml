@@ -36,6 +36,10 @@
   - changed-files:
       - any-glob-to-any-file: crates/ui/**
 
+"area: compute":
+  - changed-files:
+      - any-glob-to-any-file: crates/compute/**
+
 "area: prelude":
   - changed-files:
       - any-glob-to-any-file: crates/prelude/**

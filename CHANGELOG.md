@@ -15,6 +15,16 @@ All notable changes to this project are documented here. The format is based on
   feature. `AppConfig::device_hook` edits the device request with the adapter at hand (#87).
 - `Graphics::adapter_info()`, `Graphics::backend()` and `Graphics::supports_compute()`, e.g.
   to show a "WebGPU required" message on WebGL2 instead of failing.
+- `game-toolkit-compute`, a new crate (umbrella feature `compute`, `game_toolkit::compute`)
+  for GPU simulations: `Kernel` builds a WGSL compute pipeline with its bind-group layout and
+  dispatches it over a grid (workgroup counts rounded up) into the frame's encoder;
+  `PingPong<T>` holds a read/write pair of storage buffers with bind groups for both
+  orderings; `ReadbackRing<T>` reads small results back through a ring of staging buffers a
+  few frames later without blocking, so it works on WebGPU; `StorageTexture` is an RGBA
+  texture a kernel writes and the `Painter` draws. New example `16_compute`: Game of Life on
+  the GPU with a live-cell count read back (#92).
+- `Graphics::register_texture` makes a game's own `wgpu::Texture` (a compute output, a render
+  target) drawable as a `TextureId` (#92).
 
 ### Changed
 
