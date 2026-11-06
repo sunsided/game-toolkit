@@ -286,8 +286,19 @@ impl PostChain {
     }
 }
 
-/// The bindings, vertex shader and `VsOut` every [`ShaderEffect`] shader gets.
-pub const SHADER_PRELUDE: &str = include_str!("post_prelude.wgsl");
+/// The bindings, vertex shader and `VsOut` every [`ShaderEffect`] shader gets, plus the
+/// [`BAYER_WGSL`] dithering helpers.
+pub const SHADER_PRELUDE: &str = concat!(
+    include_str!("post_prelude.wgsl"),
+    "\n",
+    include_str!("bayer.wgsl")
+);
+
+/// WGSL ordered-dithering helpers, `bayer4(p: vec2<i32>) -> f32` and `bayer8`, returning
+/// thresholds in `0..1` for pixel `p`. Add an offset that moves with the world to `p` so the
+/// pattern doesn't crawl when the camera moves. Already part of [`SHADER_PRELUDE`]; prepend
+/// it to your own shaders' source otherwise.
+pub const BAYER_WGSL: &str = include_str!("bayer.wgsl");
 
 /// A post effect made of one WGSL fragment shader, run as a full-screen pass.
 ///
@@ -300,7 +311,8 @@ pub const SHADER_PRELUDE: &str = include_str!("post_prelude.wgsl");
 /// - `post: PostGlobals` - the uniform with `size`, `canvas_size`, `window_size`,
 ///   `canvas_origin`, `canvas_extent`, `time` and `frame` (see [`PostGlobals`]);
 /// - `struct VsOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> }` and the
-///   vertex shader.
+///   vertex shader;
+/// - `bayer4(p)` / `bayer8(p)` ordered-dithering thresholds (see [`BAYER_WGSL`]).
 ///
 /// Your source must define `@fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32>`. With
 /// [`ShaderEffect::with_params`], it must also declare its parameter block as

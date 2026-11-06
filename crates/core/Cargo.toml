@@ -9,6 +9,10 @@ description = "Game loop, the Game trait, Context and time for the game-toolkit 
 keywords = ["gamedev", "game-loop", "gamejam", "2d", "3d"]
 categories = ["game-development"]
 
+[features]
+# Indexed-colour canvas (forwards to game-toolkit-gfx).
+indexed = ["game-toolkit-gfx/indexed"]
+
 [dependencies]
 anyhow        = { workspace = true }
 log           = { workspace = true }

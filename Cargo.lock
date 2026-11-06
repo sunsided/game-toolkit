@@ -1150,6 +1150,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ex_19_palette"
+version = "0.10.0"
+dependencies = [
+ "env_logger",
+ "game-toolkit",
+]
+
+[[package]]
 name = "extended"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1428,6 +1436,7 @@ dependencies = [
  "image",
  "log",
  "miniscreenshot-wgpu",
+ "png",
  "vello",
  "web-time",
  "wgpu",

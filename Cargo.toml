@@ -30,6 +30,7 @@ members = [
     "examples/15_touch",
     "examples/17_virtual_resolution",
     "examples/18_post",
+    "examples/19_palette",
     "tools/atlas-packer",
 ]
 # cargo-generate templates contain `{{placeholders}}` and depend on the toolkit via git, so
@@ -80,6 +81,8 @@ pollster    = "1"
 wgpu        = "30"
 winit       = "0.30"
 image       = { version = "0.25", default-features = false, features = ["png"] }
+# Indexed PNGs without image's RGBA conversion; same version image uses.
+png         = "0.18"
 kira        = "0.12"
 glyphon     = "0.12"
 notify      = "8"
