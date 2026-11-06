@@ -224,6 +224,13 @@ tasks:
       - task: run
         vars: {EXAMPLE: ex_14_framebuffer}
 
+  example:compute:
+    desc: Run the GPU Game of Life example (compute feature)
+    aliases: [run:compute]
+    cmds:
+      - task: run
+        vars: {EXAMPLE: ex_16_compute}
+
   example:touch:
     desc: Run the touch-input example (needs a touchscreen; best on a phone via web:lan)
     aliases: [run:touch]
@@ -358,6 +365,7 @@ tasks:
             game-toolkit-ecs,
             game-toolkit-aseprite,
             game-toolkit-ui,
+            game-toolkit-compute,
             game-toolkit-core,
             game-toolkit,
           ]
@@ -386,6 +394,7 @@ tasks:
         area: aseprite|1d76db|game-toolkit-aseprite: .aseprite and sheet loading
         area: ecs|1d76db|game-toolkit-ecs: sillyecs glue
         area: ui|1d76db|game-toolkit-ui: egui debug overlay
+        area: compute|1d76db|game-toolkit-compute: GPU kernels, ping-pong buffers, read-back
         area: prelude|1d76db|game-toolkit umbrella crate and prelude
         area: examples|c5def5|examples/
         area: templates|c5def5|cargo-generate jam templates

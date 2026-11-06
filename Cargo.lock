@@ -1133,6 +1133,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ex_16_compute"
+version = "0.10.0"
+dependencies = [
+ "bytemuck",
+ "env_logger",
+ "game-toolkit",
+]
+
+[[package]]
 name = "ex_17_virtual_resolution"
 version = "0.10.0"
 dependencies = [
@@ -1354,6 +1363,7 @@ dependencies = [
  "game-toolkit-aseprite",
  "game-toolkit-assets",
  "game-toolkit-audio",
+ "game-toolkit-compute",
  "game-toolkit-core",
  "game-toolkit-ecs",
  "game-toolkit-gfx",
@@ -1397,6 +1407,15 @@ dependencies = [
  "kira",
  "log",
  "synthie",
+]
+
+[[package]]
+name = "game-toolkit-compute"
+version = "0.10.0"
+dependencies = [
+ "bytemuck",
+ "game-toolkit-gfx",
+ "log",
 ]
 
 [[package]]

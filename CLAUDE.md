@@ -19,11 +19,13 @@ crate; consumers depend on it and write `use game_toolkit::prelude::*;` (the pre
 | `aseprite` | `game-toolkit-aseprite` | `.aseprite` + exported-sheet loading into a GPU `SpriteSheet` |
 | `ecs` | `game-toolkit-ecs` | glue for the sillyecs archetype ECS |
 | `ui` | `game-toolkit-ui` | egui debug-overlay integration (feature-gated) |
-| `prelude` | `game-toolkit` | umbrella + prelude; features `ui`, `aseprite`, `ecs`, `synth`, `vector`, `crt`, `indexed` |
+| `compute` | `game-toolkit-compute` | GPU compute helpers: WGSL kernels, ping-pong buffers, non-blocking read-back |
+| `prelude` | `game-toolkit` | umbrella + prelude; features `ui`, `aseprite`, `ecs`, `synth`, `vector`, `crt`, `indexed`, `compute` |
 
-**Dependency direction is one-way.** `game-toolkit-aseprite` depends on `game-toolkit-gfx`, never
-the reverse, so the renderer stays unaware of asset formats. Do not pull renderer-specific types
-into `game-toolkit-core`, and do not create back-edges that the consumer would not expect.
+**Dependency direction is one-way.** `game-toolkit-aseprite` and `game-toolkit-compute` depend on
+`game-toolkit-gfx`, never the reverse, so the renderer stays unaware of asset formats and compute.
+Do not pull renderer-specific types into `game-toolkit-core`, and do not create back-edges that the
+consumer would not expect.
 
 `#![forbid(unsafe_code)]` holds across the crates - keep it that way.
 

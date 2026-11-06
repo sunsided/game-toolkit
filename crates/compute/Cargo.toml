@@ -1,0 +1,18 @@
+[package]
+name = "game-toolkit-compute"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "GPU compute helpers for game-toolkit: ping-pong storage buffers, WGSL kernels, non-blocking read-back."
+keywords = ["wgpu", "compute", "gpgpu", "gamedev", "simulation"]
+categories = ["game-development", "rendering", "simulation"]
+
+[dependencies]
+game-toolkit-gfx = { workspace = true }
+bytemuck         = { workspace = true }
+log              = { workspace = true }
+
+[lints]
+workspace = true

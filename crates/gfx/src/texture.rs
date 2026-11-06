@@ -251,6 +251,12 @@ impl TextureRegistry {
         let Some(tex) = self.map.get(&id) else {
             return false;
         };
+        // A texture registered from outside may not be writable or 4 bytes per texel.
+        if !tex.texture.usage().contains(wgpu::TextureUsages::COPY_DST)
+            || tex.texture.format().block_copy_size(None) != Some(4)
+        {
+            return false;
+        }
         let [width, height] = tex.size;
         // u64 so the expected size cannot wrap on 32-bit targets (wasm32).
         if rgba.len() as u64 != u64::from(width) * u64::from(height) * 4 {
@@ -276,6 +282,31 @@ impl TextureRegistry {
             },
         );
         true
+    }
+
+    /// Adopt a texture created elsewhere, drawn through `view`.
+    pub fn register(
+        &mut self,
+        device: &wgpu::Device,
+        texture: wgpu::Texture,
+        view: wgpu::TextureView,
+        label: Option<&str>,
+    ) -> TextureId {
+        let bind_group = self.create_bind_group(device, &view, TextureWrap::Clamp, label);
+        let id = TextureId(self.next);
+        self.next += 1;
+        self.map.insert(
+            id,
+            Texture {
+                size: [texture.width(), texture.height()],
+                bind_group,
+                texture,
+                view,
+                wrap: TextureWrap::Clamp,
+                label: label.map(str::to_owned),
+            },
+        );
+        id
     }
 
     pub fn create_from_rgba(
@@ -318,22 +349,7 @@ impl TextureRegistry {
             size,
         );
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let bind_group = self.create_bind_group(device, &view, TextureWrap::Clamp, label);
-
-        let id = TextureId(self.next);
-        self.next += 1;
-        self.map.insert(
-            id,
-            Texture {
-                size: [width, height],
-                bind_group,
-                texture,
-                view,
-                wrap: TextureWrap::Clamp,
-                label: label.map(str::to_owned),
-            },
-        );
-        id
+        self.register(device, texture, view, label)
     }
 }
 

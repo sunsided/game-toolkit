@@ -1,0 +1,19 @@
+[package]
+name = "ex_16_compute"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "16_compute"
+path = "src/main.rs"
+
+[dependencies]
+game-toolkit = { workspace = true, features = ["compute"] }
+env_logger = { workspace = true }
+bytemuck = { workspace = true }
+
+[lints]
+workspace = true
