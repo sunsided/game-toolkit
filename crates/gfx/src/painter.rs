@@ -520,7 +520,7 @@ impl<'a> Painter<'a> {
         let tex_size = font.texture_size();
         let line_h = font.line_height() as f32 * scale;
         let sprites = &mut self.gfx.sprites;
-        for (row, line) in s.split('\n').enumerate() {
+        for (row, line) in crate::bitmap_font::text_lines(s).enumerate() {
             let y = origin[1] + row as f32 * line_h;
             font.layout_line(line, |g, x| {
                 if g.src_size[0] == 0 || g.src_size[1] == 0 {

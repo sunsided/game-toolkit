@@ -187,7 +187,23 @@ impl Context {
             .map_err(|e| anyhow::anyhow!("{}: not UTF-8 ({e})", rel.display()))?;
         let page = game_toolkit_gfx::BitmapFont::bmfont_page_file(&fnt)
             .ok_or_else(|| anyhow::anyhow!("{}: no page file", rel.display()))?;
-        let page = rel.parent().unwrap_or(Path::new("")).join(page);
+        // The page must sit next to the .fnt or below it: a crafted or careless `file=` with
+        // `..` or an absolute path must not read outside the asset root.
+        let page_path = Path::new(&page);
+        if page_path.is_absolute()
+            || page_path.components().any(|c| {
+                !matches!(
+                    c,
+                    std::path::Component::Normal(_) | std::path::Component::CurDir
+                )
+            })
+        {
+            anyhow::bail!(
+                "{}: page file {page:?} must be a relative path without `..`",
+                rel.display()
+            );
+        }
+        let page = rel.parent().unwrap_or(Path::new("")).join(page_path);
         let png = self.assets.read(&page)?;
         game_toolkit_gfx::BitmapFont::from_bmfont(&mut self.gfx, &fnt, &png)
     }
