@@ -85,7 +85,7 @@ For pixel art, `virtual_resolution: Some((320, 180))` makes the painter draw int
 that size, scaled onto the window by `scale_mode` (`ScaleMode::Integer` by default: whole
 multiples, the rest of the window is `border_color`; or `Fit` / `Stretch`). `ctx.gfx.size()`
 and `ctx.input.mouse_pos()` are then in canvas pixels; `ctx.gfx.window_size()` and
-`mouse_pos_window()` keep the window's. Full-screen post effects run after the scene:
+`ctx.input.mouse_pos_window()` keep the window's. Full-screen post effects run after the scene:
 `ctx.gfx.add_post_effect(PostStage::Window, effect)` takes a `ShaderEffect` (one WGSL fragment
 shader) or any `PostEffect`; the `crt` feature adds `CrtEffect` with presets.
 `AppConfig::random_seed` seeds the deterministic

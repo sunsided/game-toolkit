@@ -139,7 +139,7 @@ impl Graphics {
             memory_hints: wgpu::MemoryHints::Performance,
             ..Default::default()
         };
-        if let Some(hook) = config.device_hook {
+        if let Some(hook) = &config.device_hook {
             hook(&adapter, &mut device_desc);
         }
         let (device, queue) = adapter
@@ -402,6 +402,8 @@ impl Graphics {
     /// `AppConfig::virtual_resolution`; changing it at runtime reallocates the canvas.
     /// See [`GraphicsConfig::virtual_resolution`].
     pub fn set_virtual_resolution(&mut self, resolution: Option<(u32, u32)>) {
+        // A zero-sized canvas would give the cameras a zero viewport; use at least 1 x 1.
+        let resolution = resolution.map(|(w, h)| (w.max(1), h.max(1)));
         if self.virtual_resolution == resolution {
             return;
         }
@@ -829,7 +831,7 @@ impl Graphics {
         if !post.active(PostStage::Window) {
             self.blit.draw(
                 encoder,
-                &scene.blit_bind_groups[self.scale_filter as usize],
+                &scene.blit_bind_groups[self.scale_filter.index()],
                 &frame.view,
                 rect,
                 border,
@@ -855,7 +857,7 @@ impl Graphics {
             let scratch = self.window_scratch.as_ref().expect("just created");
             self.blit.draw(
                 encoder,
-                &scene.blit_bind_groups[self.scale_filter as usize],
+                &scene.blit_bind_groups[self.scale_filter.index()],
                 &scratch.view,
                 rect,
                 border,
@@ -871,7 +873,7 @@ impl Graphics {
         {
             self.blit.draw(
                 encoder,
-                &result.blit_bind_groups[ScaleFilter::Nearest as usize],
+                &result.blit_bind_groups[ScaleFilter::Nearest.index()],
                 &frame.view,
                 full,
                 wgpu::Color::BLACK,
