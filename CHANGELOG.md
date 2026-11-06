@@ -108,6 +108,10 @@ All notable changes to this project are documented here. The format is based on
 - `INDEX_WGSL` (feature `indexed`): `index_out(i)` / `index_in(texel)`, the documented way for
   custom passes and post effects to write and read indices on the indexed canvas. The resolve
   pass uses the same helpers. `19_palette` now draws its dithered sky in a custom pass.
+- `Frame::target_is_indexed()` and `CustomPass::is_indexed()` say whether the painter's
+  target holds palette indices, so a game's own RGBA pass into `Frame::target_view()` /
+  `Graphics::canvas_view()` can tell it would write meaningless indices; those views now
+  document it.
 
 ### Changed
 

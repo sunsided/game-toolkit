@@ -66,7 +66,7 @@ pub struct PostPass<'a> {
     /// palette lookup and cycling, at the canvas size (also in the
     /// [`Window`](PostStage::Window) stage, where `input` is window-sized; map positions with
     /// [`PostGlobals::canvas_origin`] and `canvas_extent`). Read them with `index_in` from
-    /// [`INDEX_WGSL`](crate::INDEX_WGSL), e.g. to make only some palette entries glow. `None`
+    /// `INDEX_WGSL` (feature `indexed`), e.g. to make only some palette entries glow. `None`
     /// without indexed colour.
     pub indices: Option<&'a wgpu::TextureView>,
     pub format: wgpu::TextureFormat,

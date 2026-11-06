@@ -637,9 +637,16 @@ impl Graphics {
     }
 
     /// The offscreen texture the painter draws into, when there is one (a virtual resolution
-    /// is set or post effects are registered), for games that record their own passes into it (in [`Self::surface_format`], at
-    /// [`Self::size`]). Draw after the painter has flushed (it clears the canvas) and before
-    /// [`Self::flush_pending`] or the end of the frame, which scale it onto the window.
+    /// is set, post effects are registered or indexed colour is on), for games that record
+    /// their own passes into it (in [`Self::surface_format`], at [`Self::size`]). Draw after
+    /// the painter has flushed (it clears the canvas) and before [`Self::flush_pending`] or
+    /// the end of the frame, which scale it onto the window. To draw under painter content,
+    /// use [`Painter::custom`](crate::Painter::custom) instead.
+    ///
+    /// With indexed colour on ([`Self::is_indexed`]) it holds palette indices, not colours:
+    /// write them with `index_out` from `INDEX_WGSL` (feature `indexed`). An RGBA pass would
+    /// write meaningless indices; run colour effects as a [`PostEffect`] instead, which sees
+    /// the resolved colours.
     pub fn canvas_view(&self) -> Option<&wgpu::TextureView> {
         self.canvas.as_ref().map(|c| &c.tex.view)
     }
@@ -924,6 +931,7 @@ impl Graphics {
             clear_color: self.clear_color,
             flushed: false,
             composited: false,
+            indexed: self.is_indexed(),
         })
     }
 
@@ -1220,6 +1228,7 @@ impl Graphics {
                     sample_count: self.sample_count,
                     depth_format: self.depth_format,
                     size,
+                    indexed: frame.indexed,
                 });
             }
             self.sprites

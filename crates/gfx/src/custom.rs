@@ -40,6 +40,9 @@ impl CustomPasses {
 /// the painter's render target at that point in the frame (the canvas, the window, or the
 /// MSAA texture resolving into either).
 ///
+/// With indexed colour on ([`Self::is_indexed`]) the target holds palette indices: return
+/// `index_out(i)` from `INDEX_WGSL` (feature `indexed`) instead of a colour.
+///
 /// The easiest way to draw is [`Self::begin_render_pass`], which attaches the target the same
 /// way the painter does (load, store, MSAA resolve, depth). Build the pipeline for it with
 /// [`Self::format`], [`Self::multisample`] and [`Self::depth_stencil`], so it matches the
@@ -53,6 +56,7 @@ pub struct CustomPass<'a> {
     pub(crate) sample_count: u32,
     pub(crate) depth_format: Option<wgpu::TextureFormat>,
     pub(crate) size: [u32; 2],
+    pub(crate) indexed: bool,
 }
 
 impl<'a> CustomPass<'a> {
@@ -99,6 +103,11 @@ impl<'a> CustomPass<'a> {
     /// buffer, else one that neither tests nor writes depth (like the painter's 2D layers).
     pub fn depth_stencil(&self) -> Option<wgpu::DepthStencilState> {
         self.depth_format.map(target::no_write_depth)
+    }
+
+    /// Whether the target holds palette indices (indexed colour is on) rather than colours.
+    pub fn is_indexed(&self) -> bool {
+        self.indexed
     }
 
     /// Size of the target in pixels: the virtual resolution, else the window's size.
