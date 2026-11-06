@@ -7,11 +7,14 @@ mod camera3d;
 mod canvas;
 mod color;
 mod config;
+#[cfg(feature = "crt")]
+mod crt;
 mod draw;
 mod frame;
 mod graphics;
 mod mesh;
 mod painter;
+mod post;
 mod primitives;
 mod shapes;
 mod sprite;
@@ -37,11 +40,16 @@ pub use camera3d::{Camera, Camera3D};
 pub use canvas::{CanvasRect, ScaleFilter, ScaleMode};
 pub use color::{Color, Layer};
 pub use config::{DeviceHook, DeviceRequirementsError, GraphicsConfig, MissingLimit};
+#[cfg(feature = "crt")]
+pub use crt::{CrtEffect, CrtMask, CrtSettings};
 pub use draw::{RectDraw, SpriteDraw, TextDraw};
 pub use frame::Frame;
 pub use graphics::Graphics;
 pub use mesh::{MeshId, MeshInstance, MeshVertex};
 pub use painter::Painter;
+pub use post::{
+    PostEffect, PostEffectId, PostGlobals, PostPass, PostStage, SHADER_PRELUDE, ShaderEffect,
+};
 pub use primitives::CircleInstance;
 pub use sprite::{BlendMode, SpriteInstance};
 pub use text::Align;

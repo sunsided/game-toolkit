@@ -30,6 +30,18 @@ All notable changes to this project are documented here. The format is based on
   `Input::mouse_pos_window()` keeps the raw window position.
 - `Graphics::window_size()`: the window's size, whatever the drawing size is.
 
+- Post-processing (#89): `Graphics::add_post_effect(stage, effect)` runs full-screen effects
+  after the scene, in `PostStage::Canvas` (at the virtual resolution, before the upscale) or
+  `PostStage::Window` (after it), ping-ponging between textures, with an optional history
+  texture holding the stage's previous output. `ShaderEffect` wraps one WGSL fragment shader
+  (the toolkit prepends `SHADER_PRELUDE` with the bindings and a `post` uniform of frame
+  values), with an optional parameter block; implement `PostEffect` for anything else. Effects
+  can be removed, switched off and on, and reached by type with `post_effect_mut`.
+- Feature `crt`: `CrtEffect` with `CrtSettings` presets (`subtle`, `arcade`, `consumer_tv`,
+  `pc_monitor`): scanlines locked to canvas rows, aperture grille or shadow mask, bloom,
+  phosphor afterglow, curvature, vignette and sharp-bilinear sampling for fractional scales.
+  New example `18_post`.
+
 ### Changed
 
 - `Graphics::size()` is the size the painter draws at: the virtual resolution when one is set,
