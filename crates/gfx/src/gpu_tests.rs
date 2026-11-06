@@ -384,6 +384,7 @@ fn crt_index_mask_blooms_only_emissive_indices() {
             ..CrtSettings::arcade()
         },
     );
+    let textures = TextureRegistry::new(&device, &queue);
     let mut encoder = device.create_command_encoder(&Default::default());
     let rect = CanvasRect {
         origin: [0.0, 0.0],
@@ -403,9 +404,77 @@ fn crt_index_mask_blooms_only_emissive_indices() {
         stage: PostStage::Window,
         size,
         globals,
+        textures: &textures,
     });
     let pixels = read_back(&device, &queue, encoder, &out, size);
     let beside = |p: [u32; 2]| pixels[at([p[0] + 1, p[1]])];
     assert!(beside(lava_px) > 20, "lava glows: {}", beside(lava_px));
     assert_eq!(beside(snow_px), 0, "snow doesn't glow");
+}
+
+/// A `ShaderEffect` with a source texture reads it as `source_tex`, sees `post.source == 1u`,
+/// and follows `write_rgba` updates to that texture; without one, `source_tex` is the input.
+#[test]
+fn shader_effect_reads_its_source_texture() {
+    use crate::canvas::CanvasRect;
+    use crate::post::{PostEffect, PostPass, PostStage, ShaderEffect};
+
+    let Some((device, queue)) = device() else {
+        return;
+    };
+    let size = [4u32, 4];
+    // The scene: opaque blue. The game's source: a 2 x 2 texture, first red then green.
+    let blue: Vec<u8> = [0u8, 0, 255, 255].repeat((size[0] * size[1]) as usize);
+    let input = texture_with(&device, &queue, size, &blue);
+    let mut textures = TextureRegistry::new(&device, &queue);
+    let red = [255u8, 0, 0, 255].repeat(4);
+    let source = textures.create_from_rgba(&device, &queue, 2, 2, &red, Some("source"));
+    let mut effect = ShaderEffect::build(
+        &device,
+        FORMAT,
+        "source",
+        "@fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+            if (post.source == 1u) {
+                return textureSample(source_tex, nearest_sampler, in.uv);
+            }
+            return textureSample(input_tex, nearest_sampler, in.uv);
+        }",
+        None,
+    )
+    .with_source(source);
+
+    let run = |effect: &mut ShaderEffect, textures: &TextureRegistry| {
+        let (out, out_view) = target(&device, size);
+        let mut encoder = device.create_command_encoder(&Default::default());
+        let rect = CanvasRect {
+            origin: [0.0, 0.0],
+            size: [size[0] as f32, size[1] as f32],
+        };
+        let mut globals = crate::post::globals(size, size, rect, 0.0, 0);
+        globals.size = [size[0] as f32, size[1] as f32];
+        effect.apply(&mut PostPass {
+            device: &device,
+            queue: &queue,
+            encoder: &mut encoder,
+            input: &input,
+            output: &out_view,
+            history: None,
+            indices: None,
+            format: FORMAT,
+            stage: PostStage::Canvas,
+            size,
+            globals,
+            textures,
+        });
+        let pixels = read_back(&device, &queue, encoder, &out, size);
+        [pixels[0], pixels[1], pixels[2]]
+    };
+
+    assert_eq!(run(&mut effect, &textures), [255, 0, 0]);
+    // Updated in place, the way a game uploads a new frame each frame.
+    let green = [0u8, 255, 0, 255].repeat(4);
+    assert!(textures.write_rgba(&queue, source, &green));
+    assert_eq!(run(&mut effect, &textures), [0, 255, 0]);
+    effect.set_source(None);
+    assert_eq!(run(&mut effect, &textures), [0, 0, 255]);
 }

@@ -80,6 +80,12 @@ All notable changes to this project are documented here. The format is based on
   `BloomSource::IndexMask` (`BloomSource::indices(48..56)`), where only the listed palette
   indices glow, so a lava ramp blooms and equally bright snow doesn't. It falls back to
   luminance without an indexed canvas.
+- Post effects can read a texture of the game's own besides the scene (#100):
+  `ShaderEffect::with_source(texture_id)` / `set_source` bind it as `source_tex` (with
+  `post.source` set), and `PostPass::texture(id)` / `texture_size(id)` look up any painter
+  texture for hand-written `PostEffect`s. It is resolved on every run, so a frame uploaded each
+  frame with `update_texture_rgba` (an emulated screen, a video frame) or a hot-reloaded file
+  is picked up, and the effect runs in either stage, ordered with the others.
 
 - Bitmap pixel fonts (#91): `BitmapFont`, drawn with `Painter::bitmap_text` / `bitmap_text_ex`
   at whole-number scales on whole pixels, through the sprite batcher so text sorts with
