@@ -76,7 +76,7 @@ impl Ui {
 
         let pixels_per_point = self.ctx.pixels_per_point();
         let clipped = self.ctx.tessellate(full_output.shapes, pixels_per_point);
-        let (w, h) = gfx.size();
+        let (w, h) = gfx.window_size();
         let screen = ScreenDescriptor {
             size_in_pixels: [w, h],
             pixels_per_point,

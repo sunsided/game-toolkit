@@ -81,7 +81,11 @@ and is there to support depth-tested rendering. Games that record their own comp
 passes through `ctx.gfx.device()` can ask for more than the toolkit's downlevel defaults with
 `required_limits` and `required_features` (merged with the toolkit's; init fails with a
 `DeviceRequirementsError` naming what the adapter lacks), or edit the request in `device_hook`.
-`AppConfig::random_seed` seeds the deterministic
+For pixel art, `virtual_resolution: Some((320, 180))` makes the painter draw into a canvas of
+that size, scaled onto the window by `scale_mode` (`ScaleMode::Integer` by default: whole
+multiples, the rest of the window is `border_color`; or `Fit` / `Stretch`). `ctx.gfx.size()`
+and `ctx.input.mouse_pos()` are then in canvas pixels; `ctx.gfx.window_size()` and
+`mouse_pos_window()` keep the window's. `AppConfig::random_seed` seeds the deterministic
 per-`Context` RNG (`ctx.rng`); a fixed seed reproduces a run.
 
 ## Drawing
@@ -176,6 +180,7 @@ Run any example with `cargo run -p <package>`.
 | `13_web` | `ex_13_web` | Same code natively and in the browser: sprite, text, sound on click, synth music, gamepad. `task web`. |
 | `14_framebuffer` | `ex_14_framebuffer` | A CPU-rendered plasma uploaded every frame with `update_texture_rgba`. |
 | `15_touch` | `ex_15_touch` | Every finger as a ring, taps vs. swipes, counters, touch-as-mouse toggle. Best on a phone: `task web:lan WEB_DIR=examples/15_touch`. |
+| `17_virtual_resolution` | `ex_17_virtual_resolution` | A 320 × 180 scene scaled onto the window: integer, fit and stretch modes, nearest vs. linear, mouse in canvas pixels. |
 | `bouncing_ball` | `bouncing_ball` | A faux-3D tumbling beachball shaded through the sprite batcher. |
 
 ## Audio

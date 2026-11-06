@@ -8,6 +8,8 @@ use winit::window::Window;
 
 use crate::camera::{Camera2D, CameraUniform};
 use crate::camera3d::{Camera, Camera3D};
+use crate::canvas::{self, Canvas, CanvasRect, ScaleFilter, ScaleMode};
+use crate::color::Color;
 use crate::config::{self, GraphicsConfig};
 use crate::frame::Frame;
 use crate::mesh::{MeshBatcher, MeshId, MeshInstance, MeshRegistry, MeshVertex};
@@ -58,6 +60,11 @@ pub struct Graphics {
     pending_screenshot: Option<PathBuf>,
     adapter_info: wgpu::AdapterInfo,
     supports_compute: bool,
+    /// The virtual-resolution canvas the painter draws into, when one is set.
+    canvas: Option<Canvas>,
+    scale_mode: ScaleMode,
+    scale_filter: ScaleFilter,
+    border_color: Color,
 }
 
 impl Graphics {
@@ -69,6 +76,10 @@ impl Graphics {
             vsync,
             depth_format,
             msaa_samples,
+            virtual_resolution,
+            scale_mode,
+            scale_filter,
+            border_color,
             ..
         } = *config;
         let size = window.inner_size();
@@ -172,6 +183,11 @@ impl Graphics {
         };
         surface.configure(&device, &surface_config);
 
+        // With a virtual resolution everything the painter draws goes into the canvas, so the
+        // cameras, text, attachments and vector target are all sized to it.
+        let canvas = virtual_resolution.map(|(w, h)| Canvas::new(&device, format, [w, h]));
+        let [width, height] = canvas.as_ref().map_or([width, height], |c| c.size);
+
         let camera = Camera2D::new(width as f32, height as f32);
         let camera_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("camera.buf"),
@@ -249,7 +265,7 @@ impl Graphics {
             depth_format,
         );
         let (msaa_view, depth_view) =
-            make_attachments(&device, &surface_config, sample_count, depth_format);
+            make_attachments(&device, [width, height], format, sample_count, depth_format);
         let meshes = MeshRegistry::new();
         let mesh_batcher =
             MeshBatcher::new(&device, format, &camera_bgl, sample_count, depth_format);
@@ -292,6 +308,10 @@ impl Graphics {
             pending_screenshot: None,
             adapter_info: info,
             supports_compute,
+            canvas,
+            scale_mode,
+            scale_filter,
+            border_color,
         })
     }
 
@@ -302,9 +322,18 @@ impl Graphics {
         self.surface_config.width = width;
         self.surface_config.height = height;
         self.surface.configure(&self.device, &self.surface_config);
+        // With a canvas, the drawing size stays put; only where it lands in the window moves.
+        if self.canvas.is_none() {
+            self.resize_render_targets(width, height);
+        }
+    }
+
+    /// Resize everything that draws at the render size (the canvas, else the window).
+    fn resize_render_targets(&mut self, width: u32, height: u32) {
         let (msaa_view, depth_view) = make_attachments(
             &self.device,
-            &self.surface_config,
+            [width, height],
+            self.surface_format(),
             self.sample_count,
             self.depth_format,
         );
@@ -319,11 +348,89 @@ impl Graphics {
         }
     }
 
+    /// Draw into a fixed-size canvas of `(width, height)` pixels that is scaled onto the
+    /// window, or (`None`) straight into the window again. Usually set once through
+    /// `AppConfig::virtual_resolution`; changing it at runtime reallocates the canvas.
+    /// See [`GraphicsConfig::virtual_resolution`].
+    pub fn set_virtual_resolution(&mut self, resolution: Option<(u32, u32)>) {
+        let current = self.canvas.as_ref().map(|c| (c.size[0], c.size[1]));
+        if current == resolution {
+            return;
+        }
+        self.canvas =
+            resolution.map(|(w, h)| Canvas::new(&self.device, self.surface_format(), [w, h]));
+        let (w, h) = self.size();
+        self.resize_render_targets(w, h);
+    }
+
+    /// The virtual resolution set by [`Self::set_virtual_resolution`], if any.
+    pub fn virtual_resolution(&self) -> Option<(u32, u32)> {
+        self.canvas.as_ref().map(|c| (c.size[0], c.size[1]))
+    }
+
+    /// How the canvas is scaled onto the window. Takes effect on the next frame.
+    pub fn set_scale_mode(&mut self, mode: ScaleMode) {
+        self.scale_mode = mode;
+    }
+
+    pub fn scale_mode(&self) -> ScaleMode {
+        self.scale_mode
+    }
+
+    /// Nearest (crisp, default) or linear filtering when scaling the canvas.
+    pub fn set_scale_filter(&mut self, filter: ScaleFilter) {
+        self.scale_filter = filter;
+    }
+
+    pub fn scale_filter(&self) -> ScaleFilter {
+        self.scale_filter
+    }
+
+    /// Colour of the window area around the canvas (letterbox / pillarbox bars).
+    pub fn set_border_color(&mut self, color: impl Into<Color>) {
+        self.border_color = color.into();
+    }
+
+    pub fn border_color(&self) -> Color {
+        self.border_color
+    }
+
+    /// Where the canvas lands in the window, in physical pixels, or `None` without a virtual
+    /// resolution. Use [`CanvasRect::window_to_canvas`] to map window positions; the toolkit's
+    /// `Input` already reports the mouse and touches in canvas pixels.
+    pub fn canvas_rect(&self) -> Option<CanvasRect> {
+        let canvas = self.canvas.as_ref()?;
+        Some(canvas::layout(
+            [self.surface_config.width, self.surface_config.height],
+            canvas.size,
+            self.scale_mode,
+        ))
+    }
+
+    /// The canvas texture the painter draws into, when a virtual resolution is set, for games
+    /// that record their own passes into it (in [`Self::surface_format`], at
+    /// [`Self::size`]). Draw after the painter has flushed (it clears the canvas) and before
+    /// [`Self::flush_pending`] or the end of the frame, which scale it onto the window.
+    pub fn canvas_view(&self) -> Option<&wgpu::TextureView> {
+        self.canvas.as_ref().map(|c| &c.view)
+    }
+
     pub fn window(&self) -> &Arc<Window> {
         &self.window
     }
 
+    /// The size the painter draws at, in pixels: the virtual resolution when one is set,
+    /// else the window's size. Lay out the game with this.
     pub fn size(&self) -> (u32, u32) {
+        match &self.canvas {
+            Some(c) => (c.size[0], c.size[1]),
+            None => self.window_size(),
+        }
+    }
+
+    /// The window's (surface's) size in physical pixels, whether or not a virtual resolution
+    /// is set. Overlays drawn onto the window itself (egui) use this.
+    pub fn window_size(&self) -> (u32, u32) {
         (self.surface_config.width, self.surface_config.height)
     }
 
@@ -526,8 +633,10 @@ impl Graphics {
             encoder: Some(encoder),
             view,
             surface_texture: Some(surface_texture),
+            canvas: self.canvas.as_ref().map(|c| c.view.clone()),
             clear_color: self.clear_color,
             flushed: false,
+            composited: false,
         })
     }
 
@@ -535,6 +644,7 @@ impl Graphics {
         if !frame.flushed {
             self.flush_into(&mut frame);
         }
+        self.composite(&mut frame);
 
         if let Some(encoder) = frame.encoder.take() {
             self.queue.submit(std::iter::once(encoder.finish()));
@@ -570,11 +680,42 @@ impl Graphics {
         }
     }
 
-    /// Flush all queued 2D layers (sprites + shapes + primitives + text) into the current `frame`.
-    /// Called automatically when a [`crate::Painter`] is dropped; call manually before
-    /// stacking other passes (e.g. egui) when no painter was created.
+    /// Flush all queued 2D layers (sprites + shapes + primitives + text) into the current
+    /// `frame` and, with a virtual resolution, scale the canvas onto the window. Call it
+    /// before stacking passes that draw onto the window itself (e.g. egui); after it, the
+    /// window view holds the finished scene. The end of the frame does the same if needed.
     pub fn flush_pending(&mut self, frame: &mut Frame) {
         self.flush_into(frame);
+        self.composite(frame);
+    }
+
+    /// Scale the canvas onto the window, once per frame; nothing without a virtual
+    /// resolution.
+    fn composite(&mut self, frame: &mut Frame) {
+        if frame.composited {
+            return;
+        }
+        frame.composited = true;
+        let (Some(canvas), Some(rect), Some(encoder)) = (
+            self.canvas.as_ref(),
+            self.canvas_rect(),
+            frame.encoder.as_mut(),
+        ) else {
+            return;
+        };
+        let b = self.border_color;
+        canvas.present(
+            encoder,
+            &frame.view,
+            rect,
+            self.scale_filter,
+            wgpu::Color {
+                r: srgb_to_linear(b.r),
+                g: srgb_to_linear(b.g),
+                b: srgb_to_linear(b.b),
+                a: f64::from(b.a),
+            },
+        );
     }
 
     pub(crate) fn flush_into(&mut self, frame: &mut Frame) {
@@ -601,11 +742,12 @@ impl Graphics {
         self.primitives.upload(&self.device, &self.queue);
         self.text.prepare(&self.device, &self.queue);
 
-        // When multisampling, draws target the MSAA texture and resolve to the surface;
-        // otherwise they target the surface directly.
+        // Draws go to the canvas when there is one, else to the surface. When multisampling,
+        // they target the MSAA texture and resolve to that; otherwise they target it directly.
+        let target = frame.canvas.as_ref().unwrap_or(&frame.view);
         let (color, resolve) = match self.msaa_view.as_ref() {
-            Some(msaa) => (msaa, Some(&frame.view)),
-            None => (&frame.view, None),
+            Some(msaa) => (msaa, Some(target)),
+            None => (target, None),
         };
         let targets = Targets {
             color,
@@ -655,10 +797,10 @@ impl Graphics {
         self.text.draw_layer(None, encoder, &targets);
         self.text.finish();
 
-        // Vector content composites on top of the 2D layers, directly onto the surface.
+        // Vector content composites on top of the 2D layers, directly onto the target.
         #[cfg(feature = "vector")]
         if let Some(vector) = self.vector.as_mut() {
-            vector.render_and_composite(&self.device, &self.queue, encoder, &frame.view);
+            vector.render_and_composite(&self.device, &self.queue, encoder, target);
         }
 
         self.sprites.clear();
@@ -670,16 +812,17 @@ impl Graphics {
 }
 
 /// Allocate the MSAA color target (when `sample_count > 1`) and depth target (when a depth
-/// format is set), both sized to the surface. Returns `(msaa_view, depth_view)`.
+/// format is set), both `size` pixels. Returns `(msaa_view, depth_view)`.
 fn make_attachments(
     device: &wgpu::Device,
-    config: &wgpu::SurfaceConfiguration,
+    size: [u32; 2],
+    color_format: wgpu::TextureFormat,
     sample_count: u32,
     depth_format: Option<wgpu::TextureFormat>,
 ) -> (Option<wgpu::TextureView>, Option<wgpu::TextureView>) {
     let size = wgpu::Extent3d {
-        width: config.width,
-        height: config.height,
+        width: size[0].max(1),
+        height: size[1].max(1),
         depth_or_array_layers: 1,
     };
     let msaa_view = (sample_count > 1).then(|| {
@@ -690,7 +833,7 @@ fn make_attachments(
                 mip_level_count: 1,
                 sample_count,
                 dimension: wgpu::TextureDimension::D2,
-                format: render_format(config),
+                format: color_format,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 view_formats: &[],
             })

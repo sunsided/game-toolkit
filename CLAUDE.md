@@ -78,7 +78,7 @@ task labels                # create/update GitHub PR labels (gh); keep in sync w
 PRs are labelled by changed paths (`.github/workflows/labeler.yml`, config in
 `.github/labeler.yml`). Adding a crate or top-level area means a new entry there and in `task labels`.
 
-Examples live in `examples/` (`ex_01_window` … `ex_15_touch`, `bouncing_ball`); the offline
+Examples live in `examples/` (`ex_01_window` … `ex_17_virtual_resolution`, `bouncing_ball`); the offline
 atlas-packer is in `tools/atlas-packer`.
 
 ## Templates
