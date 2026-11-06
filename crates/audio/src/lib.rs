@@ -17,7 +17,7 @@
 //! ```
 //!
 //! Audio generated while it plays (a synthesizer, an emulated sound chip) goes through
-//! [`Audio::play_stream`]. With the `synth` feature, [`Audio::play_synth`] plays chiptune
+//! [`Audio::play_stream`], or [`Audio::play_stereo_stream`] for separate left and right channels. With the `synth` feature, [`Audio::play_synth`] plays chiptune
 //! music written in tracker notation live on the built-in synth, and [`Synth`] renders effects
 //! and jingles to PCM (see [`synth`]). Mixer tracks, spatial audio and file streaming are not wrapped;
 //! [`kira`] is re-exported for anything beyond this API, and [`SoundHandle::with_kira`]
@@ -51,8 +51,8 @@ use handle::Slot;
 pub use handle::SoundHandle;
 mod stream;
 pub use kira;
-use stream::StreamData;
-pub use stream::{AudioStream, StreamHandle};
+pub use stream::{AudioStream, StereoStream, StreamHandle};
+use stream::{Source, StreamData};
 
 #[cfg(target_arch = "wasm32")]
 mod web;
@@ -408,12 +408,39 @@ impl Audio {
         sample_rate: u32,
         options: PlayOptions,
     ) -> Result<StreamHandle, AudioError> {
+        self.start_or_queue(Source::mono(Box::new(stream)), sample_rate, options)
+    }
+
+    /// Like [`Audio::play_stream`], for a stereo source: `stream` fills `[left, right]` frames.
+    pub fn play_stereo_stream(
+        &mut self,
+        stream: impl StereoStream,
+        sample_rate: u32,
+    ) -> Result<StreamHandle, AudioError> {
+        self.play_stereo_stream_with(stream, sample_rate, PlayOptions::default())
+    }
+
+    /// [`Audio::play_stereo_stream`] with [`PlayOptions`], as for [`Audio::play_stream_with`].
+    pub fn play_stereo_stream_with(
+        &mut self,
+        stream: impl StereoStream,
+        sample_rate: u32,
+        options: PlayOptions,
+    ) -> Result<StreamHandle, AudioError> {
+        self.start_or_queue(Source::Stereo(Box::new(stream)), sample_rate, options)
+    }
+
+    fn start_or_queue(
+        &mut self,
+        source: Source,
+        sample_rate: u32,
+        options: PlayOptions,
+    ) -> Result<StreamHandle, AudioError> {
         let pending = self.manager.is_none();
         if pending && !options.deferred {
             return Err(AudioError::NotStarted);
         }
-        let (data, handle) =
-            StreamData::new(Box::new(stream), sample_rate, options.volume, pending);
+        let (data, handle) = StreamData::new(source, sample_rate, options.volume, pending);
         if pending {
             self.queued_streams.push(data);
         } else {
