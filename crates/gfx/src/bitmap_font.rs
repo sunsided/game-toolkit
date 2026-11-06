@@ -97,12 +97,24 @@ impl BitmapFont {
     }
 
     /// [`BitmapFont::from_grid`] over RGBA pixels already uploaded as `texture`.
+    ///
+    /// # Panics
+    ///
+    /// If `rgba` holds fewer than `size[0] * size[1] * 4` bytes.
     pub fn from_grid_rgba(
         texture: TextureId,
         size: [u32; 2],
         rgba: &[u8],
         layout: &GridLayout,
     ) -> Self {
+        let needed = size[0] as usize * size[1] as usize * 4;
+        assert!(
+            rgba.len() >= needed,
+            "from_grid_rgba: {} bytes of RGBA for a {}x{} sheet, need {needed}",
+            rgba.len(),
+            size[0],
+            size[1]
+        );
         let [cw, ch] = [layout.cell[0].max(1), layout.cell[1].max(1)];
         let cols = size[0] / cw;
         let rows = size[1] / ch;
@@ -248,24 +260,30 @@ impl BitmapFont {
     }
 
     /// Size `[width, height]` of `s` drawn at `scale`, in whole pixels: the widest line, and
-    /// the height of all lines (`\n` starts a new one).
+    /// the height of all lines (`\n` or `\r\n` starts a new one). The width includes glyphs
+    /// that overhang left of the start position (BMFont glyphs with a negative `xoffset`).
+    /// Saturates instead of overflowing for absurd scales.
     pub fn measure(&self, s: &str, scale: u32) -> [u32; 2] {
-        let mut width = 0i32;
+        let mut width = 0i64;
         let mut lines = 0u32;
-        for line in s.split('\n') {
-            lines += 1;
-            let mut pen = 0i32;
-            let mut extent = 0i32;
+        for line in text_lines(s) {
+            lines = lines.saturating_add(1);
+            let mut pen = 0i64;
+            let mut left = 0i64;
+            let mut right = 0i64;
             self.layout_line(line, |g, x| {
-                extent = extent.max(x + g.offset[0] + g.src_size[0] as i32);
-                pen = x + g.advance;
+                let x0 = i64::from(x) + i64::from(g.offset[0]);
+                left = left.min(x0);
+                right = right.max(x0 + i64::from(g.src_size[0]));
+                pen = i64::from(x) + i64::from(g.advance);
             });
-            width = width.max(pen.max(extent));
+            width = width.max(pen.max(right) - left);
         }
         let scale = scale.max(1);
+        let width = u32::try_from(width.max(0)).unwrap_or(u32::MAX);
         [
-            width.max(0) as u32 * scale,
-            lines * self.line_height * scale,
+            width.saturating_mul(scale),
+            lines.saturating_mul(self.line_height).saturating_mul(scale),
         ]
     }
 
@@ -288,6 +306,12 @@ impl BitmapFont {
             prev = Some(c);
         }
     }
+}
+
+/// The lines of `s` as text is drawn: split at `\n`, with a trailing `\r` (Windows line
+/// endings) dropped so it doesn't render as a glyph.
+pub(crate) fn text_lines(s: &str) -> impl Iterator<Item = &str> {
+    s.split('\n').map(|l| l.strip_suffix('\r').unwrap_or(l))
 }
 
 /// One `key=value` line of a BMFont text file: the tag and its attributes.
@@ -498,5 +522,24 @@ kerning first=65 second=86 amount=-1
         );
         // Kerning pulls V one pixel closer.
         assert_eq!(f.measure("AV", 1), [11, 10]);
+    }
+
+    #[test]
+    fn measure_counts_left_overhang_and_crlf() {
+        let fnt = "common lineHeight=8 pages=1
+char id=106 x=0 y=0 width=4 height=8 xoffset=-2 yoffset=0 xadvance=3
+";
+        let f = BitmapFont::parse_bmfont(TextureId(0), [16, 16], fnt).unwrap();
+        // 'j' starts 2 px left of the pen and ends at 2: 4 px wide, pen ends at 3 -> 5.
+        assert_eq!(f.measure("j", 1), [5, 8]);
+        let b = builtin();
+        assert_eq!(b.measure("ab\r\ncd", 1), b.measure("ab\ncd", 1));
+        assert_eq!(b.measure("W", u32::MAX)[0], u32::MAX);
+    }
+
+    #[test]
+    #[should_panic(expected = "need")]
+    fn short_rgba_is_rejected() {
+        let _ = BitmapFont::from_grid_rgba(TextureId(0), [6, 8], &[0; 4], &GridLayout::ascii(6, 8));
     }
 }

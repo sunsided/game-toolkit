@@ -30,6 +30,17 @@ pub enum ScaleFilter {
     Linear,
 }
 
+impl ScaleFilter {
+    /// Position in the `[nearest, linear]` sampler and bind-group arrays. A match rather than
+    /// `as usize`, so a new variant fails to compile here instead of picking the wrong one.
+    pub(crate) const fn index(self) -> usize {
+        match self {
+            Self::Nearest => 0,
+            Self::Linear => 1,
+        }
+    }
+}
+
 /// Where the canvas lands in the window, in physical window pixels.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct CanvasRect {
@@ -91,7 +102,7 @@ pub(crate) struct RenderTexture {
     pub size: [u32; 2],
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
-    /// Indexed by `ScaleFilter as usize`.
+    /// Indexed by [`ScaleFilter::index`].
     pub blit_bind_groups: [wgpu::BindGroup; 2],
 }
 
@@ -230,7 +241,7 @@ impl Blit {
     }
 
     /// Bind groups sampling `src` with the nearest and the linear sampler, indexed by
-    /// `ScaleFilter as usize`.
+    /// [`ScaleFilter::index`].
     pub fn bind_groups(
         &self,
         device: &wgpu::Device,

@@ -144,7 +144,7 @@ impl Graphics {
             memory_hints: wgpu::MemoryHints::Performance,
             ..Default::default()
         };
-        if let Some(hook) = config.device_hook {
+        if let Some(hook) = &config.device_hook {
             hook(&adapter, &mut device_desc);
         }
         let (device, queue) = adapter
@@ -410,6 +410,8 @@ impl Graphics {
     /// `AppConfig::virtual_resolution`; changing it at runtime reallocates the canvas.
     /// See [`GraphicsConfig::virtual_resolution`].
     pub fn set_virtual_resolution(&mut self, resolution: Option<(u32, u32)>) {
+        // A zero-sized canvas would give the cameras a zero viewport; use at least 1 x 1.
+        let resolution = resolution.map(|(w, h)| (w.max(1), h.max(1)));
         if self.virtual_resolution == resolution {
             return;
         }
@@ -538,7 +540,7 @@ impl Graphics {
     }
 
     /// Whether an effect is enabled; `None` for an unknown id.
-    pub fn post_effect_enabled(&mut self, id: PostEffectId) -> Option<bool> {
+    pub fn post_effect_enabled(&self, id: PostEffectId) -> Option<bool> {
         self.post.is_enabled(id)
     }
 
@@ -826,6 +828,8 @@ impl Graphics {
             view,
             surface_texture: Some(surface_texture),
             canvas: self.canvas.as_ref().map(|c| c.tex.view.clone()),
+            canvas_size: self.canvas.as_ref().map_or([0, 0], Canvas::size),
+            canvas_virtual: self.virtual_resolution.is_some(),
             clear_color: self.clear_color,
             flushed: false,
             composited: false,
@@ -898,15 +902,43 @@ impl Graphics {
             size: [window[0] as f32, window[1] as f32],
         });
         let format = self.surface_format();
-        let (Some(canvas), Some(encoder)) = (self.canvas.as_ref(), frame.encoder.as_mut()) else {
-            return;
-        };
         let b = self.border_color;
         let border = wgpu::Color {
             r: srgb_to_linear(b.r),
             g: srgb_to_linear(b.g),
             b: srgb_to_linear(b.b),
             a: f64::from(b.a),
+        };
+        let Some(encoder) = frame.encoder.as_mut() else {
+            return;
+        };
+        // The canvas was removed or replaced during the frame (the last effect removed, the
+        // virtual resolution changed): show what was drawn into the frame's canvas, without
+        // effects, rather than an empty frame.
+        let canvas = self
+            .canvas
+            .as_ref()
+            .filter(|c| frame.canvas.as_ref() == Some(&c.tex.view));
+        let Some(canvas) = canvas else {
+            if let Some(view) = &frame.canvas {
+                let rect = if frame.canvas_virtual {
+                    canvas::layout(window, frame.canvas_size, self.scale_mode)
+                } else {
+                    CanvasRect {
+                        origin: [0.0, 0.0],
+                        size: [window[0] as f32, window[1] as f32],
+                    }
+                };
+                let groups = self.blit.bind_groups(&self.device, view);
+                self.blit.draw(
+                    encoder,
+                    &groups[self.scale_filter.index()],
+                    &frame.view,
+                    rect,
+                    border,
+                );
+            }
+            return;
         };
         let run = StageRun {
             device: &self.device,
@@ -946,7 +978,7 @@ impl Graphics {
         if !post.active(PostStage::Window) {
             self.blit.draw(
                 encoder,
-                &scene.blit_bind_groups[self.scale_filter as usize],
+                &scene.blit_bind_groups[self.scale_filter.index()],
                 &frame.view,
                 rect,
                 border,
@@ -972,7 +1004,7 @@ impl Graphics {
             let scratch = self.window_scratch.as_ref().expect("just created");
             self.blit.draw(
                 encoder,
-                &scene.blit_bind_groups[self.scale_filter as usize],
+                &scene.blit_bind_groups[self.scale_filter.index()],
                 &scratch.view,
                 rect,
                 border,
@@ -988,7 +1020,7 @@ impl Graphics {
         {
             self.blit.draw(
                 encoder,
-                &result.blit_bind_groups[ScaleFilter::Nearest as usize],
+                &result.blit_bind_groups[ScaleFilter::Nearest.index()],
                 &frame.view,
                 full,
                 wgpu::Color::BLACK,
