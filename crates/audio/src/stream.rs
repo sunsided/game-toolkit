@@ -48,7 +48,7 @@ pub(crate) enum Source {
 
 impl Source {
     pub(crate) fn mono(stream: Box<dyn AudioStream>) -> Self {
-        Source::Mono(stream, Vec::new())
+        Source::Mono(stream, vec![0.0; CHUNK])
     }
 
     fn fill(&mut self, out: &mut [[f32; 2]]) {
