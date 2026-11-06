@@ -15,6 +15,15 @@ All notable changes to this project are documented here. The format is based on
   feature. `AppConfig::device_hook` edits the device request with the adapter at hand (#87).
 - `Graphics::adapter_info()`, `Graphics::backend()` and `Graphics::supports_compute()`, e.g.
   to show a "WebGPU required" message on WebGL2 instead of failing.
+- `AppConfig::preferred_limits` / `preferred_features`: limits and features a game would like
+  but can do without. Each limit is requested up to what the adapter offers and each feature
+  only where the adapter has it, so they never fail init; read the result from
+  `ctx.gfx.device().limits()` / `features()`. E.g. 8 storage buffers per stage on WebGPU and
+  native, WebGL2's own limits there.
+- `AppConfig::continue_without_requirements` (default `false`): when the adapter can't meet
+  `required_limits` / `required_features`, start anyway without them and report the
+  `DeviceRequirementsError` through `Graphics::unmet_requirements()`, so `Game::init` can draw
+  a "WebGPU required" screen through the painter instead of the game never starting.
 - `game-toolkit-compute`, a new crate (umbrella feature `compute`, `game_toolkit::compute`)
   for GPU simulations: `Kernel` builds a WGSL compute pipeline with its bind-group layout and
   dispatches it over a grid (workgroup counts rounded up) into the frame's encoder;
@@ -29,6 +38,11 @@ All notable changes to this project are documented here. The format is based on
   live-cell count read back (#92).
 - `Graphics::register_texture` makes a game's own `wgpu::Texture` (a compute output, a render
   target) drawable as a `TextureId` (#92).
+- `game-toolkit-compute` without its default `gfx` feature depends only on `wgpu` (re-exported
+  as `game_toolkit_compute::wgpu`) and `bytemuck`, not on game-toolkit-gfx or winit: `Kernel`,
+  `PingPong`, `ReadbackRing` and `ComputeSubmitter` work on any wgpu device, e.g. in a
+  simulation crate or a headless runner. `StorageTexture` needs `gfx`. CI checks the
+  dependency tree.
 
 - Virtual resolution (#88): `AppConfig::virtual_resolution: Option<(u32, u32)>` makes the
   painter (sprites, shapes, text, tilemaps, vector art, 3D meshes) draw into a canvas of that
@@ -43,6 +57,9 @@ All notable changes to this project are documented here. The format is based on
   virtual resolution is set (the toolkit installs a `PointerMapping` each frame);
   `Input::mouse_pos_window()` keeps the raw window position.
 - `Graphics::window_size()`: the window's size, whatever the drawing size is.
+- The pointer mapping is re-synced after every `update` step, so a virtual resolution or scale
+  mode changed in `update` applies to the next step's and `render`'s `mouse_pos` and touches
+  rather than a frame later.
 
 - Post-processing (#89): `Graphics::add_post_effect(stage, effect)` runs full-screen effects
   after the scene, in `PostStage::Canvas` (at the virtual resolution, before the upscale) or
@@ -55,6 +72,14 @@ All notable changes to this project are documented here. The format is based on
   `pc_monitor`): scanlines locked to canvas rows, aperture grille or shadow mask, bloom,
   phosphor afterglow, curvature, vignette and sharp-bilinear sampling for fractional scales.
   New example `18_post`.
+- `PostPass::indices`: with indexed colour on, every post effect (both stages) gets the
+  canvas's palette indices before the lookup, at canvas size. `ShaderEffect` shaders get them as
+  `indices_tex`, with `index_at(canvas_px)`, `index_in` / `index_out` and the `post.indexed`
+  flag in the prelude.
+- `CrtSettings::bloom_source`: `BloomSource::Luminance` (default, as before) or
+  `BloomSource::IndexMask` (`BloomSource::indices(48..56)`), where only the listed palette
+  indices glow, so a lava ramp blooms and equally bright snow doesn't. It falls back to
+  luminance without an indexed canvas.
 
 - Bitmap pixel fonts (#91): `BitmapFont`, drawn with `Painter::bitmap_text` / `bitmap_text_ex`
   at whole-number scales on whole pixels, through the sprite batcher so text sorts with
@@ -67,12 +92,26 @@ All notable changes to this project are documented here. The format is based on
 - Indexed colour (#90), feature `indexed`: `Graphics::enable_indexed(&Palette)` makes the
   canvas hold palette indices, resolved through a palette lookup texture (`Rgba8UnormSrgb`, so
   authored colours come out exactly) before post effects and the upscale. `PALETTE_ROWS`
-  palette rows with `set_palette` and `set_palette_blend` for crossfades; `PaletteCycle`
+  (16) palette rows with `set_palette` and `set_palette_blend` for crossfades; `PaletteCycle`
   rotates index ranges over time (`add_palette_cycle`). Draw indices with `Color::index` and
   textures from indexed PNGs, decoded without RGBA conversion (`IndexedImage::from_png`,
   `Graphics::load_indexed_texture`, `Context::load_indexed_texture`). New example `19_palette`.
 - `bayer4` / `bayer8` ordered-dithering helpers in the post-effect shader prelude, also as
   `BAYER_WGSL` for games' own shaders.
+
+- `Painter::custom(layer, |pass| ...)` records a game's own GPU work at a painter layer: it
+  runs after the clear and the layers below and before that layer's sprites, shapes and text,
+  so a shader-generated background (a map, a sky) can sit under painter content in the same
+  encoder and submission. `CustomPass::begin_render_pass` attaches the target the way the
+  painter does (load, MSAA resolve, depth); `Graphics::multisample()` and
+  `Graphics::depth_stencil()` give the matching pipeline state.
+- `INDEX_WGSL` (feature `indexed`): `index_out(i)` / `index_in(texel)`, the documented way for
+  custom passes and post effects to write and read indices on the indexed canvas. The resolve
+  pass uses the same helpers. `19_palette` now draws its dithered sky in a custom pass.
+- `Frame::target_is_indexed()` and `CustomPass::is_indexed()` say whether the painter's
+  target holds palette indices, so a game's own RGBA pass into `Frame::target_view()` /
+  `Graphics::canvas_view()` can tell it would write meaningless indices; those views now
+  document it.
 
 ### Changed
 

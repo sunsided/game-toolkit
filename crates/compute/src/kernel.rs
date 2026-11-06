@@ -1,5 +1,3 @@
-use game_toolkit_gfx::wgpu;
-
 /// One resource a [`Kernel`] binds, in `@group(0)`. The position in the list given to
 /// [`KernelBuilder::bindings`] is the `@binding(n)` index in the shader.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -10,8 +8,8 @@ pub enum Binding {
     StorageRead,
     /// `var<storage, read_write> s: array<T>;` (also for `atomic<u32>` counters).
     StorageReadWrite,
-    /// `var t: texture_storage_2d<format, write>;`, e.g. the output of
-    /// [`StorageTexture`](crate::StorageTexture) with [`StorageTexture::FORMAT`](crate::StorageTexture::FORMAT).
+    /// `var t: texture_storage_2d<format, write>;`, e.g. the output of `StorageTexture` with
+    /// `StorageTexture::FORMAT` (feature `gfx`).
     StorageTextureWrite(wgpu::TextureFormat),
     /// `var t: texture_2d<f32>;`, read with `textureLoad` (no sampler).
     Texture,
@@ -186,7 +184,7 @@ fn with_workgroup_prelude(source: &str, size: [u32; 3]) -> String {
 ///
 /// ```no_run
 /// # use game_toolkit_compute::{Binding, Kernel};
-/// # use game_toolkit_gfx::wgpu;
+/// # use game_toolkit_compute::wgpu;
 /// # fn demo(device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, buf: &wgpu::Buffer) {
 /// let kernel = Kernel::builder(
 ///     "double",

@@ -80,7 +80,10 @@ default `None`). The built-in 2D pipelines never write depth, so enabling it is 
 and is there to support depth-tested rendering. Games that record their own compute or render
 passes through `ctx.gfx.device()` can ask for more than the toolkit's downlevel defaults with
 `required_limits` and `required_features` (merged with the toolkit's; init fails with a
-`DeviceRequirementsError` naming what the adapter lacks), or edit the request in `device_hook`.
+`DeviceRequirementsError` naming what the adapter lacks, or with `continue_without_requirements`
+starts without them and reports them in `ctx.gfx.unmet_requirements()`), ask for
+`preferred_limits` / `preferred_features` that are clamped to the adapter and never fail, or
+edit the request in `device_hook`.
 For pixel art, `virtual_resolution: Some((320, 180))` makes the painter draw into a canvas of
 that size, scaled onto the window by `scale_mode` (`ScaleMode::Integer` by default: whole
 multiples, the rest of the window is `border_color`; or `Fit` / `Stretch`). `ctx.gfx.size()`
@@ -90,8 +93,10 @@ and `ctx.input.mouse_pos()` are then in canvas pixels; `ctx.gfx.window_size()` a
 (`ctx.load_bitmap_font`) or a BMFont `.fnt` (`ctx.load_bmfont`). Full-screen post effects run after the scene:
 `ctx.gfx.add_post_effect(PostStage::Window, effect)` takes a `ShaderEffect` (one WGSL fragment
 shader) or any `PostEffect`; the `crt` feature adds `CrtEffect` with presets. The `indexed`
-feature draws palette indices (`Color::index`, indexed PNGs) and resolves them through a
-`Palette` at the end of the frame, with palette cycling and crossfades.
+feature draws palette indices (`Color::index`, indexed PNGs, or your own shaders through
+`INDEX_WGSL`) and resolves them through a `Palette` at the end of the frame, with palette
+cycling and crossfades; post effects still see the indices, so the CRT bloom can glow only for
+chosen palette entries (`BloomSource::indices`).
 `AppConfig::random_seed` seeds the deterministic
 per-`Context` RNG (`ctx.rng`); a fixed seed reproduces a run.
 
@@ -114,6 +119,7 @@ flushes them when it drops. Positions are pixels from the top-left. Colors are a
 | `measure_text(s, size_px)` | a string's `[width, height]`, for aligning or sizing a box |
 | `draw_sprite(..)`, `draw_rect(..)`, `draw_text(..)` | builders for draws with options: `.region(..)`, `.flip_x()`, `.layer(..)`, `.blend(..)`, `.align(..)`, …; queued when dropped |
 | `mesh(mesh, model, color)` | a 3D mesh, depth-tested under all 2D content |
+| `custom(layer, \|pass\| ..)` | your own render pass at a layer (e.g. a shader background under the sprites), in the frame's encoder |
 
 **Draw order.** Lower layers draw under higher ones; the calls without a layer argument use
 layer 0. Within a layer: sprites and rects/lines first (grouped by blend mode, then texture;
@@ -378,7 +384,10 @@ p.sprite(tex.id(), [0.0, 0.0], [512.0, 512.0]);
 ```
 
 There is no compute on WebGL2 (the browser fallback without WebGPU): check
-`ctx.gfx.supports_compute()` first. `examples/16_compute` is the full version.
+`ctx.gfx.supports_compute()` first. `examples/16_compute` is the full version. Simulation
+crates that shouldn't depend on the toolkit can use `game-toolkit-compute` with
+`default-features = false`: everything but `StorageTexture` then needs only `wgpu` (re-exported
+as `game_toolkit_compute::wgpu`), no window.
 `Graphics::register_texture` makes any wgpu texture of your own drawable as a `TextureId`.
 
 ## Web (wasm32)

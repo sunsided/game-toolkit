@@ -10,9 +10,19 @@ keywords = ["wgpu", "compute", "gpgpu", "gamedev", "simulation"]
 categories = ["game-development", "rendering", "simulation"]
 
 [dependencies]
-game-toolkit-gfx = { workspace = true }
+game-toolkit-gfx = { workspace = true, optional = true }
+wgpu             = { workspace = true }
 bytemuck         = { workspace = true }
 log              = { workspace = true }
+
+[dev-dependencies]
+pollster = { workspace = true }
+
+[features]
+default = ["gfx"]
+# `StorageTexture`, drawn by the game-toolkit `Painter`. Without it the crate needs only wgpu
+# (no game-toolkit-gfx, no winit), for engine-agnostic simulation crates and headless runs.
+gfx = ["dep:game-toolkit-gfx"]
 
 [lints]
 workspace = true

@@ -1,5 +1,6 @@
 use crate::bitmap_font::BitmapFont;
 use crate::color::{Color, Layer};
+use crate::custom::CustomPass;
 use crate::draw::{RectDraw, SpriteDraw, TextDraw};
 use crate::frame::Frame;
 use crate::graphics::Graphics;
@@ -598,6 +599,35 @@ impl<'a> Painter<'a> {
     pub fn mesh(&mut self, mesh: MeshId, model: Mat4, color: impl Into<Color>) {
         self.gfx
             .draw_mesh(mesh, MeshInstance::new(model, color.into().to_array()));
+    }
+
+    /// Record your own GPU work at `layer`: the closure runs while the painter flushes, after
+    /// the clear and the layers below, and before this layer's sprites, shapes and text, so
+    /// it can draw a full-screen background (a shader-generated map, a sky) under painter
+    /// content. Everything shares the frame's encoder and submission.
+    ///
+    /// Draw through [`CustomPass::begin_render_pass`], with a pipeline built for
+    /// [`Graphics::surface_format`], [`Graphics::multisample`] and
+    /// [`Graphics::depth_stencil`]. The closure is `'static`: clone the `wgpu` handles it
+    /// needs into it (they are cheap reference-counted clones).
+    ///
+    /// ```ignore
+    /// let (pipeline, bind_group) = (self.pipeline.clone(), self.bind_group.clone());
+    /// let mut p = frame.painter(&mut ctx.gfx);
+    /// p.custom(Layer::BOTTOM, move |pass| {
+    ///     let mut rp = pass.begin_render_pass("background");
+    ///     rp.set_pipeline(&pipeline);
+    ///     rp.set_bind_group(0, &bind_group, &[]);
+    ///     rp.draw(0..3, 0..1); // full-screen triangle
+    /// });
+    /// p.sprite(tex, [10.0, 10.0], [16.0, 16.0]); // on top
+    /// ```
+    pub fn custom(
+        &mut self,
+        layer: impl Into<Layer>,
+        f: impl FnOnce(&mut CustomPass<'_>) + 'static,
+    ) {
+        self.gfx.custom.push(layer.into().0, Box::new(f));
     }
 
     /// Draw vector graphics with vello (feature `vector`). The closure receives the frame's

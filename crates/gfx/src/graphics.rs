@@ -12,6 +12,7 @@ use crate::camera3d::{Camera, Camera3D};
 use crate::canvas::{self, Blit, Canvas, CanvasRect, RenderTexture, ScaleFilter, ScaleMode};
 use crate::color::Color;
 use crate::config::{self, GraphicsConfig};
+use crate::custom::CustomPass;
 use crate::frame::Frame;
 use crate::mesh::{MeshBatcher, MeshId, MeshInstance, MeshRegistry, MeshVertex};
 use crate::post::{self, PostChain, PostEffect, PostEffectId, PostStage, StageRun};
@@ -38,6 +39,8 @@ pub struct Graphics {
     pub(crate) shapes: ShapeBatcher,
     pub(crate) text: TextSystem,
     pub(crate) textures: TextureRegistry,
+    /// Passes queued with `Painter::custom`, run at their layer.
+    pub(crate) custom: crate::custom::CustomPasses,
     pub(crate) clear_color: [f32; 4],
     texture_paths: HashMap<PathBuf, TextureId>,
     sample_count: u32,
@@ -62,6 +65,8 @@ pub struct Graphics {
     pending_screenshot: Option<PathBuf>,
     adapter_info: wgpu::AdapterInfo,
     supports_compute: bool,
+    /// What the device was created without (`continue_without_requirements`).
+    unmet_requirements: Option<crate::DeviceRequirementsError>,
     /// The offscreen scene the painter draws into: the virtual-resolution canvas, or a
     /// window-sized one while post effects are registered. `None`: straight to the surface.
     canvas: Option<Canvas>,
@@ -132,16 +137,32 @@ impl Graphics {
         let backend = info.backend;
         log::info!("wgpu adapter: {:?} ({backend:?})", info.name);
         let adapter_limits = adapter.limits();
+        let adapter_features = adapter.features();
         let (required_limits, required_features) =
-            config::merged_requirements(config, backend, &adapter_limits);
-        config::check_requirements(
+            config::merged_requirements(config, backend, &adapter_limits, adapter_features, true);
+        let checked = config::check_requirements(
             &info.name,
             backend,
             &adapter_limits,
-            adapter.features(),
+            adapter_features,
             &required_limits,
             required_features,
-        )?;
+        );
+        let (required_limits, required_features, unmet_requirements) = match checked {
+            Ok(()) => (required_limits, required_features, None),
+            Err(err) if config.continue_without_requirements => {
+                log::warn!("{err}; continuing without the game's required limits and features");
+                let (limits, features) = config::merged_requirements(
+                    config,
+                    backend,
+                    &adapter_limits,
+                    adapter_features,
+                    false,
+                );
+                (limits, features, Some(err))
+            }
+            Err(err) => return Err(err.into()),
+        };
         let mut device_desc = wgpu::DeviceDescriptor {
             label: Some("toolkit.device"),
             required_features,
@@ -314,6 +335,7 @@ impl Graphics {
             shapes,
             text,
             textures,
+            custom: crate::custom::CustomPasses::default(),
             clear_color: [0.0, 0.0, 0.0, 1.0],
             texture_paths: HashMap::new(),
             sample_count,
@@ -331,6 +353,7 @@ impl Graphics {
             pending_screenshot: None,
             adapter_info: info,
             supports_compute,
+            unmet_requirements,
             canvas,
             virtual_resolution,
             blit,
@@ -417,6 +440,12 @@ impl Graphics {
     /// window, or (`None`) straight into the window again. Usually set once through
     /// `AppConfig::virtual_resolution`; changing it at runtime reallocates the canvas.
     /// See [`GraphicsConfig::virtual_resolution`].
+    ///
+    /// The toolkit's input follows right after the `update` that changed it: the next
+    /// `update` step and `render` already read `mouse_pos` and touches in the new canvas
+    /// pixels. With [`ScaleMode::Integer`], a canvas larger than the window is scaled down to
+    /// fit (fractionally) rather than cropped; use [`Self::set_scale_mode`] for per-resolution
+    /// choices, e.g. `Fit` for 800 x 600 on a 1080p screen.
     pub fn set_virtual_resolution(&mut self, resolution: Option<(u32, u32)>) {
         // A zero-sized canvas would give the cameras a zero viewport; use at least 1 x 1.
         let resolution = resolution.map(|(w, h)| (w.max(1), h.max(1)));
@@ -608,9 +637,16 @@ impl Graphics {
     }
 
     /// The offscreen texture the painter draws into, when there is one (a virtual resolution
-    /// is set or post effects are registered), for games that record their own passes into it (in [`Self::surface_format`], at
-    /// [`Self::size`]). Draw after the painter has flushed (it clears the canvas) and before
-    /// [`Self::flush_pending`] or the end of the frame, which scale it onto the window.
+    /// is set, post effects are registered or indexed colour is on), for games that record
+    /// their own passes into it (in [`Self::surface_format`], at [`Self::size`]). Draw after
+    /// the painter has flushed (it clears the canvas) and before [`Self::flush_pending`] or
+    /// the end of the frame, which scale it onto the window. To draw under painter content,
+    /// use [`Painter::custom`](crate::Painter::custom) instead.
+    ///
+    /// With indexed colour on ([`Self::is_indexed`]) it holds palette indices, not colours:
+    /// write them with `index_out` from `INDEX_WGSL` (feature `indexed`). An RGBA pass would
+    /// write meaningless indices; run colour effects as a [`PostEffect`] instead, which sees
+    /// the resolved colours.
     pub fn canvas_view(&self) -> Option<&wgpu::TextureView> {
         self.canvas.as_ref().map(|c| &c.tex.view)
     }
@@ -640,6 +676,19 @@ impl Graphics {
         render_format(&self.surface_config)
     }
 
+    /// Multisample state matching the painter's render target (`AppConfig::msaa_samples`),
+    /// for pipelines that draw in a [`Painter::custom`](crate::Painter::custom) pass.
+    pub fn multisample(&self) -> wgpu::MultisampleState {
+        crate::target::multisample(self.sample_count)
+    }
+
+    /// Depth-stencil state matching the painter's render target, for pipelines that draw in
+    /// a [`Painter::custom`](crate::Painter::custom) pass: `None` without a depth buffer, else
+    /// one that neither tests nor writes depth.
+    pub fn depth_stencil(&self) -> Option<wgpu::DepthStencilState> {
+        self.depth_format.map(crate::target::no_write_depth)
+    }
+
     pub fn device(&self) -> &wgpu::Device {
         &self.device
     }
@@ -663,6 +712,14 @@ impl Graphics {
     /// instead of failing. The device's limits and features are on [`Self::device`].
     pub fn supports_compute(&self) -> bool {
         self.supports_compute
+    }
+
+    /// The required limits and features the device was created without, when
+    /// `continue_without_requirements` is set and the adapter couldn't provide them; `None`
+    /// when everything was met. Check it in `Game::init` to show a "this browser/GPU is not
+    /// supported" screen through the painter instead of failing to start.
+    pub fn unmet_requirements(&self) -> Option<&crate::DeviceRequirementsError> {
+        self.unmet_requirements.as_ref()
     }
 
     /// Load a PNG from disk and remember its path for [`Graphics::refresh_textures`]. Not
@@ -874,6 +931,7 @@ impl Graphics {
             clear_color: self.clear_color,
             flushed: false,
             composited: false,
+            indexed: self.is_indexed(),
         })
     }
 
@@ -998,6 +1056,7 @@ impl Graphics {
                 self.start.elapsed().as_secs_f32(),
                 self.frame_count,
             ),
+            indices: None,
         };
 
         // Indexed canvas: indices become colour before any effect sees the scene.
@@ -1019,6 +1078,12 @@ impl Graphics {
             .unwrap_or(&canvas.tex);
         #[cfg(not(feature = "indexed"))]
         let base = &canvas.tex;
+        // Effects in both stages can read the indices behind the resolved colours.
+        #[cfg(feature = "indexed")]
+        let run = StageRun {
+            indices: self.indexed.is_some().then_some(&canvas.tex.view),
+            ..run
+        };
 
         let post = &mut self.post;
         let canvas_out = post.run(PostStage::Canvas, &run, encoder, &base.view, canvas.size());
@@ -1095,6 +1160,7 @@ impl Graphics {
         self.shapes.collect_layers(&mut layers);
         self.primitives.collect_layers(&mut layers);
         self.text.collect_layers(&mut layers);
+        self.custom.collect_layers(&mut layers);
 
         // Upload each batcher's instances exactly once before drawing: `queue.write_buffer`
         // is not part of the encoder command stream, so writing per layer pass would clobber
@@ -1146,7 +1212,25 @@ impl Graphics {
             &self.camera3d_bg,
         );
 
+        let size = frame.canvas.as_ref().map_or(
+            [self.surface_config.width, self.surface_config.height],
+            |_| frame.canvas_size,
+        );
         for &layer in &layers {
+            // Custom passes first: within a layer they draw under the painter's own content.
+            for f in self.custom.take_layer(layer) {
+                f(&mut CustomPass {
+                    device: &self.device,
+                    queue: &self.queue,
+                    encoder,
+                    targets,
+                    format: self.surface_format(),
+                    sample_count: self.sample_count,
+                    depth_format: self.depth_format,
+                    size,
+                    indexed: frame.indexed,
+                });
+            }
             self.sprites
                 .draw_layer(layer, encoder, &targets, &self.camera_bg, &self.textures);
             self.shapes
@@ -1169,6 +1253,7 @@ impl Graphics {
         self.shapes.clear();
         self.primitives.clear();
         self.mesh_batcher.clear();
+        self.custom.clear();
         frame.flushed = true;
     }
 }
@@ -1233,7 +1318,7 @@ fn render_format(config: &wgpu::SurfaceConfiguration) -> wgpu::TextureFormat {
 }
 
 /// Decode one sRGB color component to linear, as the shaders do for painter colors.
-fn srgb_to_linear(c: f32) -> f64 {
+pub(crate) fn srgb_to_linear(c: f32) -> f64 {
     let c = f64::from(c);
     if c <= 0.04045 {
         c / 12.92

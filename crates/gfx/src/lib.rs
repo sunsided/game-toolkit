@@ -10,8 +10,11 @@ mod color;
 mod config;
 #[cfg(feature = "crt")]
 mod crt;
+mod custom;
 mod draw;
 mod frame;
+#[cfg(all(test, feature = "indexed", not(target_arch = "wasm32")))]
+mod gpu_tests;
 mod graphics;
 #[cfg(feature = "indexed")]
 mod indexed;
@@ -45,13 +48,15 @@ pub use canvas::{CanvasRect, ScaleFilter, ScaleMode};
 pub use color::{Color, Layer};
 pub use config::{DeviceHook, DeviceRequirementsError, GraphicsConfig, MissingLimit};
 #[cfg(feature = "crt")]
-pub use crt::{CrtEffect, CrtMask, CrtSettings};
+pub use crt::{BloomSource, CrtEffect, CrtMask, CrtSettings};
+pub use custom::CustomPass;
 pub use draw::{RectDraw, SpriteDraw, TextDraw};
 pub use frame::Frame;
 pub use graphics::Graphics;
 #[cfg(feature = "indexed")]
 pub use indexed::{
-    IndexedImage, MAX_PALETTE_CYCLES, PALETTE_ROWS, Palette, PaletteCycle, PaletteCycleId,
+    INDEX_WGSL, IndexedImage, MAX_PALETTE_CYCLES, PALETTE_ROWS, Palette, PaletteCycle,
+    PaletteCycleId,
 };
 pub use mesh::{MeshId, MeshInstance, MeshVertex};
 pub use painter::Painter;

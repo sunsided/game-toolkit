@@ -14,6 +14,8 @@ pub struct Frame {
     pub(crate) flushed: bool,
     /// Whether the canvas has been scaled onto the window this frame.
     pub(crate) composited: bool,
+    /// Whether indexed colour was on when the frame began (the canvas holds indices).
+    pub(crate) indexed: bool,
 }
 
 impl Frame {
@@ -35,8 +37,19 @@ impl Frame {
 
     /// The view the painter draws into: the virtual-resolution canvas when one is set, else
     /// the window's view.
+    ///
+    /// With indexed colour on ([`Self::target_is_indexed`]) this is the index canvas: it holds
+    /// palette indices, not colours. Write them with `index_out` from
+    /// `INDEX_WGSL` (feature `indexed`); an RGBA pass would write meaningless indices. Colour
+    /// effects belong in a [`PostEffect`](crate::PostEffect), which sees the resolved colours.
     pub fn target_view(&self) -> &wgpu::TextureView {
         self.canvas.as_ref().unwrap_or(&self.view)
+    }
+
+    /// Whether [`Self::target_view`] holds palette indices (indexed colour was on when the
+    /// frame began) rather than colours. Always `false` without the `indexed` feature.
+    pub fn target_is_indexed(&self) -> bool {
+        self.indexed
     }
 
     /// Split borrow of the view and encoder so overlays (egui, custom passes) can record

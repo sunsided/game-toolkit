@@ -58,9 +58,11 @@ positions are all in canvas pixels, so layout code is unchanged; `ctx.gfx.window
 `ctx.input.mouse_pos_window()` give the window's. All change at runtime:
 `ctx.gfx.set_virtual_resolution(..)`, `ctx.gfx.set_scale_mode(..)`, `ctx.gfx.set_scale_filter(..)`,
 `ctx.gfx.set_border_color(..)`.
-Text is drawn at canvas resolution too. For own passes into the canvas use
-`ctx.gfx.canvas_view()` after the painter has flushed; `ctx.gfx.flush_pending(frame)` (or the end
-of the frame) scales it onto the window, after which overlays like egui draw at window resolution.
+Text is drawn at canvas resolution too. For your own render passes, `p.custom(layer, |pass| ..)`
+(see Drawing) runs them at a painter layer, so they can go under sprites and text;
+`ctx.gfx.canvas_view()` is the canvas itself, for passes after the painter has flushed.
+`ctx.gfx.flush_pending(frame)` (or the end of the frame) scales the canvas onto the window, after
+which overlays like egui draw at window resolution.
 
 ## Pixel fonts
 
@@ -98,12 +100,16 @@ ctx.gfx.set_post_effect_enabled(id, false);
 
 The shader gets `input_tex`, `nearest_sampler`, `linear_sampler`, `history_tex` (previous output,
 with `.with_history()`), the `post` uniform (`size`, `canvas_size`, `window_size`,
-`canvas_origin`, `canvas_extent`, `time`, `frame`) and `VsOut { pos, uv }`; it defines `fs_main`.
+`canvas_origin`, `canvas_extent`, `time`, `frame`, `indexed`) and `VsOut { pos, uv }`; it defines
+`fs_main`. With indexed colour, `indices_tex` / `index_at(canvas_px)` give the palette index
+behind each canvas pixel (`post.indexed == 1u`), e.g. to make only some entries glow.
 `ShaderEffect::with_params(&gfx, label, wgsl, &pod)` adds `@group(1) @binding(0) var<uniform>
 params`, updated with `gfx.post_effect_mut::<ShaderEffect>(id).unwrap().set_params(&pod)`.
 Implement `PostEffect` for multi-pass effects. Feature `crt`: `CrtEffect::new(&ctx.gfx,
 CrtSettings::arcade())` (also `subtle`, `consumer_tv`, `pc_monitor`) in `PostStage::Window`, with
-scanlines locked to canvas rows; it also makes fractional `ScaleMode::Fit` look even.
+scanlines locked to canvas rows; it also makes fractional `ScaleMode::Fit` look even. Its bloom
+follows brightness, or only chosen palette entries on an indexed canvas:
+`bloom_source: BloomSource::indices(LAVA..LAVA + 8)`.
 
 ## Indexed colour (feature `indexed`)
 
@@ -112,7 +118,7 @@ Draw palette indices instead of colours; the end of the frame looks them up in a
 
 ```rust,ignore
 ctx.gfx.enable_indexed(&Palette::from_hex(&[0x000000, 0x8cc8f0, 0x4a9a3a]));
-ctx.gfx.set_palette(1, &night);                 // rows 0..PALETTE_ROWS
+ctx.gfx.set_palette(1, &night);                 // rows 0..PALETTE_ROWS (16)
 ctx.gfx.set_palette_blend(0, 1, t);             // crossfade row 0 -> 1
 ctx.gfx.add_palette_cycle(PaletteCycle { start: 16, len: 8, speed: 10.0 }); // steps/s, <0 reverses
 let (tex, png_palette) = ctx.load_indexed_texture("tiles.png")?; // indexed PNG, kept as indices
@@ -121,7 +127,10 @@ p.rect(pos, size, Color::index(2));             // shapes, text: palette index a
 
 Indices ride in the canvas's red channel, so draw them fully opaque and untinted (circle edges
 are anti-aliased and blend indices). `IndexedImage` builds index textures by hand
-(`create_indexed_texture`). Post effects see the resolved colours. Every effect shader also has
+(`create_indexed_texture`). Your own shaders (a `p.custom` pass) write index `i` by returning
+`index_out(i)` and read one back with `index_in(texel)`, from `INDEX_WGSL` (prepend it), with
+blending off. Post effects see the resolved colours, plus the indices (see Post-processing).
+Every effect shader also has
 `bayer4(p)` / `bayer8(p)` ordered-dither thresholds (`BAYER_WGSL` for your own shaders); add a
 world-anchored offset to `p` so the pattern doesn't crawl.
 
@@ -171,6 +180,21 @@ Lower-level variants take an explicit layer: `sprite_ex(tex, SpriteInstance, lay
 `rect_ex(pos, size, color, layer, BlendMode)` (also `rect_outline_ex`, `line_ex`),
 `circle_ex(center, radius, thickness, color, layer)`. Also `visible_rect()`. With the `vector`
 feature: `p.vector(|scene| { /* vello::Scene */ })`.
+
+Your own GPU work at a layer: `p.custom(layer, move |pass| ..)` runs when that layer draws,
+before its sprites, shapes and text, in the frame's encoder. A full-screen shader background goes
+under everything on `Layer::BOTTOM`. Build the pipeline for `ctx.gfx.surface_format()`,
+`ctx.gfx.multisample()` and `ctx.gfx.depth_stencil()` and clone what it needs into the closure:
+
+```rust,ignore
+let (pipeline, bind_group) = (self.pipeline.clone(), self.bind_group.clone());
+p.custom(Layer::BOTTOM, move |pass| {
+    let mut rp = pass.begin_render_pass("background"); // loads, resolves MSAA, attaches depth
+    rp.set_pipeline(&pipeline);
+    rp.set_bind_group(0, &bind_group, &[]);
+    rp.draw(0..3, 0..1);
+});
+```
 
 Draw order: lower layers draw under higher ones. Within one layer, call order holds only for
 draws with the same blend mode and texture, and untextured shapes (`rect`, `line`) sort under
@@ -350,8 +374,12 @@ Option<wgpu::TextureFormat>` (default `None`; set `Some(wgpu::TextureFormat::Dep
 `msaa_samples` (default `1`; `4` for anti-aliasing), `touch_emulates_mouse` (default `false`),
 `required_limits: Option<wgpu::Limits>` / `required_features: wgpu::Features` (extra device
 limits and features for your own compute or render passes; merged with the toolkit's, and init
-fails naming whatever the adapter lacks) and `device_hook` (edit the device request with the
-adapter at hand). WebGL2 has no compute: to degrade instead of failing, check
+fails naming whatever the adapter lacks), `preferred_limits` / `preferred_features` (the same,
+but each is clamped to what the adapter has and never fails; read the result from
+`ctx.gfx.device().limits()`), `continue_without_requirements` (default `false`; `true` starts
+without unmet required limits and reports them in `ctx.gfx.unmet_requirements()`, so `init` can
+draw a "WebGPU required" screen) and `device_hook` (edit the device request with the adapter at
+hand). WebGL2 has no compute: to degrade instead of failing, check
 `ctx.gfx.supports_compute()` in `init`.
 
 ## Features
