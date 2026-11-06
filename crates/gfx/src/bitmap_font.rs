@@ -107,7 +107,15 @@ impl BitmapFont {
         rgba: &[u8],
         layout: &GridLayout,
     ) -> Self {
-        let needed = size[0] as usize * size[1] as usize * 4;
+        let needed = (size[0] as usize)
+            .checked_mul(size[1] as usize)
+            .and_then(|n| n.checked_mul(4))
+            .unwrap_or_else(|| {
+                panic!(
+                    "from_grid_rgba: a {}x{} sheet is too large",
+                    size[0], size[1]
+                )
+            });
         assert!(
             rgba.len() >= needed,
             "from_grid_rgba: {} bytes of RGBA for a {}x{} sheet, need {needed}",
@@ -118,7 +126,8 @@ impl BitmapFont {
         let [cw, ch] = [layout.cell[0].max(1), layout.cell[1].max(1)];
         let cols = size[0] / cw;
         let rows = size[1] / ch;
-        let alpha = |x: u32, y: u32| rgba[((y * size[0] + x) * 4 + 3) as usize];
+        // In usize: the size check above guarantees every index fits.
+        let alpha = |x: u32, y: u32| rgba[(y as usize * size[0] as usize + x as usize) * 4 + 3];
         let mut glyphs = HashMap::new();
         for (i, c) in layout.chars.chars().enumerate() {
             let i = i as u32;
