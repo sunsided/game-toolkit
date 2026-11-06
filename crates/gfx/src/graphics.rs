@@ -65,6 +65,8 @@ pub struct Graphics {
     pending_screenshot: Option<PathBuf>,
     adapter_info: wgpu::AdapterInfo,
     supports_compute: bool,
+    /// What the device was created without (`continue_without_requirements`).
+    unmet_requirements: Option<crate::DeviceRequirementsError>,
     /// The offscreen scene the painter draws into: the virtual-resolution canvas, or a
     /// window-sized one while post effects are registered. `None`: straight to the surface.
     canvas: Option<Canvas>,
@@ -135,16 +137,32 @@ impl Graphics {
         let backend = info.backend;
         log::info!("wgpu adapter: {:?} ({backend:?})", info.name);
         let adapter_limits = adapter.limits();
+        let adapter_features = adapter.features();
         let (required_limits, required_features) =
-            config::merged_requirements(config, backend, &adapter_limits);
-        config::check_requirements(
+            config::merged_requirements(config, backend, &adapter_limits, adapter_features, true);
+        let checked = config::check_requirements(
             &info.name,
             backend,
             &adapter_limits,
-            adapter.features(),
+            adapter_features,
             &required_limits,
             required_features,
-        )?;
+        );
+        let (required_limits, required_features, unmet_requirements) = match checked {
+            Ok(()) => (required_limits, required_features, None),
+            Err(err) if config.continue_without_requirements => {
+                log::warn!("{err}; continuing without the game's required limits and features");
+                let (limits, features) = config::merged_requirements(
+                    config,
+                    backend,
+                    &adapter_limits,
+                    adapter_features,
+                    false,
+                );
+                (limits, features, Some(err))
+            }
+            Err(err) => return Err(err.into()),
+        };
         let mut device_desc = wgpu::DeviceDescriptor {
             label: Some("toolkit.device"),
             required_features,
@@ -335,6 +353,7 @@ impl Graphics {
             pending_screenshot: None,
             adapter_info: info,
             supports_compute,
+            unmet_requirements,
             canvas,
             virtual_resolution,
             blit,
@@ -680,6 +699,14 @@ impl Graphics {
     /// instead of failing. The device's limits and features are on [`Self::device`].
     pub fn supports_compute(&self) -> bool {
         self.supports_compute
+    }
+
+    /// The required limits and features the device was created without, when
+    /// `continue_without_requirements` is set and the adapter couldn't provide them; `None`
+    /// when everything was met. Check it in `Game::init` to show a "this browser/GPU is not
+    /// supported" screen through the painter instead of failing to start.
+    pub fn unmet_requirements(&self) -> Option<&crate::DeviceRequirementsError> {
+        self.unmet_requirements.as_ref()
     }
 
     /// Load a PNG from disk and remember its path for [`Graphics::refresh_textures`]. Not

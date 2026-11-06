@@ -70,13 +70,27 @@ pub struct AppConfig {
     /// `Some(wgpu::Limits { max_storage_buffers_per_shader_stage: 8, ..wgpu::Limits::downlevel_defaults() })`.
     /// Init fails with a [`DeviceRequirementsError`](game_toolkit_gfx::DeviceRequirementsError)
     /// naming any limit the adapter can't provide. WebGL2 has no compute at all; to fall back
-    /// gracefully instead, leave this unset and check
+    /// gracefully instead, use [`Self::preferred_limits`] and check
     /// [`Graphics::supports_compute`](game_toolkit_gfx::Graphics::supports_compute) in
-    /// `Game::init`.
+    /// `Game::init`, or set [`Self::continue_without_requirements`].
     pub required_limits: Option<wgpu::Limits>,
     /// Optional device features the game needs (`SHADER_F16`, `TIMESTAMP_QUERY`, ...).
     /// Default empty. Missing ones fail init like missing limits.
     pub required_features: wgpu::Features,
+    /// Device limits the game would like but can do without: each is requested up to what the
+    /// adapter offers, so init never fails on them. Read what you got from
+    /// `ctx.gfx.device().limits()`. E.g. `Some(wgpu::Limits { max_storage_buffers_per_shader_stage:
+    /// 8, ..wgpu::Limits::downlevel_defaults() })` gets 8 on WebGPU and native and stays at
+    /// WebGL2's 0 there. See [`GraphicsConfig::preferred_limits`](game_toolkit_gfx::GraphicsConfig::preferred_limits).
+    pub preferred_limits: Option<wgpu::Limits>,
+    /// Device features the game would like but can do without; enabled where the adapter has
+    /// them. Check `ctx.gfx.device().features()`.
+    pub preferred_features: wgpu::Features,
+    /// `true`: when the adapter can't meet `required_limits` / `required_features`, start
+    /// anyway without them and report it through
+    /// [`Graphics::unmet_requirements`](game_toolkit_gfx::Graphics::unmet_requirements), so
+    /// `Game::init` can draw a "WebGPU required" screen. `false` (default): init fails.
+    pub continue_without_requirements: bool,
     /// Last look at the device request, with the adapter at hand, for decisions the fields
     /// above can't express; see [`DeviceHook`](game_toolkit_gfx::DeviceHook).
     pub device_hook: Option<game_toolkit_gfx::DeviceHook>,
@@ -107,6 +121,9 @@ impl AppConfig {
             msaa_samples: self.msaa_samples,
             required_limits: self.required_limits.clone(),
             required_features: self.required_features,
+            preferred_limits: self.preferred_limits.clone(),
+            preferred_features: self.preferred_features,
+            continue_without_requirements: self.continue_without_requirements,
             device_hook: self.device_hook.clone(),
             virtual_resolution: self.virtual_resolution,
             scale_mode: self.scale_mode,
@@ -134,6 +151,9 @@ impl Default for AppConfig {
             touch_emulates_mouse: false,
             required_limits: None,
             required_features: wgpu::Features::empty(),
+            preferred_limits: None,
+            preferred_features: wgpu::Features::empty(),
+            continue_without_requirements: false,
             device_hook: None,
             virtual_resolution: None,
             scale_mode: game_toolkit_gfx::ScaleMode::Integer,

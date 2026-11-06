@@ -15,6 +15,15 @@ All notable changes to this project are documented here. The format is based on
   feature. `AppConfig::device_hook` edits the device request with the adapter at hand (#87).
 - `Graphics::adapter_info()`, `Graphics::backend()` and `Graphics::supports_compute()`, e.g.
   to show a "WebGPU required" message on WebGL2 instead of failing.
+- `AppConfig::preferred_limits` / `preferred_features`: limits and features a game would like
+  but can do without. Each limit is requested up to what the adapter offers and each feature
+  only where the adapter has it, so they never fail init; read the result from
+  `ctx.gfx.device().limits()` / `features()`. E.g. 8 storage buffers per stage on WebGPU and
+  native, WebGL2's own limits there.
+- `AppConfig::continue_without_requirements` (default `false`): when the adapter can't meet
+  `required_limits` / `required_features`, start anyway without them and report the
+  `DeviceRequirementsError` through `Graphics::unmet_requirements()`, so `Game::init` can draw
+  a "WebGPU required" screen through the painter instead of the game never starting.
 - `game-toolkit-compute`, a new crate (umbrella feature `compute`, `game_toolkit::compute`)
   for GPU simulations: `Kernel` builds a WGSL compute pipeline with its bind-group layout and
   dispatches it over a grid (workgroup counts rounded up) into the frame's encoder;

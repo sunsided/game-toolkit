@@ -51,6 +51,21 @@ pub struct GraphicsConfig {
     /// Optional device features the game needs (`SHADER_F16`, `TIMESTAMP_QUERY`, ...).
     /// Default `Features::empty()`. Missing ones fail init with a [`DeviceRequirementsError`].
     pub required_features: wgpu::Features,
+    /// Device limits the game would like but can do without. Each is requested up to what the
+    /// adapter offers and never fails init; read what you got from
+    /// `Graphics::device().limits()`. `None` (default) asks for nothing extra. E.g. `Some(Limits
+    /// { max_storage_buffers_per_shader_stage: 8, ..Limits::downlevel_defaults() })` gets 8 on
+    /// WebGPU and native, and whatever WebGL2 has there.
+    pub preferred_limits: Option<wgpu::Limits>,
+    /// Device features the game would like but can do without: the ones the adapter has are
+    /// enabled, the others skipped. Check `Graphics::device().features()`.
+    pub preferred_features: wgpu::Features,
+    /// What to do when the adapter lacks a [`Self::required_limits`] or
+    /// [`Self::required_features`] entry. `false` (default): [`Graphics::new`](crate::Graphics::new)
+    /// fails with a [`DeviceRequirementsError`]. `true`: create the device without them and
+    /// report the error through `Graphics::unmet_requirements()`, so the game can start and
+    /// explain itself (e.g. a "WebGPU required" screen on WebGL2).
+    pub continue_without_requirements: bool,
     /// Last look at the device request before it is sent; see [`DeviceHook`].
     pub device_hook: Option<DeviceHook>,
     /// Draw into a fixed-size canvas of `(width, height)` pixels (e.g. `(320, 180)`) and
@@ -79,6 +94,9 @@ impl Default for GraphicsConfig {
             msaa_samples: 1,
             required_limits: None,
             required_features: wgpu::Features::empty(),
+            preferred_limits: None,
+            preferred_features: wgpu::Features::empty(),
+            continue_without_requirements: false,
             device_hook: None,
             virtual_resolution: None,
             scale_mode: ScaleMode::Integer,
@@ -96,6 +114,12 @@ impl fmt::Debug for GraphicsConfig {
             .field("msaa_samples", &self.msaa_samples)
             .field("required_limits", &self.required_limits)
             .field("required_features", &self.required_features)
+            .field("preferred_limits", &self.preferred_limits)
+            .field("preferred_features", &self.preferred_features)
+            .field(
+                "continue_without_requirements",
+                &self.continue_without_requirements,
+            )
             .field("device_hook", &self.device_hook.is_some())
             .field("virtual_resolution", &self.virtual_resolution)
             .field("scale_mode", &self.scale_mode)
@@ -121,7 +145,8 @@ pub struct MissingLimit {
 ///
 /// WebGL2 (the web fallback when the browser has no WebGPU) has no compute shaders and much
 /// lower limits, so a game that requires compute fails here there. To show a "WebGPU
-/// required" screen instead, don't require the limits; check
+/// required" screen instead, set `continue_without_requirements` and check
+/// `Graphics::unmet_requirements()`, or ask with `preferred_limits` and check
 /// [`Graphics::supports_compute`](crate::Graphics::supports_compute) and
 /// `ctx.gfx.device().limits()` in `Game::init`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -171,17 +196,29 @@ pub(crate) fn toolkit_limits(backend: wgpu::Backend) -> wgpu::Limits {
 
 /// Merge the toolkit's limits for `backend` with the game's, and the features likewise.
 /// Texture dimensions follow the adapter (as before: the toolkit asks for the largest the
-/// adapter supports) unless the game asked for more.
+/// adapter supports) unless the game asked for more. Preferred limits and features are
+/// clamped to the adapter, so they never make the request fail; required ones are added as
+/// asked when `with_required` is set.
 pub(crate) fn merged_requirements(
     config: &GraphicsConfig,
     backend: wgpu::Backend,
     adapter_limits: &wgpu::Limits,
+    adapter_features: wgpu::Features,
+    with_required: bool,
 ) -> (wgpu::Limits, wgpu::Features) {
     let mut limits = toolkit_limits(backend).using_resolution(adapter_limits.clone());
-    if let Some(extra) = &config.required_limits {
-        limits = limits.or_better_values_from(extra);
+    let mut features = config.preferred_features & adapter_features;
+    if let Some(preferred) = &config.preferred_limits {
+        limits =
+            limits.or_better_values_from(&preferred.clone().or_worse_values_from(adapter_limits));
     }
-    (limits, config.required_features)
+    if with_required {
+        if let Some(extra) = &config.required_limits {
+            limits = limits.or_better_values_from(extra);
+        }
+        features |= config.required_features;
+    }
+    (limits, features)
 }
 
 /// Check `limits` and `features` against what the adapter offers.
@@ -227,7 +264,13 @@ mod tests {
             ..Default::default()
         };
         let adapter = wgpu::Limits::default();
-        let (limits, _) = merged_requirements(&config, wgpu::Backend::Vulkan, &adapter);
+        let (limits, _) = merged_requirements(
+            &config,
+            wgpu::Backend::Vulkan,
+            &adapter,
+            wgpu::Features::empty(),
+            true,
+        );
         assert_eq!(limits.max_storage_buffers_per_shader_stage, 8);
         let base = toolkit_limits(wgpu::Backend::Vulkan);
         assert_eq!(limits.max_bind_groups, base.max_bind_groups);
@@ -282,6 +325,104 @@ mod tests {
                 wgpu::Features::empty(),
                 &wgpu::Limits::downlevel_defaults(),
                 wgpu::Features::empty(),
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn preferred_limits_are_clamped_to_the_adapter() {
+        let config = GraphicsConfig {
+            preferred_limits: Some(wgpu::Limits {
+                max_storage_buffers_per_shader_stage: 8,
+                ..wgpu::Limits::downlevel_defaults()
+            }),
+            preferred_features: wgpu::Features::SHADER_F16 | wgpu::Features::TIMESTAMP_QUERY,
+            ..Default::default()
+        };
+        // A WebGPU-class adapter has the limit and one of the features.
+        let webgpu = wgpu::Limits::default();
+        let (limits, features) = merged_requirements(
+            &config,
+            wgpu::Backend::BrowserWebGpu,
+            &webgpu,
+            wgpu::Features::SHADER_F16,
+            true,
+        );
+        assert_eq!(limits.max_storage_buffers_per_shader_stage, 8);
+        assert_eq!(features, wgpu::Features::SHADER_F16);
+        assert!(
+            check_requirements(
+                "t",
+                wgpu::Backend::BrowserWebGpu,
+                &webgpu,
+                features,
+                &limits,
+                features
+            )
+            .is_ok()
+        );
+
+        // WebGL2 has no storage buffers at all: the request is clamped, never failing.
+        let gl = wgpu::Limits::downlevel_webgl2_defaults();
+        let (limits, features) = merged_requirements(
+            &config,
+            wgpu::Backend::Gl,
+            &gl,
+            wgpu::Features::empty(),
+            true,
+        );
+        assert_eq!(limits.max_storage_buffers_per_shader_stage, 0);
+        assert!(features.is_empty());
+        assert!(
+            check_requirements("t", wgpu::Backend::Gl, &gl, features, &limits, features).is_ok()
+        );
+    }
+
+    #[test]
+    fn without_required_leaves_out_only_the_required_part() {
+        let config = GraphicsConfig {
+            required_limits: Some(wgpu::Limits {
+                max_storage_buffers_per_shader_stage: 8,
+                ..wgpu::Limits::downlevel_defaults()
+            }),
+            required_features: wgpu::Features::SHADER_F16,
+            ..Default::default()
+        };
+        let gl = wgpu::Limits::downlevel_webgl2_defaults();
+        let (limits, features) = merged_requirements(
+            &config,
+            wgpu::Backend::Gl,
+            &gl,
+            wgpu::Features::empty(),
+            true,
+        );
+        assert!(
+            check_requirements(
+                "t",
+                wgpu::Backend::Gl,
+                &gl,
+                wgpu::Features::empty(),
+                &limits,
+                features
+            )
+            .is_err()
+        );
+        let (limits, features) = merged_requirements(
+            &config,
+            wgpu::Backend::Gl,
+            &gl,
+            wgpu::Features::empty(),
+            false,
+        );
+        assert!(
+            check_requirements(
+                "t",
+                wgpu::Backend::Gl,
+                &gl,
+                wgpu::Features::empty(),
+                &limits,
+                features
             )
             .is_ok()
         );
