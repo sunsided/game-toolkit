@@ -121,6 +121,9 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 
+- `PostPass` can no longer be built with a struct literal outside the toolkit: it gained the
+  `indices` field and a private texture-registry field for `PostPass::texture`. Effects only ever
+  receive a `PostPass`, so `PostEffect` implementations are unaffected.
 - `Graphics::size()` is the size the painter draws at: the virtual resolution when one is set,
   otherwise (as before) the window size. Layout code keeps working with a canvas.
 - `Graphics::flush_pending` also scales the canvas onto the window, so egui and other window
