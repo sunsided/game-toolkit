@@ -63,6 +63,38 @@ pub struct AppConfig {
     /// with [`Input::set_touch_emulates_mouse`](game_toolkit_input::Input::set_touch_emulates_mouse),
     /// which has the details. No effect on Windows, where the OS already does this.
     pub touch_emulates_mouse: bool,
+    /// Device limits the game needs beyond the toolkit's own, for compute or render passes
+    /// it records itself through `ctx.gfx.device()`. `None` (default) requests only what the
+    /// toolkit needs (`Limits::downlevel_defaults()`, or `Limits::default()` with the `vector`
+    /// feature); with `Some`, each limit is the better of the two, e.g.
+    /// `Some(wgpu::Limits { max_storage_buffers_per_shader_stage: 8, ..wgpu::Limits::downlevel_defaults() })`.
+    /// Init fails with a [`DeviceRequirementsError`](game_toolkit_gfx::DeviceRequirementsError)
+    /// naming any limit the adapter can't provide. WebGL2 has no compute at all; to fall back
+    /// gracefully instead, leave this unset and check
+    /// [`Graphics::supports_compute`](game_toolkit_gfx::Graphics::supports_compute) in
+    /// `Game::init`.
+    pub required_limits: Option<wgpu::Limits>,
+    /// Optional device features the game needs (`SHADER_F16`, `TIMESTAMP_QUERY`, ...).
+    /// Default empty. Missing ones fail init like missing limits.
+    pub required_features: wgpu::Features,
+    /// Last look at the device request, with the adapter at hand, for decisions the fields
+    /// above can't express; see [`DeviceHook`](game_toolkit_gfx::DeviceHook).
+    pub device_hook: Option<game_toolkit_gfx::DeviceHook>,
+}
+
+impl AppConfig {
+    /// The [`GraphicsConfig`](game_toolkit_gfx::GraphicsConfig) this config creates the
+    /// renderer with.
+    pub fn graphics_config(&self) -> game_toolkit_gfx::GraphicsConfig {
+        game_toolkit_gfx::GraphicsConfig {
+            vsync: self.vsync,
+            depth_format: self.depth_format,
+            msaa_samples: self.msaa_samples,
+            required_limits: self.required_limits.clone(),
+            required_features: self.required_features,
+            device_hook: self.device_hook,
+        }
+    }
 }
 
 impl Default for AppConfig {
@@ -81,6 +113,9 @@ impl Default for AppConfig {
             depth_format: None,
             msaa_samples: 1,
             touch_emulates_mouse: false,
+            required_limits: None,
+            required_features: wgpu::Features::empty(),
+            device_hook: None,
         }
     }
 }

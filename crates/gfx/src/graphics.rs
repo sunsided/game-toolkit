@@ -8,6 +8,7 @@ use winit::window::Window;
 
 use crate::camera::{Camera2D, CameraUniform};
 use crate::camera3d::{Camera, Camera3D};
+use crate::config::{self, GraphicsConfig};
 use crate::frame::Frame;
 use crate::mesh::{MeshBatcher, MeshId, MeshInstance, MeshRegistry, MeshVertex};
 use crate::primitives::PrimitiveBatcher;
@@ -55,15 +56,21 @@ pub struct Graphics {
     capture_copy_src: bool,
     /// Path to write a screenshot of the next presented frame, set by `request_screenshot`.
     pending_screenshot: Option<PathBuf>,
+    adapter_info: wgpu::AdapterInfo,
+    supports_compute: bool,
 }
 
 impl Graphics {
-    pub async fn new(
-        window: Arc<Window>,
-        vsync: bool,
-        depth_format: Option<wgpu::TextureFormat>,
-        msaa_samples: u32,
-    ) -> Result<Self> {
+    /// Create the surface and device for `window`. Fails with a
+    /// [`DeviceRequirementsError`](crate::DeviceRequirementsError) when the adapter lacks a
+    /// limit or feature from `config`.
+    pub async fn new(window: Arc<Window>, config: &GraphicsConfig) -> Result<Self> {
+        let GraphicsConfig {
+            vsync,
+            depth_format,
+            msaa_samples,
+            ..
+        } = *config;
         let size = window.inner_size();
         let (width, height) = (size.width.max(1), size.height.max(1));
 
@@ -91,28 +98,38 @@ impl Graphics {
             .await
             .context("no compatible adapter")?;
 
-        let backend = adapter.get_info().backend;
-        log::info!("wgpu adapter: {:?} ({backend:?})", adapter.get_info().name);
-        // WebGL2 can't meet even the downlevel limits (and has no compute, so no vello).
-        // Otherwise vello needs the standard (non-downlevel) limits; bump them when it's on.
-        let required_limits = if backend == wgpu::Backend::Gl {
-            wgpu::Limits::downlevel_webgl2_defaults()
-        } else if cfg!(feature = "vector") {
-            wgpu::Limits::default()
-        } else {
-            wgpu::Limits::downlevel_defaults()
+        let info = adapter.get_info();
+        let backend = info.backend;
+        log::info!("wgpu adapter: {:?} ({backend:?})", info.name);
+        let adapter_limits = adapter.limits();
+        let (required_limits, required_features) =
+            config::merged_requirements(config, backend, &adapter_limits);
+        config::check_requirements(
+            &info.name,
+            backend,
+            &adapter_limits,
+            adapter.features(),
+            &required_limits,
+            required_features,
+        )?;
+        let mut device_desc = wgpu::DeviceDescriptor {
+            label: Some("toolkit.device"),
+            required_features,
+            required_limits,
+            memory_hints: wgpu::MemoryHints::Performance,
+            ..Default::default()
+        };
+        if let Some(hook) = config.device_hook {
+            hook(&adapter, &mut device_desc);
         }
-        .using_resolution(adapter.limits());
         let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor {
-                label: Some("toolkit.device"),
-                required_features: wgpu::Features::empty(),
-                required_limits,
-                memory_hints: wgpu::MemoryHints::Performance,
-                ..Default::default()
-            })
+            .request_device(&device_desc)
             .await
             .context("request_device")?;
+        let supports_compute = adapter
+            .get_downlevel_capabilities()
+            .flags
+            .contains(wgpu::DownlevelFlags::COMPUTE_SHADERS);
 
         let caps = surface.get_capabilities(&adapter);
         let surface_format = caps
@@ -237,11 +254,7 @@ impl Graphics {
         let mesh_batcher =
             MeshBatcher::new(&device, format, &camera_bgl, sample_count, depth_format);
         #[cfg(feature = "vector")]
-        let vector = if adapter
-            .get_downlevel_capabilities()
-            .flags
-            .contains(wgpu::DownlevelFlags::COMPUTE_SHADERS)
-        {
+        let vector = if supports_compute {
             Some(VectorPass::new(&device, format, width, height))
         } else {
             log::error!("vector graphics disabled: adapter has no compute shaders ({backend:?})");
@@ -277,6 +290,8 @@ impl Graphics {
             vector,
             capture_copy_src,
             pending_screenshot: None,
+            adapter_info: info,
+            supports_compute,
         })
     }
 
@@ -323,6 +338,24 @@ impl Graphics {
     }
     pub fn queue(&self) -> &wgpu::Queue {
         &self.queue
+    }
+
+    /// The GPU adapter the device was created on: its name, vendor and backend.
+    pub fn adapter_info(&self) -> &wgpu::AdapterInfo {
+        &self.adapter_info
+    }
+
+    /// The graphics backend in use, e.g. `Vulkan`, `Metal`, `BrowserWebGpu` or `Gl`
+    /// (WebGL2 on the web).
+    pub fn backend(&self) -> wgpu::Backend {
+        self.adapter_info.backend
+    }
+
+    /// Whether compute shaders are available. `false` on WebGL2, the web fallback when the
+    /// browser has no WebGPU; check this in `Game::init` to show a "WebGPU required" message
+    /// instead of failing. The device's limits and features are on [`Self::device`].
+    pub fn supports_compute(&self) -> bool {
+        self.supports_compute
     }
 
     /// Load a PNG from disk and remember its path for [`Graphics::refresh_textures`]. Not
