@@ -2,6 +2,9 @@
 
 use std::fmt;
 
+use crate::canvas::{ScaleFilter, ScaleMode};
+use crate::color::Color;
+
 /// Called with the adapter and the device descriptor the toolkit is about to request, after
 /// it has merged its own limits and features with [`GraphicsConfig::required_limits`] and
 /// [`GraphicsConfig::required_features`]. Change the descriptor to request more (or less)
@@ -50,6 +53,22 @@ pub struct GraphicsConfig {
     pub required_features: wgpu::Features,
     /// Last look at the device request before it is sent; see [`DeviceHook`].
     pub device_hook: Option<DeviceHook>,
+    /// Draw into a fixed-size canvas of `(width, height)` pixels (e.g. `(320, 180)`) and
+    /// scale it onto the window with [`Self::scale_mode`], for crisp pixel art. `None`
+    /// (default) draws straight into the window.
+    ///
+    /// With a canvas, everything the painter draws (sprites, shapes, text, tilemaps, vector
+    /// art, 3D meshes) lands in it; [`Graphics::size`](crate::Graphics::size) and the
+    /// cameras report the canvas size, and the toolkit's input reports the mouse and touches
+    /// in canvas pixels. [`Graphics::window_size`](crate::Graphics::window_size) and
+    /// `Frame::view` still give the window.
+    pub virtual_resolution: Option<(u32, u32)>,
+    /// How the canvas is scaled onto the window; default [`ScaleMode::Integer`].
+    pub scale_mode: ScaleMode,
+    /// Filter for scaling the canvas; default [`ScaleFilter::Nearest`].
+    pub scale_filter: ScaleFilter,
+    /// Colour around the canvas; default black.
+    pub border_color: Color,
 }
 
 impl Default for GraphicsConfig {
@@ -61,6 +80,10 @@ impl Default for GraphicsConfig {
             required_limits: None,
             required_features: wgpu::Features::empty(),
             device_hook: None,
+            virtual_resolution: None,
+            scale_mode: ScaleMode::Integer,
+            scale_filter: ScaleFilter::Nearest,
+            border_color: Color::BLACK,
         }
     }
 }
@@ -74,6 +97,10 @@ impl fmt::Debug for GraphicsConfig {
             .field("required_limits", &self.required_limits)
             .field("required_features", &self.required_features)
             .field("device_hook", &self.device_hook.is_some())
+            .field("virtual_resolution", &self.virtual_resolution)
+            .field("scale_mode", &self.scale_mode)
+            .field("scale_filter", &self.scale_filter)
+            .field("border_color", &self.border_color)
             .finish()
     }
 }

@@ -36,8 +36,35 @@ impl From<winit::event::MouseButton> for MouseButton {
     }
 }
 
-/// One finger on a touchscreen. Positions are in physical pixels, the same space as
-/// [`Input::mouse_pos`]. Obtain via [`Input::touches`], [`Input::touches_started`] or
+/// Maps window positions (physical pixels) to the space the game draws in, e.g. a
+/// virtual-resolution canvas scaled into the window: `game = (window - origin) * scale`.
+/// The toolkit sets it each frame from the renderer; see [`Input::set_pointer_mapping`].
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct PointerMapping {
+    /// Window position of the game space's origin.
+    pub origin: (f32, f32),
+    /// Game pixels per window pixel.
+    pub scale: (f32, f32),
+}
+
+impl PointerMapping {
+    /// Map a window position to game space.
+    pub fn apply(&self, pos: (f32, f32)) -> (f32, f32) {
+        (
+            (pos.0 - self.origin.0) * self.scale.0,
+            (pos.1 - self.origin.1) * self.scale.1,
+        )
+    }
+
+    /// Map a movement in window pixels to game space.
+    pub fn apply_delta(&self, delta: (f32, f32)) -> (f32, f32) {
+        (delta.0 * self.scale.0, delta.1 * self.scale.1)
+    }
+}
+
+/// One finger on a touchscreen. Positions are in the same space as [`Input::mouse_pos`]:
+/// physical window pixels, or canvas pixels with a virtual resolution (more precisely, mapped
+/// by the [`PointerMapping`] in effect when the event arrived). Obtain via [`Input::touches`], [`Input::touches_started`] or
 /// [`Input::touches_ended`].
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Touch {
@@ -137,6 +164,8 @@ pub struct Input {
     touch_emulates_mouse: bool,
     /// The finger currently acting as the mouse, while emulation is on.
     mouse_finger: Option<u64>,
+    /// See [`Input::set_pointer_mapping`].
+    pointer_mapping: Option<PointerMapping>,
     /// `None` when no gamepad backend could initialize (the toolkit keeps running).
     gilrs: Option<Gilrs>,
     gamepads: HashMap<GamepadId, Gamepad>,
@@ -365,11 +394,39 @@ impl Input {
         self.mouse_released.contains(&b)
     }
 
+    /// Cursor position: physical window pixels, or canvas pixels when a virtual resolution
+    /// is set (outside `0..size` while the cursor is over the border). See
+    /// [`Input::mouse_pos_window`] for the raw window position.
     pub fn mouse_pos(&self) -> (f32, f32) {
+        match &self.pointer_mapping {
+            Some(m) => m.apply(self.mouse_pos),
+            None => self.mouse_pos,
+        }
+    }
+    /// Cursor position in physical window pixels, ignoring any virtual resolution; for
+    /// overlays drawn onto the window itself.
+    pub fn mouse_pos_window(&self) -> (f32, f32) {
         self.mouse_pos
     }
+    /// How far the cursor moved this frame, in the same space as [`Input::mouse_pos`].
     pub fn mouse_delta(&self) -> (f32, f32) {
-        self.mouse_delta
+        match &self.pointer_mapping {
+            Some(m) => m.apply_delta(self.mouse_delta),
+            None => self.mouse_delta,
+        }
+    }
+
+    /// Report the mouse and touches in another space than window pixels: with `Some`,
+    /// [`Input::mouse_pos`], [`Input::mouse_delta`] and new [`Touch`] positions are mapped
+    /// through it. The toolkit calls this every frame with the virtual-resolution canvas's
+    /// placement, so games don't need to; `None` (the default) reports window pixels.
+    pub fn set_pointer_mapping(&mut self, mapping: Option<PointerMapping>) {
+        self.pointer_mapping = mapping;
+    }
+
+    /// The mapping set by [`Input::set_pointer_mapping`].
+    pub fn pointer_mapping(&self) -> Option<PointerMapping> {
+        self.pointer_mapping
     }
     pub fn scroll(&self) -> (f32, f32) {
         self.scroll
@@ -442,9 +499,14 @@ impl Input {
 
     fn handle_touch(&mut self, id: u64, phase: winit::event::TouchPhase, pos: (f32, f32)) {
         use winit::event::TouchPhase;
+        // The emulated mouse keeps window pixels like the real one (mapped when read).
         if self.touch_emulates_mouse && !cfg!(target_os = "windows") {
             self.emulate_mouse(id, phase, pos);
         }
+        let pos = match &self.pointer_mapping {
+            Some(m) => m.apply(pos),
+            None => pos,
+        };
         match phase {
             TouchPhase::Started => {
                 let touch = Touch {
@@ -768,5 +830,24 @@ mod tests {
         touch(&mut input, 9, Ended, 1.0, 1.0);
         assert_eq!(input.touches().count(), 0);
         assert!(input.touches_ended().is_empty());
+    }
+
+    #[test]
+    fn pointer_mapping_maps_mouse_and_touch() {
+        use winit::event::TouchPhase;
+        let mut input = Input::default();
+        input.set_pointer_mapping(Some(PointerMapping {
+            origin: (20.0, 80.0),
+            scale: (1.0 / 3.0, 1.0 / 3.0),
+        }));
+        input.mouse_pos = (23.0, 86.0);
+        input.mouse_delta = (6.0, -3.0);
+        assert_eq!(input.mouse_pos(), (1.0, 2.0));
+        assert_eq!(input.mouse_pos_window(), (23.0, 86.0));
+        assert_eq!(input.mouse_delta(), (2.0, -1.0));
+        input.handle_touch(7, TouchPhase::Started, (50.0, 80.0));
+        assert_eq!(input.touch(7).map(Touch::pos), Some((10.0, 0.0)));
+        input.set_pointer_mapping(None);
+        assert_eq!(input.mouse_pos(), (23.0, 86.0));
     }
 }

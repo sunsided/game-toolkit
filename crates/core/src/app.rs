@@ -80,6 +80,21 @@ pub struct AppConfig {
     /// Last look at the device request, with the adapter at hand, for decisions the fields
     /// above can't express; see [`DeviceHook`](game_toolkit_gfx::DeviceHook).
     pub device_hook: Option<game_toolkit_gfx::DeviceHook>,
+    /// Draw into a fixed-size canvas of `(width, height)` pixels (e.g. `(320, 180)`) and scale
+    /// it onto the window, for crisp pixel art. `None` (default) draws straight into the
+    /// window. With a canvas, `ctx.gfx.size()`, the cameras and everything the painter draws
+    /// use canvas pixels, and so do `Input::mouse_pos` and touch positions; see
+    /// [`GraphicsConfig::virtual_resolution`](game_toolkit_gfx::GraphicsConfig::virtual_resolution).
+    pub virtual_resolution: Option<(u32, u32)>,
+    /// How the canvas is scaled onto the window: [`ScaleMode::Integer`] (default; whole
+    /// multiples, the rest is border), `Fit` (fractional) or `Stretch`.
+    ///
+    /// [`ScaleMode::Integer`]: game_toolkit_gfx::ScaleMode::Integer
+    pub scale_mode: game_toolkit_gfx::ScaleMode,
+    /// Nearest (default) or linear filtering when scaling the canvas.
+    pub scale_filter: game_toolkit_gfx::ScaleFilter,
+    /// Colour of the border around the canvas (default black).
+    pub border_color: game_toolkit_gfx::Color,
 }
 
 impl AppConfig {
@@ -93,6 +108,10 @@ impl AppConfig {
             required_limits: self.required_limits.clone(),
             required_features: self.required_features,
             device_hook: self.device_hook.clone(),
+            virtual_resolution: self.virtual_resolution,
+            scale_mode: self.scale_mode,
+            scale_filter: self.scale_filter,
+            border_color: self.border_color,
         }
     }
 }
@@ -116,6 +135,10 @@ impl Default for AppConfig {
             required_limits: None,
             required_features: wgpu::Features::empty(),
             device_hook: None,
+            virtual_resolution: None,
+            scale_mode: game_toolkit_gfx::ScaleMode::Integer,
+            scale_filter: game_toolkit_gfx::ScaleFilter::Nearest,
+            border_color: game_toolkit_gfx::Color::BLACK,
         }
     }
 }
@@ -239,6 +262,7 @@ impl<G: Game> ApplicationHandler<InitDone> for AppRunner<G> {
             }
             WindowEvent::Resized(size) => {
                 state.ctx.gfx.resize(size.width, size.height);
+                state.ctx.sync_pointer_mapping();
                 state.game.event(
                     &mut state.ctx,
                     &GameEvent::Resized {
@@ -323,6 +347,7 @@ impl<G: Game> AppRunner<G> {
         // so it sees the true surface size.
         let size = ctx.window.inner_size();
         ctx.gfx.resize(size.width, size.height);
+        ctx.sync_pointer_mapping();
         // If the page already had a user gesture, audio may start now rather than on the first
         // click on the canvas: `G::init` then sees `is_started()` and music plays at once
         // (Chromium). Where the browser takes a moment to tell (Firefox, WebKit), the probe
@@ -361,6 +386,8 @@ impl<G: Game> AppRunner<G> {
         };
         state.ctx.time.tick();
         state.ctx.input.poll_gamepads();
+        // The game may have changed the virtual resolution or scale mode last frame.
+        state.ctx.sync_pointer_mapping();
         #[cfg(target_arch = "wasm32")]
         state.ctx.poll_autoplay();
         #[cfg(target_arch = "wasm32")]

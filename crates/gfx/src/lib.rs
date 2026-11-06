@@ -4,6 +4,7 @@
 
 mod camera;
 mod camera3d;
+mod canvas;
 mod color;
 mod config;
 mod draw;
@@ -33,6 +34,7 @@ pub use vello;
 
 pub use camera::Camera2D;
 pub use camera3d::{Camera, Camera3D};
+pub use canvas::{CanvasRect, ScaleFilter, ScaleMode};
 pub use color::{Color, Layer};
 pub use config::{DeviceHook, DeviceRequirementsError, GraphicsConfig, MissingLimit};
 pub use draw::{RectDraw, SpriteDraw, TextDraw};
