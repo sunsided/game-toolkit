@@ -92,7 +92,7 @@ impl AppConfig {
             msaa_samples: self.msaa_samples,
             required_limits: self.required_limits.clone(),
             required_features: self.required_features,
-            device_hook: self.device_hook,
+            device_hook: self.device_hook.clone(),
         }
     }
 }

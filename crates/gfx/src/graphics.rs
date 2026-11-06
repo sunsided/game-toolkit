@@ -119,7 +119,7 @@ impl Graphics {
             memory_hints: wgpu::MemoryHints::Performance,
             ..Default::default()
         };
-        if let Some(hook) = config.device_hook {
+        if let Some(hook) = &config.device_hook {
             hook(&adapter, &mut device_desc);
         }
         let (device, queue) = adapter
