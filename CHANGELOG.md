@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-06
+
 ### Added
 
 - Stereo streams: `StereoStream` (implemented for `FnMut(&mut [[f32; 2]])`) and
@@ -544,7 +546,8 @@ the `game-toolkit` umbrella; add one dependency and `use game_toolkit::prelude::
 - Top-level and per-crate `README.md`s, crates.io metadata, and `#![forbid(unsafe_code)]`
   across every crate.
 
-[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/sunsided/game-toolkit/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/sunsided/game-toolkit/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/sunsided/game-toolkit/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/sunsided/game-toolkit/compare/v0.8.0...v0.9.0
