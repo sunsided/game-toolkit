@@ -461,6 +461,45 @@ task publish:dry   # trial publish all crates in order (task publish releases fo
 
 The generated jam templates ship their own `Taskfile.yaml` too.
 
+## How it compares
+
+game-toolkit is a library, not an engine: you own the game loop and the state, it brings a
+window, a renderer, input, audio and assets. There is no editor, scene graph, physics or
+required ECS. What it adds instead is aimed at the 48 hours of a jam: a working native + web
+project from a template, Aseprite files loaded as they are, music and effects without audio
+files, retro presentation (virtual resolution, CRT, indexed palettes), and direct access to
+wgpu when you need your own pass or compute shader.
+
+| | Model | Rendering | 2D / 3D | Editor | Web |
+|-|-------|-----------|---------|--------|-----|
+| **game-toolkit** | `Game` trait with `init` / `update` / `render` and a batched `Painter` | wgpu, open to custom passes and compute | 2D, plus instanced 3D meshes under a 2D HUD | no | yes, same code (WebGPU, WebGL2 fallback) |
+| [Bevy](https://bevy.org) | ECS, plugins, everything is systems | wgpu | both, full feature set | no | yes |
+| [Fyrox](https://fyrox.rs) | scene graph with scripts, "like Godot, but in Rust" | own renderer | both | yes | examples run in the browser |
+| [Godot](https://godotengine.org) + [godot-rust](https://godot-rust.github.io/) | Rust classes in a Godot 4 project via GDExtension | Godot's | both | yes, Godot's | Godot export; Rust on web is experimental |
+| [macroquad](https://github.com/not-fl3/macroquad) | immediate-mode free functions, async main loop | miniquad (OpenGL) | 2D-focused | no | yes |
+| [ggez](https://github.com/ggez/ggez) | `EventHandler` trait, LÖVE-inspired | wgpu | 2D, some 3D | no | not officially |
+
+Roughly:
+
+- **Bevy** when the game will grow past the jam, or you want ECS everywhere, a large plugin
+  ecosystem and a full 3D renderer. You pay for it in compile times, a new mental model, and
+  breaking releases about every three months.
+- **Fyrox** or **Godot with godot-rust** when you want an editor to lay out levels and scenes.
+  Godot also brings its mature tooling, export pipeline and asset library.
+- **macroquad** for the smallest dependency tree and fastest builds, with free functions and
+  no structure to learn.
+- **ggez** for the closest model to game-toolkit (a trait you implement, on wgpu), if you do not
+  need the browser.
+- **game-toolkit** when you want macroquad-level directness on wgpu, the web build working from
+  minute one, and the jam extras above in one dependency.
+
+Others on [Are we game yet?](https://arewegameyet.rs/ecosystem/engines/) include
+[Notan](https://github.com/Nazariglez/notan) (2D, glow, strong web support; in slow maintenance
+mode), [Tetra](https://github.com/17cupsofcoffee/tetra), [Piston](https://github.com/PistonDevelopers/piston),
+[nannou](https://nannou.cc) for creative coding, and bindings to raylib and SDL3.
+[Comfy](https://github.com/darthdeus/comfy), a wgpu-based 2D toolkit with similar goals, is
+archived.
+
 ## Status
 
 Published on [crates.io](https://crates.io/crates/game-toolkit). The 2D runtime, input
