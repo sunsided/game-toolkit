@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- Every crate's package metadata now links the project site, https://game-toolkit.dev/, as its
+  homepage (shown on crates.io); `repository` still points at GitHub.
+- The README compares game-toolkit with Bevy, Fyrox, Godot (godot-rust), macroquad and ggez.
+
 ## [0.11.2] - 2026-11-08
 
 ### Added
