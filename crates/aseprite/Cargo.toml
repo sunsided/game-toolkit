@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
 description = "Load native .aseprite files and exported PNG+JSON sheets into GPU-ready sprite sheets for game-toolkit."
 keywords = ["aseprite", "sprite", "spritesheet", "gamedev", "2d"]
 categories = ["game-development", "multimedia::images"]

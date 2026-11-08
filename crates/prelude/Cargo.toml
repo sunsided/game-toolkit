@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
 description = "A Rust game-jam toolkit for 2D and 3D - umbrella crate; use game_toolkit::prelude::* and go."
 keywords = ["gamedev", "gamejam", "2d", "3d", "toolkit"]
 categories = ["game-development", "game-engines"]

@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
 description = "Keyboard, mouse and gamepad input for game-toolkit."
 keywords = ["input", "gamepad", "keyboard", "gamedev", "winit"]
 categories = ["game-development"]

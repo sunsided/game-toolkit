@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
 description = "wgpu rendering for game-toolkit: sprite/primitive/text batchers, tilemaps, 3D meshes, optional vello."
 keywords = ["wgpu", "rendering", "gamedev", "2d", "3d"]
 categories = ["game-development", "rendering", "graphics"]

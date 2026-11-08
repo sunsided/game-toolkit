@@ -44,6 +44,7 @@ version = "0.11.2"
 edition = "2024"
 license = "EUPL-1.2"
 repository = "https://github.com/sunsided/game-toolkit"
+homepage = "https://game-toolkit.dev/"
 authors = ["Markus Mayer"]
 # egui 0.37 sets the floor. CI runs an MSRV job against this exact toolchain.
 rust-version = "1.95"
