@@ -29,6 +29,7 @@ All notable changes to this project are documented here. The format is based on
 
 - `CrtSettings` has three new fields (`beam`, `monochrome`, `corner_radius`): struct literals
   need them, or `..CrtSettings::arcade()` style updates.
+- `CrtMask` has a new variant, `SlotMask`: exhaustive `match`es need an arm for it.
 
 ## [0.11.1] - 2026-11-06
 

@@ -59,7 +59,9 @@ fn canvas_uv(t: vec2<f32>) -> vec2<f32> {
 // The picture at `t` (in picture pixels), bilinear.
 fn pic_linear(t: vec2<f32>) -> vec3<f32> {
     if (post.source == 1u) {
-        let uv = (params.src_region.xy + t) / vec2<f32>(textureDimensions(source_tex));
+        // Half a texel in from the region's edges: no blending with what lies outside it.
+        let inside = clamp(t, vec2<f32>(0.5), params.src_region.zw - 0.5);
+        let uv = (params.src_region.xy + inside) / vec2<f32>(textureDimensions(source_tex));
         return textureSampleLevel(source_tex, linear_sampler, uv, 0.0).rgb;
     }
     return textureSampleLevel(input_tex, linear_sampler, canvas_uv(t), 0.0).rgb;
@@ -86,6 +88,10 @@ fn sample_sharp(t: vec2<f32>) -> vec3<f32> {
 
 // One source line at `x`, blurred horizontally like the beam's spot.
 fn beam_line(x: f32, row: i32) -> vec3<f32> {
+    // No line above the first or below the last: nothing to add there.
+    if (row < 0 || row >= i32(pic_size().y)) {
+        return vec3<f32>(0.0);
+    }
     let sigma = params.beam.z;
     let x0 = floor(x - 0.5);
     var acc = vec3<f32>(0.0);
@@ -119,7 +125,8 @@ fn beam(t: vec2<f32>, px_per_line: f32) -> vec3<f32> {
     let scan = params.scanline * smoothstep(1.4, 2.6, px_per_line);
     let flat = select(b, a, fy < 0.5);
     let lit = beam_profile(fy, a) + beam_profile(1.0 - fy, b);
-    // Make up the average brightness lost to the gaps.
+    // Make up the average brightness lost to the gaps. Only that: stripes wide enough to
+    // overlap are left to add up, so bright areas glow and bleed as on a real tube.
     let avg_w = mix(params.beam.x, params.beam.y, 0.5);
     let norm = 1.0 / clamp(avg_w * 2.5066, 0.35, 1.0);
     return mix(flat, lit * norm, scan);

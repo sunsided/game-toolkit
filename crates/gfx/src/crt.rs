@@ -30,7 +30,8 @@ pub enum CrtMask {
 pub struct CrtBeam {
     /// Beam height (Gaussian sigma, in source lines) for black.
     pub min: f32,
-    /// Beam height for full brightness; `min..=max`, around `0.3..0.6`.
+    /// Beam height for full brightness; `min..=max`, around `0.3..0.6`. Above about `0.4`
+    /// neighbouring lines overlap and add up, so bright areas get brighter and may clip.
     pub max: f32,
     /// Horizontal spot blur (sigma, in source pixels): `0.3` is sharp, `1.0` a blurry TV.
     pub blur: f32,
@@ -47,8 +48,24 @@ pub struct CrtSource {
     /// in the [`Window`](crate::PostStage::Window) stage). Outside it the input passes
     /// through unchanged, so a border or UI drawn around the picture stays as it is.
     pub rect: [f32; 4],
-    /// The part of the texture to show, `[x, y, w, h]` in texels.
+    /// The part of the texture to show, `[x, y, w, h]` in texels, cut to the texture. If
+    /// nothing is left of it, or `rect` is empty, the effect filters the canvas instead.
     pub region: [f32; 4],
+}
+
+impl CrtSource {
+    /// This source with its region cut to a texture of `size`; `None` if there is no picture
+    /// to show (the comparisons also reject NaN).
+    fn fitted(mut self, size: [u32; 2]) -> Option<Self> {
+        let [x, y, w, h] = self.region;
+        let [tw, th] = size.map(|v| v as f32);
+        let (x0, x1) = (x.clamp(0.0, tw), (x + w).clamp(0.0, tw));
+        let (y0, y1) = (y.clamp(0.0, th), (y + h).clamp(0.0, th));
+        self.region = [x0, y0, x1 - x0, y1 - y0];
+        let visible = self.rect[2] > 0.0 && self.rect[3] > 0.0;
+        // The shader addresses whole texels, so at least one of them.
+        (visible && x1 - x0 >= 1.0 && y1 - y0 >= 1.0).then_some(self)
+    }
 }
 
 /// What glows when [`CrtSettings::bloom`] is on.
@@ -110,7 +127,8 @@ pub struct CrtSettings {
     /// A monochrome monitor: only brightness is shown, in this phosphor colour (sRGB, alpha
     /// ignored), e.g. `Color::hex(0x33ff66)` for green, `Color::hex(0xffb000)` for amber.
     pub monochrome: Option<Color>,
-    /// Rounded screen corners, as a fraction of the picture height; `0` for square.
+    /// Rounded screen corners: the radius as a fraction of half the picture height, `0..=1`;
+    /// `0` for square.
     pub corner_radius: f32,
 }
 
@@ -268,7 +286,7 @@ impl CrtSettings {
                 let lin = |v: f32| crate::graphics::srgb_to_linear(v) as f32;
                 [lin(c.r), lin(c.g), lin(c.b), 1.0]
             }),
-            shape: [self.corner_radius, 0.0, 0.0, 0.0],
+            shape: [self.corner_radius.clamp(0.0, 1.0), 0.0, 0.0, 0.0],
             src_rect: source.map_or([0.0; 4], |s| s.rect),
             src_region: source.map_or([0.0; 4], |s| s.region),
         }
@@ -392,10 +410,16 @@ impl CrtEffect {
 
 impl PostEffect for CrtEffect {
     fn apply(&mut self, pass: &mut PostPass<'_>) {
-        let state = (self.settings, pass.indices.is_some(), self.source);
+        // An unknown texture stays as it is, for the shader's own warning.
+        let source = self.source.and_then(|s| {
+            pass.texture_size(s.texture)
+                .map_or(Some(s), |t| s.fitted(t))
+        });
+        let state = (self.settings, pass.indices.is_some(), source);
         if self.uploaded != Some(state) {
             self.shader
-                .set_params(&self.settings.params(state.1, self.source.as_ref()));
+                .set_params(&self.settings.params(state.1, source.as_ref()));
+            self.shader.set_source(source.map(|s| s.texture));
             self.uploaded = Some(state);
         }
         self.shader.apply(pass);
@@ -427,6 +451,25 @@ mod tests {
         };
         let [min, max, ..] = s.params(false, None).beam;
         assert_eq!((min, max), (0.5, 0.5));
+    }
+
+    #[test]
+    fn source_region_is_cut_to_the_texture() {
+        let source = |rect, region| CrtSource {
+            texture: TextureId(0),
+            rect,
+            region,
+        };
+        let rect = [0.0, 0.0, 64.0, 64.0];
+        let fit = |r| source(rect, r).fitted([8, 4]).map(|s| s.region);
+        assert_eq!(fit([2.0, 1.0, 4.0, 2.0]), Some([2.0, 1.0, 4.0, 2.0]));
+        assert_eq!(fit([6.0, -1.0, 8.0, 3.0]), Some([6.0, 0.0, 2.0, 2.0]));
+        assert_eq!(fit([0.0, 0.0, 0.0, 4.0]), None);
+        assert_eq!(fit([0.0, 0.0, -8.0, 4.0]), None);
+        assert_eq!(fit([9.0, 0.0, 4.0, 4.0]), None);
+        assert_eq!(fit([f32::NAN, 0.0, 4.0, 4.0]), None);
+        let empty_rect = source([0.0, 0.0, 0.0, 64.0], [0.0, 0.0, 8.0, 4.0]);
+        assert_eq!(empty_rect.fitted([8, 4]), None);
     }
 
     #[test]

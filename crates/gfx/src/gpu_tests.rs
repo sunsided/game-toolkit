@@ -499,6 +499,9 @@ fn crt_source_is_filtered_into_its_rectangle() {
     let mut textures = TextureRegistry::new(&device, &queue);
     let white = [255u8; 4].repeat(16);
     let screen = textures.create_from_rgba(&device, &queue, 4, 4, &white, Some("screen"));
+    let mut first_line = [0u8; 64];
+    first_line[..16].copy_from_slice(&[100, 100, 100, 255].repeat(4));
+    let first = textures.create_from_rgba(&device, &queue, 4, 4, &first_line, Some("first"));
     // 4 x 4 source pixels into 16 x 16 output pixels at (8, 8): 4 pixels per line.
     let source = CrtSource {
         texture: screen,
@@ -520,7 +523,7 @@ fn crt_source_is_filtered_into_its_rectangle() {
         }),
         ..CrtSettings::arcade()
     };
-    let run = |settings: CrtSettings| {
+    let run_with = |settings: CrtSettings, source: CrtSource| {
         let mut crt = CrtEffect::with_device(&device, FORMAT, settings).with_source(source);
         let (out, out_view) = target(&device, size);
         let mut encoder = device.create_command_encoder(&Default::default());
@@ -551,6 +554,8 @@ fn crt_source_is_filtered_into_its_rectangle() {
         }
     };
 
+    let run = |settings: CrtSettings| run_with(settings, source);
+
     let px = run(settings);
     assert_eq!(px(2, 2), [0, 0, 255], "outside the rectangle: the input");
     // Source line 1 is centred on output row 8 + 6 = 14; row 12 is near the gap above it.
@@ -566,4 +571,23 @@ fn crt_source_is_filtered_into_its_rectangle() {
     let [r, g, b] = px(16, 14);
     assert!(r == 0 && b == 0 && g > 200, "green phosphor: {r} {g} {b}");
     assert_eq!(px(8, 8), [0, 0, 0], "the corner is cut off");
+
+    // Only the first line lit, with a wide beam: its stripe is the same above its centre
+    // (output row 10) as below it, nothing is added for the row that doesn't exist above.
+    let px = run_with(
+        CrtSettings {
+            beam: Some(CrtBeam {
+                min: 0.5,
+                max: 0.5,
+                blur: 0.3,
+            }),
+            ..settings
+        },
+        CrtSource {
+            texture: first,
+            ..source
+        },
+    );
+    let (above, below) = (px(16, 8)[0], px(16, 11)[0]);
+    assert!(above.abs_diff(below) <= 2, "above {above}, below {below}");
 }
