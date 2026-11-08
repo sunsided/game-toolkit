@@ -64,7 +64,7 @@ pub mod prelude {
     pub use game_toolkit_gfx::vello;
 
     #[cfg(feature = "crt")]
-    pub use game_toolkit_gfx::{BloomSource, CrtEffect, CrtMask, CrtSettings};
+    pub use game_toolkit_gfx::{BloomSource, CrtBeam, CrtEffect, CrtMask, CrtSettings, CrtSource};
 
     #[cfg(feature = "indexed")]
     pub use game_toolkit_gfx::{INDEX_WGSL, IndexedImage, Palette, PaletteCycle, PaletteCycleId};

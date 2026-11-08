@@ -125,7 +125,12 @@ Implement `PostEffect` for multi-pass effects. Feature `crt`: `CrtEffect::new(&c
 CrtSettings::arcade())` (also `subtle`, `consumer_tv`, `pc_monitor`) in `PostStage::Window`, with
 scanlines locked to canvas rows; it also makes fractional `ScaleMode::Fit` look even. Its bloom
 follows brightness, or only chosen palette entries on an indexed canvas:
-`bloom_source: BloomSource::indices(LAVA..LAVA + 8)`.
+`bloom_source: BloomSource::indices(LAVA..LAVA + 8)`. `beam: Some(CrtBeam { min, max, blur })`
+models the electron beam (lines that widen with brightness, a horizontal blur that melts
+dithering), `monochrome: Some(color)` makes a green or amber screen
+(`CrtSettings::monochrome_monitor(color)`), `corner_radius` rounds the tube.
+`.with_source(CrtSource { texture, rect, region })` filters a texture of your own (an emulated
+screen) into a rectangle instead of the canvas, with scanlines on its lines.
 
 ## Indexed colour (feature `indexed`)
 

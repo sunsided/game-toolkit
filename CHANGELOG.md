@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `CrtEffect` learns what `game-toolkit-dosvideo`'s own CRT filter had, so that crate can drop
+  its filter and use this one:
+  - `CrtSettings::beam: Option<CrtBeam>` (`min`, `max`, `blur`): an electron-beam model. Each
+    source line is a Gaussian stripe of light that grows with brightness (bright lines close
+    the gaps between scanlines, dark ones leave them open), blurred horizontally like the
+    beam's spot, which melts dither patterns into the intended colours. The gaps fade out
+    below about two output pixels per line instead of aliasing. `None` (all existing presets)
+    keeps the row darkening as before.
+  - `CrtMask::SlotMask`: staggered RGB slots with gaps, as on most TVs.
+  - `CrtSettings::monochrome: Option<Color>`: show only brightness, in a phosphor colour; the
+    `CrtSettings::monochrome_monitor(color)` preset is a green or amber screen.
+  - `CrtSettings::corner_radius`: rounded tube corners.
+  - `CrtEffect::with_source(CrtSource { texture, rect, region })` / `set_source`: filter a
+    painter texture of the game's own (an emulated screen with its border) into a rectangle
+    instead of the canvas, with scanlines and blur on the texture's lines and pixels. Outside
+    the rectangle the input passes through.
+
+### Changed
+
+- `CrtSettings` has three new fields (`beam`, `monochrome`, `corner_radius`): struct literals
+  need them, or `..CrtSettings::arcade()` style updates.
+- `CrtMask` has a new variant, `SlotMask`: exhaustive `match`es need an arm for it.
+
 ## [0.11.1] - 2026-11-06
 
 ### Added

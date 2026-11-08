@@ -478,3 +478,116 @@ fn shader_effect_reads_its_source_texture() {
     effect.set_source(None);
     assert_eq!(run(&mut effect, &textures), [0, 0, 255]);
 }
+
+/// A `CrtEffect` with a [`CrtSource`] shows that texture inside its rectangle, with the beam
+/// model's gaps between its lines (not the canvas rows), and passes the input through outside
+/// it; monochrome shows only the phosphor colour and rounded corners cut the rectangle's
+/// corners.
+#[cfg(feature = "crt")]
+#[test]
+fn crt_source_is_filtered_into_its_rectangle() {
+    use crate::canvas::CanvasRect;
+    use crate::crt::{CrtBeam, CrtEffect, CrtMask, CrtSettings, CrtSource};
+    use crate::post::{PostEffect, PostPass, PostStage};
+
+    let Some((device, queue)) = device() else {
+        return;
+    };
+    let size = [32u32, 32];
+    let blue: Vec<u8> = [0u8, 0, 255, 255].repeat((size[0] * size[1]) as usize);
+    let input = texture_with(&device, &queue, size, &blue);
+    let mut textures = TextureRegistry::new(&device, &queue);
+    let white = [255u8; 4].repeat(16);
+    let screen = textures.create_from_rgba(&device, &queue, 4, 4, &white, Some("screen"));
+    let mut first_line = [0u8; 64];
+    first_line[..16].copy_from_slice(&[100, 100, 100, 255].repeat(4));
+    let first = textures.create_from_rgba(&device, &queue, 4, 4, &first_line, Some("first"));
+    // 4 x 4 source pixels into 16 x 16 output pixels at (8, 8): 4 pixels per line.
+    let source = CrtSource {
+        texture: screen,
+        rect: [8.0, 8.0, 16.0, 16.0],
+        region: [0.0, 0.0, 4.0, 4.0],
+    };
+    let settings = CrtSettings {
+        scanlines: 1.0,
+        mask: CrtMask::None,
+        bloom: 0.0,
+        persistence: 0.0,
+        curvature: 0.0,
+        vignette: 0.0,
+        brightness: 1.0,
+        beam: Some(CrtBeam {
+            min: 0.2,
+            max: 0.2,
+            blur: 0.3,
+        }),
+        ..CrtSettings::arcade()
+    };
+    let run_with = |settings: CrtSettings, source: CrtSource| {
+        let mut crt = CrtEffect::with_device(&device, FORMAT, settings).with_source(source);
+        let (out, out_view) = target(&device, size);
+        let mut encoder = device.create_command_encoder(&Default::default());
+        let rect = CanvasRect {
+            origin: [0.0, 0.0],
+            size: [size[0] as f32, size[1] as f32],
+        };
+        let mut globals = crate::post::globals(size, size, rect, 0.0, 0);
+        globals.size = [size[0] as f32, size[1] as f32];
+        crt.apply(&mut PostPass {
+            device: &device,
+            queue: &queue,
+            encoder: &mut encoder,
+            input: &input,
+            output: &out_view,
+            history: None,
+            indices: None,
+            format: FORMAT,
+            stage: PostStage::Window,
+            size,
+            globals,
+            textures: &textures,
+        });
+        let pixels = read_back(&device, &queue, encoder, &out, size);
+        move |x: u32, y: u32| {
+            let i = ((y * size[0] + x) * 4) as usize;
+            [pixels[i], pixels[i + 1], pixels[i + 2]]
+        }
+    };
+
+    let run = |settings: CrtSettings| run_with(settings, source);
+
+    let px = run(settings);
+    assert_eq!(px(2, 2), [0, 0, 255], "outside the rectangle: the input");
+    // Source line 1 is centred on output row 8 + 6 = 14; row 12 is near the gap above it.
+    let (line, gap) = (px(16, 14)[0], px(16, 12)[0]);
+    assert!(line > 240 && gap < 200, "line {line}, gap {gap}");
+    assert_eq!(px(16, 14)[1], line, "white stays white");
+
+    let px = run(CrtSettings {
+        monochrome: Some(Color::rgb(0.0, 1.0, 0.0)),
+        corner_radius: 0.3,
+        ..settings
+    });
+    let [r, g, b] = px(16, 14);
+    assert!(r == 0 && b == 0 && g > 200, "green phosphor: {r} {g} {b}");
+    assert_eq!(px(8, 8), [0, 0, 0], "the corner is cut off");
+
+    // Only the first line lit, with a wide beam: its stripe is the same above its centre
+    // (output row 10) as below it, nothing is added for the row that doesn't exist above.
+    let px = run_with(
+        CrtSettings {
+            beam: Some(CrtBeam {
+                min: 0.5,
+                max: 0.5,
+                blur: 0.3,
+            }),
+            ..settings
+        },
+        CrtSource {
+            texture: first,
+            ..source
+        },
+    );
+    let (above, below) = (px(16, 8)[0], px(16, 11)[0]);
+    assert!(above.abs_diff(below) <= 2, "above {above}, below {below}");
+}

@@ -92,7 +92,8 @@ and `ctx.input.mouse_pos()` are then in canvas pixels; `ctx.gfx.window_size()` a
 5 × 7 font, `p.bitmap_text(&font, ..)` a `BitmapFont` loaded from a glyph sheet
 (`ctx.load_bitmap_font`) or a BMFont `.fnt` (`ctx.load_bmfont`). Full-screen post effects run after the scene:
 `ctx.gfx.add_post_effect(PostStage::Window, effect)` takes a `ShaderEffect` (one WGSL fragment
-shader) or any `PostEffect`; the `crt` feature adds `CrtEffect` with presets. The `indexed`
+shader) or any `PostEffect`; the `crt` feature adds `CrtEffect` with presets, an optional
+electron-beam model and monochrome phosphors, over the canvas or a texture of your own. The `indexed`
 feature draws palette indices (`Color::index`, indexed PNGs, or your own shaders through
 `INDEX_WGSL`) and resolves them through a `Palette` at the end of the frame, with palette
 cycling and crossfades; post effects still see the indices, so the CRT bloom can glow only for
