@@ -3,7 +3,9 @@
 
 use bytemuck::{Pod, Zeroable};
 
+use crate::color::Color;
 use crate::post::{PostEffect, PostPass, ShaderEffect};
+use crate::texture::TextureId;
 
 /// The phosphor pattern a [`CrtEffect`] overlays.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -14,6 +16,39 @@ pub enum CrtMask {
     ApertureGrille,
     /// RGB triads offset on alternate rows.
     ShadowMask,
+    /// Vertical RGB slots, every other triad column shifted down by half a slot, with short
+    /// gaps between the slots (most TVs).
+    SlotMask,
+}
+
+/// A model of the electron beam for [`CrtSettings::beam`]: each source line is lit as a
+/// Gaussian stripe that grows with brightness, so bright lines close the gaps between
+/// scanlines and dark ones leave them open, and the spot is blurred horizontally, which melts
+/// dither patterns into the colours the artists meant. Wants a few window pixels per source
+/// line; below about two the gaps fade out instead of aliasing.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct CrtBeam {
+    /// Beam height (Gaussian sigma, in source lines) for black.
+    pub min: f32,
+    /// Beam height for full brightness; `min..=max`, around `0.3..0.6`.
+    pub max: f32,
+    /// Horizontal spot blur (sigma, in source pixels): `0.3` is sharp, `1.0` a blurry TV.
+    pub blur: f32,
+}
+
+/// A picture of the game's own for the CRT to show instead of the canvas, see
+/// [`CrtEffect::with_source`]: an emulated screen or a video frame, one texel per dot and
+/// line, so scanlines and blur follow its lines rather than the canvas rows.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct CrtSource {
+    /// Painter texture with the picture, uploaded each frame with `update_texture_rgba`.
+    pub texture: TextureId,
+    /// Where the picture goes, `[x, y, w, h]` in pixels of the stage's image (window pixels
+    /// in the [`Window`](crate::PostStage::Window) stage). Outside it the input passes
+    /// through unchanged, so a border or UI drawn around the picture stays as it is.
+    pub rect: [f32; 4],
+    /// The part of the texture to show, `[x, y, w, h]` in texels.
+    pub region: [f32; 4],
 }
 
 /// What glows when [`CrtSettings::bloom`] is on.
@@ -66,7 +101,17 @@ pub struct CrtSettings {
     /// Overall gain, compensating for what scanlines and mask take away.
     pub brightness: f32,
     /// `1.0`: hard canvas pixel edges with a one-window-pixel blend; `0.0`: plain bilinear.
+    /// Not used with a [`beam`](Self::beam), which blurs instead.
     pub sharpness: f32,
+    /// The beam model instead of the plain row darkening (`None`, all presets but
+    /// [`monochrome_monitor`](Self::monochrome_monitor)); [`scanlines`](Self::scanlines)
+    /// sets how dark its gaps get.
+    pub beam: Option<CrtBeam>,
+    /// A monochrome monitor: only brightness is shown, in this phosphor colour (sRGB, alpha
+    /// ignored), e.g. `Color::hex(0x33ff66)` for green, `0xffb000` for amber.
+    pub monochrome: Option<Color>,
+    /// Rounded screen corners, as a fraction of the picture height; `0` for square.
+    pub corner_radius: f32,
 }
 
 impl Default for CrtSettings {
@@ -91,6 +136,9 @@ impl CrtSettings {
             vignette: 0.1,
             brightness: 1.05,
             sharpness: 1.0,
+            beam: None,
+            monochrome: None,
+            corner_radius: 0.0,
         }
     }
 
@@ -108,6 +156,9 @@ impl CrtSettings {
             vignette: 0.25,
             brightness: 1.3,
             sharpness: 1.0,
+            beam: None,
+            monochrome: None,
+            corner_radius: 0.0,
         }
     }
 
@@ -125,6 +176,9 @@ impl CrtSettings {
             vignette: 0.4,
             brightness: 1.35,
             sharpness: 0.5,
+            beam: None,
+            monochrome: None,
+            corner_radius: 0.0,
         }
     }
 
@@ -142,11 +196,40 @@ impl CrtSettings {
             vignette: 0.1,
             brightness: 1.1,
             sharpness: 1.0,
+            beam: None,
+            monochrome: None,
+            corner_radius: 0.0,
+        }
+    }
+
+    /// A monochrome monitor (a green or amber screen, a white paper-white one): the beam
+    /// model with a soft spot, no mask, a long glow, slightly curved glass with round
+    /// corners, everything in shades of `phosphor`.
+    pub fn monochrome_monitor(phosphor: Color) -> Self {
+        Self {
+            scanlines: 0.6,
+            mask: CrtMask::None,
+            mask_strength: 0.0,
+            mask_size: 1.0,
+            bloom: 0.35,
+            bloom_source: BloomSource::Luminance,
+            persistence: 0.0,
+            curvature: 0.03,
+            vignette: 0.25,
+            brightness: 1.15,
+            sharpness: 1.0,
+            beam: Some(CrtBeam {
+                min: 0.3,
+                max: 0.55,
+                blur: 0.55,
+            }),
+            monochrome: Some(phosphor),
+            corner_radius: 0.03,
         }
     }
 
     /// The shader parameters; `indexed` says whether the frame has an indexed canvas.
-    fn params(&self, indexed: bool) -> CrtParams {
+    fn params(&self, indexed: bool, source: Option<&CrtSource>) -> CrtParams {
         let (bloom_from_indices, emissive) = match self.bloom_source {
             BloomSource::IndexMask(mask) if indexed => (
                 1,
@@ -164,6 +247,7 @@ impl CrtSettings {
                 CrtMask::None => 0,
                 CrtMask::ApertureGrille => 1,
                 CrtMask::ShadowMask => 2,
+                CrtMask::SlotMask => 3,
             },
             mask_size: self.mask_size,
             bloom: self.bloom,
@@ -175,6 +259,16 @@ impl CrtSettings {
             bloom_from_indices,
             _pad: 0.0,
             emissive,
+            beam: self.beam.map_or([0.0; 4], |b| {
+                [b.min.max(0.05), b.max.max(0.05), b.blur.max(0.05), 1.0]
+            }),
+            mono: self.monochrome.map_or([0.0; 4], |c| {
+                let lin = |v: f32| crate::graphics::srgb_to_linear(v) as f32;
+                [lin(c.r), lin(c.g), lin(c.b), 1.0]
+            }),
+            shape: [self.corner_radius, 0.0, 0.0, 0.0],
+            src_rect: source.map_or([0.0; 4], |s| s.rect),
+            src_region: source.map_or([0.0; 4], |s| s.region),
         }
     }
 }
@@ -196,6 +290,11 @@ struct CrtParams {
     bloom_from_indices: u32,
     _pad: f32,
     emissive: [[u32; 4]; 2],
+    beam: [f32; 4],
+    mono: [f32; 4],
+    shape: [f32; 4],
+    src_rect: [f32; 4],
+    src_region: [f32; 4],
 }
 
 /// A CRT look: scanlines locked to canvas rows, an aperture grille or shadow mask, bloom,
@@ -208,11 +307,15 @@ struct CrtParams {
 /// // later
 /// ctx.gfx.post_effect_mut::<CrtEffect>(crt).unwrap().settings_mut().curvature = 0.0;
 /// ```
+///
+/// To filter a picture of the game's own (an emulated screen) instead of the canvas, give it
+/// a [`CrtSource`] with [`with_source`](Self::with_source).
 pub struct CrtEffect {
     shader: ShaderEffect,
     settings: CrtSettings,
-    /// The settings and indexed state last uploaded.
-    uploaded: Option<(CrtSettings, bool)>,
+    source: Option<CrtSource>,
+    /// The settings, indexed state and source last uploaded.
+    uploaded: Option<(CrtSettings, bool, Option<CrtSource>)>,
 }
 
 impl CrtEffect {
@@ -225,7 +328,7 @@ impl CrtEffect {
         format: wgpu::TextureFormat,
         settings: CrtSettings,
     ) -> Self {
-        let params = settings.params(false);
+        let params = settings.params(false, None);
         let shader = ShaderEffect::build(
             device,
             format,
@@ -240,7 +343,8 @@ impl CrtEffect {
         Self {
             shader,
             settings,
-            uploaded: Some((settings, false)),
+            source: None,
+            uploaded: Some((settings, false, None)),
         }
     }
 
@@ -256,13 +360,40 @@ impl CrtEffect {
     pub fn set_settings(&mut self, settings: CrtSettings) {
         self.settings = settings;
     }
+
+    /// Show `source` instead of the canvas: its texture, filtered into its rectangle, with
+    /// scanlines on its lines. Update the rectangle with [`Self::set_source`] when the layout
+    /// changes (a resize).
+    ///
+    /// ```ignore
+    /// let screen = ctx.gfx.create_texture_rgba(640, 400, &pixels, Some("screen"));
+    /// let source = CrtSource { texture: screen, rect: [80.0, 60.0, 1280.0, 960.0], region: [0.0, 0.0, 640.0, 400.0] };
+    /// let crt = CrtEffect::new(&ctx.gfx, CrtSettings::pc_monitor()).with_source(source);
+    /// ctx.gfx.add_post_effect(PostStage::Window, crt);
+    /// ```
+    #[must_use]
+    pub fn with_source(mut self, source: CrtSource) -> Self {
+        self.set_source(Some(source));
+        self
+    }
+
+    /// Change or (`None`) drop the source; see [`Self::with_source`].
+    pub fn set_source(&mut self, source: Option<CrtSource>) {
+        self.shader.set_source(source.map(|s| s.texture));
+        self.source = source;
+    }
+
+    pub fn source(&self) -> Option<CrtSource> {
+        self.source
+    }
 }
 
 impl PostEffect for CrtEffect {
     fn apply(&mut self, pass: &mut PostPass<'_>) {
-        let state = (self.settings, pass.indices.is_some());
+        let state = (self.settings, pass.indices.is_some(), self.source);
         if self.uploaded != Some(state) {
-            self.shader.set_params(&self.settings.params(state.1));
+            self.shader
+                .set_params(&self.settings.params(state.1, self.source.as_ref()));
             self.uploaded = Some(state);
         }
         self.shader.apply(pass);
@@ -279,7 +410,7 @@ mod tests {
 
     #[test]
     fn params_match_the_wgsl_struct_size() {
-        assert_eq!(size_of::<CrtParams>(), 80);
+        assert_eq!(size_of::<CrtParams>(), 160);
     }
 
     #[test]
@@ -296,8 +427,8 @@ mod tests {
             bloom_source: BloomSource::indices([5]),
             ..CrtSettings::arcade()
         };
-        assert_eq!(s.params(false).bloom_from_indices, 0);
-        assert_eq!(s.params(true).bloom_from_indices, 1);
-        assert_eq!(s.params(true).emissive[0][0], 1 << 5);
+        assert_eq!(s.params(false, None).bloom_from_indices, 0);
+        assert_eq!(s.params(true, None).bloom_from_indices, 1);
+        assert_eq!(s.params(true, None).emissive[0][0], 1 << 5);
     }
 }

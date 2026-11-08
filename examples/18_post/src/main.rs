@@ -1,7 +1,8 @@
 //! Post-processing: a CRT filter in the window stage and a custom WGSL effect in the canvas
 //! stage, over a 320 × 180 scene.
 //!
-//! Keys: `C` toggles the CRT, `1`-`4` pick a preset (subtle, arcade, TV, PC monitor), `P`
+//! Keys: `C` toggles the CRT, `1`-`5` pick a preset (subtle, arcade, TV, PC monitor, green
+//! screen with the beam model), `P`
 //! toggles the canvas-stage posterize effect, `V` toggles the virtual resolution, `Esc` quits.
 
 use game_toolkit::prelude::*;
@@ -70,6 +71,9 @@ impl Game for App {
             (Key::Digit2, CrtSettings::arcade),
             (Key::Digit3, CrtSettings::consumer_tv),
             (Key::Digit4, CrtSettings::pc_monitor),
+            (Key::Digit5, || {
+                CrtSettings::monochrome_monitor(Color::hex(0x33ff66))
+            }),
         ]
         .into_iter()
         .find(|(k, _)| ctx.input.key_pressed(*k));
@@ -125,7 +129,7 @@ impl Game for App {
 
         p.text(
             [4.0, 4.0],
-            "C crt  1-4 preset  P posterize  V canvas",
+            "C crt  1-5 preset  P posterize  V canvas",
             10.0,
             Color::WHITE,
         );
