@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-08
+
 ### Added
 
 - `CrtEffect` learns what `game-toolkit-dosvideo`'s own CRT filter had, so that crate can drop
@@ -571,7 +573,8 @@ the `game-toolkit` umbrella; add one dependency and `use game_toolkit::prelude::
 - Top-level and per-crate `README.md`s, crates.io metadata, and `#![forbid(unsafe_code)]`
   across every crate.
 
-[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/sunsided/game-toolkit/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/sunsided/game-toolkit/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/sunsided/game-toolkit/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/sunsided/game-toolkit/compare/v0.9.0...v0.10.0
