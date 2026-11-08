@@ -108,7 +108,7 @@ pub struct CrtSettings {
     /// sets how dark its gaps get.
     pub beam: Option<CrtBeam>,
     /// A monochrome monitor: only brightness is shown, in this phosphor colour (sRGB, alpha
-    /// ignored), e.g. `Color::hex(0x33ff66)` for green, `0xffb000` for amber.
+    /// ignored), e.g. `Color::hex(0x33ff66)` for green, `Color::hex(0xffb000)` for amber.
     pub monochrome: Option<Color>,
     /// Rounded screen corners, as a fraction of the picture height; `0` for square.
     pub corner_radius: f32,
@@ -260,7 +260,9 @@ impl CrtSettings {
             _pad: 0.0,
             emissive,
             beam: self.beam.map_or([0.0; 4], |b| {
-                [b.min.max(0.05), b.max.max(0.05), b.blur.max(0.05), 1.0]
+                // max below min would make the beam narrow as it brightens.
+                let min = b.min.max(0.05);
+                [min, b.max.max(min), b.blur.max(0.05), 1.0]
             }),
             mono: self.monochrome.map_or([0.0; 4], |c| {
                 let lin = |v: f32| crate::graphics::srgb_to_linear(v) as f32;
@@ -411,6 +413,20 @@ mod tests {
     #[test]
     fn params_match_the_wgsl_struct_size() {
         assert_eq!(size_of::<CrtParams>(), 160);
+    }
+
+    #[test]
+    fn beam_max_is_clamped_to_min() {
+        let s = CrtSettings {
+            beam: Some(CrtBeam {
+                min: 0.5,
+                max: 0.2,
+                blur: 0.6,
+            }),
+            ..CrtSettings::arcade()
+        };
+        let [min, max, ..] = s.params(false, None).beam;
+        assert_eq!((min, max), (0.5, 0.5));
     }
 
     #[test]
