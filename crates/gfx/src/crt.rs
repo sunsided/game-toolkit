@@ -399,7 +399,6 @@ impl CrtEffect {
 
     /// Change or (`None`) drop the source; see [`Self::with_source`].
     pub fn set_source(&mut self, source: Option<CrtSource>) {
-        self.shader.set_source(source.map(|s| s.texture));
         self.source = source;
     }
 

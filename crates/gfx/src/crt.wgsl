@@ -22,7 +22,7 @@ struct CrtParams {
     beam: vec4<f32>,
     // Monochrome: phosphor colour (linear) in rgb, w = 1 when on.
     mono: vec4<f32>,
-    // x: corner radius, as a fraction of the picture height.
+    // x: corner radius, as a fraction of half the picture height.
     shape: vec4<f32>,
     // With a source texture: where the picture goes (x, y, w, h in pixels of the stage's
     // image) and which texels it shows (x, y, w, h).
