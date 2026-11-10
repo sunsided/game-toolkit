@@ -522,5 +522,16 @@ Licensed under the European Union Public Licence v. 1.2 (EUPL-1.2). See
 - [**Cheesed!**](https://github.com/sunsided/cheesed) ([play in the browser](https://sunsided.github.io/cheesed/)):
   a thrilling action adventure in DOS-era dress. The Mouse. The Cheese. The Destiny. Native and
   web from the same code, with procedural music from title-screen metal to a music-box minuet.
+- [**QBasic Gorillas**](https://github.com/sunsided/gorillas.rs) ([play in the browser](https://games.markusmayer.dev/gorillas/)):
+  GORILLAS.BAS of 1991, ported statement by statement onto
+  [game-toolkit-dosvideo](https://github.com/sunsided/game-toolkit-dosvideo)'s emulated VGA card
+  and PC speaker, and checked pixel for pixel against QBasic. Native and web.
+- [**SPORAGON**](https://github.com/sunsided/sporagon) ([play in the browser](https://games.markusmayer.dev/sporagon/)):
+  a Hexxagon-style mould war on a cracked egg tray in a rundown fridge, in 640x480 with 256
+  colours on game-toolkit-dosvideo's VESA SVGA card. Every colony, slime bridge and stain is
+  painted procedurally at startup. Native and web.
+- [**The Lock-Keeper's Night**](https://github.com/sunsided/lock-keeper) ([play in the browser](https://games.markusmayer.dev/lock-keeper/)):
+  a 1923 canal murder, written into a constable's notebook by candlelight. Interactive fiction
+  on [loremaster](https://github.com/sunsided/loremaster) and game-toolkit. Native and web.
 
 [synthie]: https://github.com/sunsided/synth
