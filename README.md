@@ -529,8 +529,8 @@ Licensed under the European Union Public Licence v. 1.2 (EUPL-1.2). See
 - [**SPORAGON**](https://github.com/sunsided/sporagon) ([play in the browser](https://games.markusmayer.dev/sporagon/)):
   a Hexxagon-style mould war on a cracked egg tray in a rundown fridge, in 640x480 with 256
   colours on [game-toolkit-dosvideo](https://github.com/sunsided/game-toolkit-dosvideo)'s VESA
-  SVGA card. Every colony, slime bridge and stain is
-  painted procedurally at startup. Native and web.
+  SVGA card. Every colony, slime bridge and stain is painted procedurally at startup. Native and
+  web.
 - [**The Lock-Keeper's Night**](https://github.com/sunsided/lock-keeper) ([play in the browser](https://games.markusmayer.dev/lock-keeper/)):
   a 1923 canal murder, written into a constable's notebook by candlelight. Interactive fiction
   on [loremaster](https://github.com/sunsided/loremaster) and game-toolkit. Native and web.
