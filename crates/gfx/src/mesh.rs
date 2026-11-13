@@ -43,6 +43,7 @@ impl MeshInstance {
 
 struct MeshGpu {
     vertex_buf: wgpu::Buffer,
+    vertex_count: usize,
     index_buf: wgpu::Buffer,
     index_count: u32,
 }
@@ -70,7 +71,8 @@ impl MeshRegistry {
         let vertex_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("mesh.vertices"),
             contents: bytemuck::cast_slice(vertices),
-            usage: wgpu::BufferUsages::VERTEX,
+            // COPY_DST so `update_vertices` can rewrite deforming meshes in place.
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
         let index_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("mesh.indices"),
@@ -83,11 +85,27 @@ impl MeshRegistry {
             id,
             MeshGpu {
                 vertex_buf,
+                vertex_count: vertices.len(),
                 index_buf,
                 index_count: indices.len() as u32,
             },
         );
         id
+    }
+
+    /// Overwrite the vertices of `id` in place. Topology is fixed at creation, so the count
+    /// must match; unknown ids are ignored with a warning.
+    pub fn update_vertices(&self, queue: &wgpu::Queue, id: MeshId, vertices: &[MeshVertex]) {
+        let Some(mesh) = self.map.get(&id) else {
+            log::warn!("update_mesh: unknown {id:?}");
+            return;
+        };
+        assert_eq!(
+            vertices.len(),
+            mesh.vertex_count,
+            "update_mesh: vertex count must match the count at create_mesh"
+        );
+        queue.write_buffer(&mesh.vertex_buf, 0, bytemuck::cast_slice(vertices));
     }
 }
 

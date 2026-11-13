@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `Graphics::update_mesh(mesh, vertices)` rewrites a mesh's vertices in place, for meshes that
+  deform every frame. The vertex count must match `create_mesh`.
+
 ## [0.11.3] - 2026-11-08
 
 ### Changed
