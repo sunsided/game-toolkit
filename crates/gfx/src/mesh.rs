@@ -94,17 +94,21 @@ impl MeshRegistry {
     }
 
     /// Overwrite the vertices of `id` in place. Topology is fixed at creation, so the count
-    /// must match; unknown ids are ignored with a warning.
+    /// must match; unknown ids and count mismatches are logged and skipped, like
+    /// [`crate::Graphics::update_texture_rgba`].
     pub fn update_vertices(&self, queue: &wgpu::Queue, id: MeshId, vertices: &[MeshVertex]) {
         let Some(mesh) = self.map.get(&id) else {
             log::warn!("update_mesh: unknown {id:?}");
             return;
         };
-        assert_eq!(
-            vertices.len(),
-            mesh.vertex_count,
-            "update_mesh: vertex count must match the count at create_mesh"
-        );
+        if vertices.len() != mesh.vertex_count {
+            log::warn!(
+                "update_mesh: {id:?} has {} vertices, got {}; skipped",
+                mesh.vertex_count,
+                vertices.len()
+            );
+            return;
+        }
         queue.write_buffer(&mesh.vertex_buf, 0, bytemuck::cast_slice(vertices));
     }
 }

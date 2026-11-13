@@ -9,7 +9,8 @@ All notable changes to this project are documented here. The format is based on
 ### Added
 
 - `Graphics::update_mesh(mesh, vertices)` rewrites a mesh's vertices in place, for meshes that
-  deform every frame. The vertex count must match `create_mesh`.
+  deform every frame. The vertex count must match `create_mesh`; unknown ids and mismatches are
+  logged and skipped, as with `update_texture_rgba`.
 
 ## [0.11.3] - 2026-11-08
 
