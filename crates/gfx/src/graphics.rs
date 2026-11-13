@@ -866,6 +866,14 @@ impl Graphics {
         self.meshes.create(&self.device, vertices, indices)
     }
 
+    /// Replace the vertices of a mesh made by [`Graphics::create_mesh`], for meshes that deform
+    /// every frame (skinning, blend shapes). The indices stay as created, so `vertices` must
+    /// hold as many vertices as were passed to `create_mesh`. Unknown ids and count mismatches
+    /// are logged and ignored.
+    pub fn update_mesh(&mut self, mesh: MeshId, vertices: &[MeshVertex]) {
+        self.meshes.update_vertices(&self.queue, mesh, vertices);
+    }
+
     /// Queue one instance of `mesh` for this frame. Meshes render before the 2D layers, so
     /// 2D sprites, primitives and text draw on top of them.
     pub fn draw_mesh(&mut self, mesh: MeshId, instance: MeshInstance) {
