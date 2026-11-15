@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-11-15
+
 ### Added
 
 - `Graphics::update_mesh(mesh, vertices)` rewrites a mesh's vertices in place, for meshes that
@@ -587,7 +589,8 @@ the `game-toolkit` umbrella; add one dependency and `use game_toolkit::prelude::
 - Top-level and per-crate `README.md`s, crates.io metadata, and `#![forbid(unsafe_code)]`
   across every crate.
 
-[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.11.3...HEAD
+[Unreleased]: https://github.com/sunsided/game-toolkit/compare/v0.11.4...HEAD
+[0.11.4]: https://github.com/sunsided/game-toolkit/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/sunsided/game-toolkit/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/sunsided/game-toolkit/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/sunsided/game-toolkit/compare/v0.11.0...v0.11.1
