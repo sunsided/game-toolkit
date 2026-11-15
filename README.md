@@ -173,6 +173,7 @@ Built on game-toolkit, published separately:
 |-------|-------------------|
 | [`game-toolkit-platformer`](https://github.com/sunsided/game-toolkit-platformer) | A pluggable platforming controller: snappy movement (jump buffer, coyote time, wall jumps, dashes, climbing) with feel presets, control schemes for game-toolkit input, and an animation state graph that follows it. `Platformer::on(&level, preset)`, `update(&input, &mut level, dt)`, draw `sprite()` at `position()`. |
 | [`game-toolkit-dosvideo`](https://github.com/sunsided/game-toolkit-dosvideo) | DOS-era PC video, emulated at the register level with a beam-accurate CRT: VGA (mode 13h, Mode X, 16-color planar, text), EGA, CGA (composite artifact colors, snow), Hercules, Tandy 1000 and VESA SVGA, plus the PC speaker. Program it through I/O ports and memory pokes or higher-level helpers; implement `DosGame` and `run` it with a `DosConfig`. |
+| [`game-toolkit-dosaudio`](https://github.com/sunsided/game-toolkit-dosaudio) | DOS-era PC sound devices for any Rust game: PC speaker, Sound Blaster (SB1 to SB16 with DMA), AdLib OPL2/OPL3, Tandy PSG and MPU-401 MIDI on one shared hardware clock. Plays IMF, DRO, VGM and Standard MIDI files, and renders offline to WAV without an audio device. |
 
 ## Examples
 
