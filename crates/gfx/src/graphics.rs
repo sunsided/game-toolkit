@@ -1347,6 +1347,9 @@ fn render_format(config: &wgpu::SurfaceConfiguration) -> wgpu::TextureFormat {
 /// `render_format`) and the non-sRGB twin overlays draw through (see `overlay_format`),
 /// leaving out the surface's own format. `can_view` is `DownlevelFlags::SURFACE_VIEW_FORMATS`;
 /// without it an sRGB surface gets no view formats (configuring it with one would fail).
+/// A non-sRGB surface always gets its sRGB twin, as before overlays existed: every painter
+/// shader writes linear colour and relies on it. Surfaces that offer no sRGB format are
+/// WebGPU canvases, where an sRGB view format is always allowed.
 fn surface_view_formats(
     surface_format: wgpu::TextureFormat,
     can_view: bool,

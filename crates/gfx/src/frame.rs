@@ -69,6 +69,9 @@ impl Frame {
     /// [`Graphics::overlay_format`] (non-sRGB): what the pass writes is stored as is, not
     /// sRGB-encoded. For overlays that output gamma-space colours (egui), which the sRGB view
     /// would encode a second time.
+    ///
+    /// Record overlays after [`Graphics::flush_pending`]: with a canvas, scaling it onto the
+    /// window clears this view, so anything drawn into it before the flush is lost.
     pub fn overlay_view_and_encoder(&mut self) -> (&wgpu::TextureView, &mut wgpu::CommandEncoder) {
         (
             &self.overlay_view,
