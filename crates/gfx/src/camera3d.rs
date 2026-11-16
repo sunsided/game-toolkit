@@ -16,13 +16,16 @@ pub trait Camera {
 pub struct Camera3D {
     pub eye: [f32; 3],
     pub target: [f32; 3],
+    /// Which world direction points up on screen. Must not be parallel to the view direction
+    /// (`target - eye`), or the view collapses: looking straight down or up the default
+    /// `[0, 1, 0]`, set it to e.g. `[0.0, 0.0, -1.0]`.
     pub up: [f32; 3],
     /// Vertical field of view, in radians. Unused while [`Self::ortho_height`] is set.
     pub fov_y: f32,
     /// `Some(h)` switches to an orthographic projection showing `h` world units vertically
     /// (and `h * aspect` horizontally), centred on the view axis: no foreshortening, for
-    /// isometric and top-down views. Smaller is more zoomed in. `None` (the default) is
-    /// perspective.
+    /// isometric and top-down views (straight down needs another [`Self::up`]). Smaller is
+    /// more zoomed in; clamped to a small positive minimum. `None` (the default) is perspective.
     pub ortho_height: Option<f32>,
     pub aspect: f32,
     pub near: f32,
@@ -54,7 +57,7 @@ impl Camera for Camera3D {
     fn view_proj(&self) -> Mat4 {
         let proj = match self.ortho_height {
             Some(h) => {
-                let hh = h * 0.5;
+                let hh = h.max(1e-4) * 0.5;
                 let hw = hh * self.aspect;
                 ortho(-hw, hw, -hh, hh, self.near, self.far)
             }
@@ -139,5 +142,25 @@ mod tests {
         // Perspective shrinks the same point with distance.
         cam.ortho_height = None;
         assert!(ndc(&cam, [4.0, 2.0, -95.0])[0] < ndc(&cam, [4.0, 2.0, 4.9])[0]);
+    }
+
+    #[test]
+    fn ortho_height_is_clamped_to_a_finite_projection() {
+        let mut cam = Camera3D::new(2.0);
+        for h in [0.0, -3.0, f32::NAN] {
+            cam.ortho_height = Some(h);
+            assert!(cam.view_proj().iter().flatten().all(|v| v.is_finite()));
+        }
+    }
+
+    #[test]
+    fn top_down_view_needs_a_perpendicular_up() {
+        let mut cam = Camera3D::new(1.0);
+        cam.eye = [0.0, 10.0, 0.0];
+        cam.ortho_height = Some(4.0);
+        cam.up = [0.0, 0.0, -1.0];
+        // World -z is up on screen, +x is right.
+        let [x, y, _] = ndc(&cam, [2.0, 0.0, -2.0]);
+        assert!(close([x, y, 0.0], [1.0, 1.0, 0.0]));
     }
 }

@@ -325,7 +325,7 @@ the 2D layers, which composite on top (HUD, menus, text). It needs a depth buffe
 ```rust
 let cube = ctx.gfx.create_mesh(&vertices, &indices); // [MeshVertex] + [u16]
 ctx.gfx.camera3d.eye = [0.0, 1.6, 6.0];              // perspective Camera3D
-ctx.gfx.camera3d.ortho_height = Some(6.0);           // or orthographic: 6 world units tall
+// ctx.gfx.camera3d.ortho_height = Some(6.0);        // orthographic instead: 6 world units tall
 
 // each frame, via the painter:
 let model = transform::mul(&transform::translation([x, 0.0, 0.0]), &transform::rotation_y(t));

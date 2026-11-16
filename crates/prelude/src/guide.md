@@ -349,7 +349,7 @@ let (w, h) = ctx.gfx.size();
 let tex = ctx.load_texture("player.png")?;            // -> TextureId (relative to asset_root)
 let mesh = ctx.gfx.create_mesh(&vertices, &indices);  // &[MeshVertex], &[u16] -> MeshId
 ctx.gfx.camera3d.eye = [2.5, 2.0, 3.5];               // perspective Camera3D (3D path)
-ctx.gfx.camera3d.ortho_height = Some(6.0);            // orthographic instead: 6 world units tall
+// ctx.gfx.camera3d.ortho_height = Some(6.0);         // orthographic instead: 6 world units tall
 ctx.gfx.request_screenshot("shot.png");               // saves the next presented frame (native only)
 let rt = ctx.gfx.register_texture(texture, view, Some("rt")); // your own wgpu::Texture + view -> TextureId
 // ctx.gfx.camera is the 2D Camera2D.
