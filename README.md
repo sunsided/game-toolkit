@@ -187,7 +187,7 @@ Run any example with `cargo run -p <package>`.
 | `04_text` | `ex_04_text` | Text rendering through glyphon. |
 | `05_tilemap` | `ex_05_tilemap` | Instanced atlas tilemap. |
 | `06_egui` | `ex_06_egui` | egui debug overlay (uses the `ui` feature). |
-| `07_3d` | `ex_07_3d` | Depth-tested perspective cubes (instanced meshes) with a 2D HUD on top. |
+| `07_3d` | `ex_07_3d` | Depth-tested cubes (instanced meshes) with a 2D HUD on top; O toggles an orthographic camera. |
 | `07_audio` | `ex_07_audio` | Play a WAV (Space), synthesized retro effects (1/2/3), a jingle (5), a looping synth song (M, C for a live crash) and a generated tone stream (4); runs muted with no device. |
 | `08_hot_reload` | `ex_08_hot_reload` | Edit `assets/reload_me.png` while it runs and watch the texture update live. |
 | `09_aseprite` | `ex_09_aseprite` | Load a native `.aseprite`, pack its frames into an atlas, and play a tagged animation. |
@@ -318,13 +318,14 @@ from the surface with [miniscreenshot-wgpu](https://github.com/sunsided/miniscre
 
 ## 3D
 
-Static meshes are drawn instanced and depth-tested through a perspective `Camera3D`, under
+Static meshes are drawn instanced and depth-tested through a `Camera3D`, under
 the 2D layers, which composite on top (HUD, menus, text). It needs a depth buffer
 (`AppConfig::depth_format`); `templates/jam-3d` starts from a spinning cube with a 2D HUD.
 
 ```rust
 let cube = ctx.gfx.create_mesh(&vertices, &indices); // [MeshVertex] + [u16]
 ctx.gfx.camera3d.eye = [0.0, 1.6, 6.0];              // perspective Camera3D
+ctx.gfx.camera3d.ortho_height = Some(6.0);           // or orthographic: 6 world units tall
 
 // each frame, via the painter:
 let model = transform::mul(&transform::translation([x, 0.0, 0.0]), &transform::rotation_y(t));

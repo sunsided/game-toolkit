@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- `Camera3D::ortho_height`: `Some(h)` switches the 3D camera to an orthographic projection
+  showing `h` world units vertically, for isometric and top-down views. `None` (the default)
+  keeps the perspective projection. Code that builds a `Camera3D` with a struct literal needs
+  the new field; `Camera3D::new` and `gfx.camera3d` are unaffected.
 - `Graphics::overlay_format()` and `Frame::overlay_view_and_encoder()`: the window through a
   non-sRGB view, for overlay passes that output gamma-space colours.
 
