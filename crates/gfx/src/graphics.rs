@@ -214,11 +214,13 @@ impl Graphics {
             present_mode,
             desired_maximum_frame_latency: 2,
             alpha_mode: caps.alpha_modes[0],
-            view_formats: if format == surface_format {
-                vec![]
-            } else {
-                vec![format]
-            },
+            view_formats: surface_view_formats(
+                surface_format,
+                adapter
+                    .get_downlevel_capabilities()
+                    .flags
+                    .contains(wgpu::DownlevelFlags::SURFACE_VIEW_FORMATS),
+            ),
             color_space: wgpu::SurfaceColorSpace::Auto,
         };
         surface.configure(&device, &surface_config);
@@ -676,6 +678,14 @@ impl Graphics {
         render_format(&self.surface_config)
     }
 
+    /// The format of [`Frame::overlay_view_and_encoder`]'s view: the window's non-sRGB format,
+    /// so what a pass writes is stored as is. Build pipelines for overlays that output
+    /// gamma-space colours (egui) with this. Falls back to [`Self::surface_format`] where the
+    /// backend cannot view an sRGB surface as non-sRGB (GL).
+    pub fn overlay_format(&self) -> wgpu::TextureFormat {
+        overlay_format(&self.surface_config)
+    }
+
     /// Multisample state matching the painter's render target (`AppConfig::msaa_samples`),
     /// for pipelines that draw in a [`Painter::custom`](crate::Painter::custom) pass.
     pub fn multisample(&self) -> wgpu::MultisampleState {
@@ -923,6 +933,12 @@ impl Graphics {
                 format: Some(render_format(&self.surface_config)),
                 ..Default::default()
             });
+        let overlay_view = surface_texture
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor {
+                format: Some(overlay_format(&self.surface_config)),
+                ..Default::default()
+            });
         let encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -932,6 +948,7 @@ impl Graphics {
         Ok(Frame {
             encoder: Some(encoder),
             view,
+            overlay_view,
             surface_texture: Some(surface_texture),
             canvas: self.canvas.as_ref().map(|c| c.tex.view.clone()),
             canvas_size: self.canvas.as_ref().map_or([0, 0], Canvas::size),
@@ -1326,6 +1343,39 @@ fn render_format(config: &wgpu::SurfaceConfiguration) -> wgpu::TextureFormat {
         .unwrap_or(config.format)
 }
 
+/// The surface's view formats: the sRGB twin frames are rendered through (see
+/// `render_format`) and the non-sRGB twin overlays draw through (see `overlay_format`),
+/// leaving out the surface's own format. `can_view` is `DownlevelFlags::SURFACE_VIEW_FORMATS`;
+/// without it an sRGB surface gets no view formats (configuring it with one would fail).
+/// A non-sRGB surface always gets its sRGB twin, as before overlays existed: every painter
+/// shader writes linear colour and relies on it. Surfaces that offer no sRGB format are
+/// WebGPU canvases, where an sRGB view format is always allowed.
+fn surface_view_formats(
+    surface_format: wgpu::TextureFormat,
+    can_view: bool,
+) -> Vec<wgpu::TextureFormat> {
+    let srgb = surface_format.add_srgb_suffix();
+    let linear = surface_format.remove_srgb_suffix();
+    if srgb != surface_format {
+        vec![srgb]
+    } else if linear != surface_format && can_view {
+        vec![linear]
+    } else {
+        vec![]
+    }
+}
+
+/// The non-sRGB format overlays draw through: the surface's own if it is non-sRGB, else the
+/// non-sRGB view format `Graphics::new` added, else the render format.
+fn overlay_format(config: &wgpu::SurfaceConfiguration) -> wgpu::TextureFormat {
+    let linear = config.format.remove_srgb_suffix();
+    if linear == config.format || config.view_formats.contains(&linear) {
+        linear
+    } else {
+        render_format(config)
+    }
+}
+
 /// Decode one sRGB color component to linear, as the shaders do for painter colors.
 pub(crate) fn srgb_to_linear(c: f32) -> f64 {
     let c = f64::from(c);
@@ -1333,5 +1383,39 @@ pub(crate) fn srgb_to_linear(c: f32) -> f64 {
         c / 12.92
     } else {
         ((c + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wgpu::TextureFormat::{Bgra8Unorm, Bgra8UnormSrgb};
+
+    fn config(format: wgpu::TextureFormat, can_view: bool) -> wgpu::SurfaceConfiguration {
+        wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format,
+            width: 1,
+            height: 1,
+            present_mode: wgpu::PresentMode::AutoVsync,
+            desired_maximum_frame_latency: 2,
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            view_formats: surface_view_formats(format, can_view),
+            color_space: wgpu::SurfaceColorSpace::Auto,
+        }
+    }
+
+    #[test]
+    fn frames_render_srgb_and_overlays_non_srgb() {
+        // (surface format, backend can view it in the other format) -> (render, overlay)
+        for (format, can_view, overlay) in [
+            (Bgra8UnormSrgb, true, Bgra8Unorm),
+            (Bgra8UnormSrgb, false, Bgra8UnormSrgb),
+            (Bgra8Unorm, true, Bgra8Unorm),
+        ] {
+            let config = config(format, can_view);
+            assert_eq!(render_format(&config), Bgra8UnormSrgb);
+            assert_eq!(overlay_format(&config), overlay);
+        }
     }
 }
