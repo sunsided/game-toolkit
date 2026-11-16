@@ -871,7 +871,7 @@ impl Graphics {
     }
 
     /// Upload a static mesh (positions + normals, indexed) and return its handle. Meshes are
-    /// drawn depth-tested via [`Graphics::draw_mesh`] using the perspective [`Self::camera3d`].
+    /// drawn depth-tested via [`Graphics::draw_mesh`] using [`Self::camera3d`].
     pub fn create_mesh(&mut self, vertices: &[MeshVertex], indices: &[u16]) -> MeshId {
         self.meshes.create(&self.device, vertices, indices)
     }

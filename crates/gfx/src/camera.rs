@@ -63,7 +63,7 @@ impl Camera2D {
     }
 }
 
-fn ortho(l: f32, r: f32, b: f32, t: f32, n: f32, f: f32) -> [[f32; 4]; 4] {
+pub(crate) fn ortho(l: f32, r: f32, b: f32, t: f32, n: f32, f: f32) -> [[f32; 4]; 4] {
     let rml = r - l;
     let tmb = t - b;
     let fmn = f - n;

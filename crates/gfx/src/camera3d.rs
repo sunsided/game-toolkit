@@ -1,6 +1,7 @@
-//! Perspective 3D camera producing a column-major `view_proj` for the same camera uniform
+//! 3D camera (perspective or orthographic) producing a column-major `view_proj` for the same camera uniform
 //! the 2D path uses. Right-handed, looking down -Z, with wgpu's `[0, 1]` depth range.
 
+use crate::camera::ortho;
 use crate::transform::{Mat4, mul};
 
 /// A camera with a `view_proj` matrix, implemented by both [`crate::Camera2D`] and
@@ -9,14 +10,26 @@ pub trait Camera {
     fn view_proj(&self) -> Mat4;
 }
 
-/// Perspective camera. Set [`Camera3D::eye`]/[`Camera3D::target`] to move it.
+/// 3D camera: perspective by default, orthographic when [`Camera3D::ortho_height`] is set.
+/// Set [`Camera3D::eye`]/[`Camera3D::target`] to move it.
 #[derive(Copy, Clone, Debug)]
 pub struct Camera3D {
     pub eye: [f32; 3],
+    /// The point the camera looks at. Must differ from [`Self::eye`], or the view collapses
+    /// (watch for a follow camera that lerps `eye` all the way onto `target`).
     pub target: [f32; 3],
+    /// Which world direction points up on screen. Must not be parallel to the view direction
+    /// (`target - eye`), or the view collapses: looking straight down or up the default
+    /// `[0, 1, 0]`, set it to e.g. `[0.0, 0.0, -1.0]`.
     pub up: [f32; 3],
-    /// Vertical field of view, in radians.
+    /// Vertical field of view, in radians. Unused while [`Self::ortho_height`] is set.
     pub fov_y: f32,
+    /// `Some(h)` switches to an orthographic projection showing `h` world units vertically
+    /// (and `h * aspect` horizontally), centred on the view axis: no foreshortening, for
+    /// isometric and top-down views (straight down needs another [`Self::up`]). Smaller is
+    /// more zoomed in; zero, negative and non-finite heights fall back to a small positive
+    /// minimum. `None` (the default) is perspective.
+    pub ortho_height: Option<f32>,
     pub aspect: f32,
     pub near: f32,
     pub far: f32,
@@ -29,6 +42,7 @@ impl Camera3D {
             target: [0.0, 0.0, 0.0],
             up: [0.0, 1.0, 0.0],
             fov_y: 60.0_f32.to_radians(),
+            ortho_height: None,
             aspect,
             near: 0.1,
             far: 100.0,
@@ -44,10 +58,16 @@ impl Camera3D {
 
 impl Camera for Camera3D {
     fn view_proj(&self) -> Mat4 {
-        mul(
-            &perspective(self.fov_y, self.aspect, self.near, self.far),
-            &look_at(self.eye, self.target, self.up),
-        )
+        let proj = match self.ortho_height {
+            Some(h) => {
+                let h = if h.is_finite() { h.max(1e-4) } else { 1e-4 };
+                let hh = h * 0.5;
+                let hw = hh * self.aspect;
+                ortho(-hw, hw, -hh, hh, self.near, self.far)
+            }
+            None => perspective(self.fov_y, self.aspect, self.near, self.far),
+        };
+        mul(&proj, &look_at(self.eye, self.target, self.up))
     }
 }
 
@@ -97,4 +117,54 @@ fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
 fn normalize(v: [f32; 3]) -> [f32; 3] {
     let len = dot(v, v).sqrt().max(1e-6);
     [v[0] / len, v[1] / len, v[2] / len]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Project a world-space point to normalized device coordinates.
+    fn ndc(cam: &Camera3D, p: [f32; 3]) -> [f32; 3] {
+        let m = cam.view_proj();
+        let row = |i: usize| m[0][i] * p[0] + m[1][i] * p[1] + m[2][i] * p[2] + m[3][i];
+        let w = row(3);
+        [row(0) / w, row(1) / w, row(2) / w]
+    }
+
+    fn close(a: [f32; 3], b: [f32; 3]) -> bool {
+        a.iter().zip(b).all(|(a, b)| (a - b).abs() < 1e-5)
+    }
+
+    #[test]
+    fn ortho_has_no_foreshortening_and_fills_the_height() {
+        // Default camera sits at z = 5 looking down -z; near 0.1, far 100.
+        let mut cam = Camera3D::new(2.0);
+        cam.ortho_height = Some(4.0);
+        // The top-right corner of the 8x4 view volume, on the near and the far plane.
+        assert!(close(ndc(&cam, [4.0, 2.0, 4.9]), [1.0, 1.0, 0.0]));
+        assert!(close(ndc(&cam, [4.0, 2.0, -95.0]), [1.0, 1.0, 1.0]));
+        // Perspective shrinks the same point with distance.
+        cam.ortho_height = None;
+        assert!(ndc(&cam, [4.0, 2.0, -95.0])[0] < ndc(&cam, [4.0, 2.0, 4.9])[0]);
+    }
+
+    #[test]
+    fn ortho_height_is_clamped_to_a_finite_projection() {
+        let mut cam = Camera3D::new(2.0);
+        for h in [0.0, -3.0, f32::NAN, f32::INFINITY] {
+            cam.ortho_height = Some(h);
+            assert!(cam.view_proj().iter().flatten().all(|v| v.is_finite()));
+        }
+    }
+
+    #[test]
+    fn top_down_view_needs_a_perpendicular_up() {
+        let mut cam = Camera3D::new(1.0);
+        cam.eye = [0.0, 10.0, 0.0];
+        cam.ortho_height = Some(4.0);
+        cam.up = [0.0, 0.0, -1.0];
+        // World -z is up on screen, +x is right.
+        let [x, y, _] = ndc(&cam, [2.0, 0.0, -2.0]);
+        assert!(close([x, y, 0.0], [1.0, 1.0, 0.0]));
+    }
 }

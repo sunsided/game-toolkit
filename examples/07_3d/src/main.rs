@@ -1,4 +1,5 @@
-//! Three depth-tested cubes spinning under a perspective camera, with a 2D HUD on top.
+//! Three depth-tested cubes spinning under a perspective camera, with a 2D HUD on top. O
+//! switches the camera between perspective and orthographic.
 //!
 //! Shows the 3D path: upload a mesh once with `create_mesh`, then `painter.mesh(id, model,
 //! color)` per instance. The mesh pass is depth-tested against `gfx.camera3d`; the 2D text
@@ -66,6 +67,11 @@ impl Game for Cubes {
         if ctx.input.key_pressed(Key::Escape) {
             ctx.quit();
         }
+        if ctx.input.key_pressed(Key::KeyO) {
+            let cam = &mut ctx.gfx.camera3d;
+            // 6 world units tall frames the row of cubes about as the perspective view does.
+            cam.ortho_height = cam.ortho_height.xor(Some(6.0));
+        }
     }
 
     fn render(&mut self, ctx: &mut Context, frame: &mut Frame) {
@@ -90,7 +96,7 @@ impl Game for Cubes {
 
         p.text(
             [16.0, 16.0],
-            "07_3d: depth-tested cubes, 2D HUD on top (Esc to quit)",
+            "07_3d: depth-tested cubes, 2D HUD on top (O: ortho, Esc to quit)",
             22.0,
             [0.9, 0.9, 0.95, 1.0],
         );
