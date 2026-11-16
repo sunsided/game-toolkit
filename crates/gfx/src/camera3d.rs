@@ -15,6 +15,8 @@ pub trait Camera {
 #[derive(Copy, Clone, Debug)]
 pub struct Camera3D {
     pub eye: [f32; 3],
+    /// The point the camera looks at. Must differ from [`Self::eye`], or the view collapses
+    /// (watch for a follow camera that lerps `eye` all the way onto `target`).
     pub target: [f32; 3],
     /// Which world direction points up on screen. Must not be parallel to the view direction
     /// (`target - eye`), or the view collapses: looking straight down or up the default
@@ -25,7 +27,8 @@ pub struct Camera3D {
     /// `Some(h)` switches to an orthographic projection showing `h` world units vertically
     /// (and `h * aspect` horizontally), centred on the view axis: no foreshortening, for
     /// isometric and top-down views (straight down needs another [`Self::up`]). Smaller is
-    /// more zoomed in; clamped to a small positive minimum. `None` (the default) is perspective.
+    /// more zoomed in; zero, negative and non-finite heights fall back to a small positive
+    /// minimum. `None` (the default) is perspective.
     pub ortho_height: Option<f32>,
     pub aspect: f32,
     pub near: f32,
@@ -57,7 +60,8 @@ impl Camera for Camera3D {
     fn view_proj(&self) -> Mat4 {
         let proj = match self.ortho_height {
             Some(h) => {
-                let hh = h.max(1e-4) * 0.5;
+                let h = if h.is_finite() { h.max(1e-4) } else { 1e-4 };
+                let hh = h * 0.5;
                 let hw = hh * self.aspect;
                 ortho(-hw, hw, -hh, hh, self.near, self.far)
             }
@@ -147,7 +151,7 @@ mod tests {
     #[test]
     fn ortho_height_is_clamped_to_a_finite_projection() {
         let mut cam = Camera3D::new(2.0);
-        for h in [0.0, -3.0, f32::NAN] {
+        for h in [0.0, -3.0, f32::NAN, f32::INFINITY] {
             cam.ortho_height = Some(h);
             assert!(cam.view_proj().iter().flatten().all(|v| v.is_finite()));
         }
