@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `Graphics::overlay_format()` and `Frame::overlay_view_and_encoder()`: the window through a
+  non-sRGB view, for overlay passes that output gamma-space colours.
+
+### Fixed
+
+- `Ui` (egui) rendered into the sRGB view of the window, so its colours were sRGB-encoded twice:
+  panels came out washed out, alpha blending was off, and egui-wgpu warned about a linear
+  framebuffer at startup. It now draws through the non-sRGB view (#106).
+
 ## [0.11.4] - 2026-11-15
 
 ### Added

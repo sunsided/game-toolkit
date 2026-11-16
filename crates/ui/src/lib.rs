@@ -33,7 +33,8 @@ impl Ui {
         let state = State::new(ctx.clone(), viewport_id, window.as_ref(), scale, None, None);
         let renderer = Renderer::new(
             gfx.device(),
-            gfx.surface_format(),
+            // egui outputs gamma-space colours; an sRGB target would encode them twice.
+            gfx.overlay_format(),
             RendererOptions::default(),
         );
         Ok(Self {
@@ -90,7 +91,7 @@ impl Ui {
             }
         }
 
-        let (view, encoder) = frame.view_and_encoder();
+        let (view, encoder) = frame.overlay_view_and_encoder();
         let extra_cmds =
             self.renderer
                 .update_buffers(gfx.device(), gfx.queue(), encoder, &clipped, &screen);

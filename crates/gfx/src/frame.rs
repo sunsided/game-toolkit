@@ -4,6 +4,8 @@ use crate::painter::Painter;
 pub struct Frame {
     pub(crate) encoder: Option<wgpu::CommandEncoder>,
     pub(crate) view: wgpu::TextureView,
+    /// The window's view in [`Graphics::overlay_format`].
+    pub(crate) overlay_view: wgpu::TextureView,
     pub(crate) surface_texture: Option<wgpu::SurfaceTexture>,
     /// The virtual-resolution canvas the painter draws into, if any.
     pub(crate) canvas: Option<wgpu::TextureView>,
@@ -60,6 +62,19 @@ impl Frame {
             self.encoder
                 .as_mut()
                 .expect("frame encoder taken/dropped before view_and_encoder"),
+        )
+    }
+
+    /// Like [`Self::view_and_encoder`], but the window's view is in
+    /// [`Graphics::overlay_format`] (non-sRGB): what the pass writes is stored as is, not
+    /// sRGB-encoded. For overlays that output gamma-space colours (egui), which the sRGB view
+    /// would encode a second time.
+    pub fn overlay_view_and_encoder(&mut self) -> (&wgpu::TextureView, &mut wgpu::CommandEncoder) {
+        (
+            &self.overlay_view,
+            self.encoder
+                .as_mut()
+                .expect("frame encoder taken/dropped before overlay_view_and_encoder"),
         )
     }
 }
